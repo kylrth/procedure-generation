@@ -26,3 +26,7 @@ We will evaluate the generated recipes using the following metrics. Those marked
 ```sh
 pip install -r requirements.txt
 ```
+
+### tests
+
+If you're doing development, also install `pytest`.
