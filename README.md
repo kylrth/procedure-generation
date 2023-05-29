@@ -14,6 +14,9 @@ Our current task is recipe generation, based on the RecipeNLG dataset. We will l
 We will evaluate the generated recipes using the following metrics. Those marked as "model-based" will use an LLM for evaluation:
 
 - **ROUGE**: summarization score using the recipes in the dataset
+- **BLEU**: translation-inspired score using the recipes in the dataset
+- **cosine similarity**: calculated on TF-IDF representation to measure text similarity between generated and gold recipe
+- **linguistic correctness**: number of spelling and grammar mistakes detected with LanguageCheck
 - **coherence** (model-based): Is the recipe clear and readable according to an LLM?
 - **ingredient comparison**: how well the ingredients match with the gold recipe
 - **ingredient relevance** (model-based): Does the list of ingredients align with the culinary expectations of the recipe (e.g. no-bake, gluten free, etc.)?
