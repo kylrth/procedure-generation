@@ -20,7 +20,10 @@ testset = Dataset.from_list(
                 "3 1/2 c. bite size shredded rice biscuits",
             ],
             "directions": [
-                "In a heavy 2-quart saucepan, mix brown sugar, nuts, evaporated milk and butter or margarine.",
+                (
+                    "In a heavy 2-quart saucepan, mix brown sugar, nuts, evaporated milk and "
+                    "butter or margarine."
+                ),
                 "Stir over medium heat until mixture bubbles all over top.",
                 "Boil and stir 5 minutes more. Take off heat.",
                 "Stir in vanilla and cereal; mix well.",
@@ -50,7 +53,10 @@ testset = Dataset.from_list(
             "directions": [
                 "Place chipped beef on bottom of baking dish.",
                 "Place chicken on top of beef.",
-                "Mix soup and cream together; pour over chicken. Bake, uncovered, at 275° for 3 hours.",
+                (
+                    "Mix soup and cream together; pour over chicken. Bake, uncovered, at 275° for "
+                    "3 hours."
+                ),
             ],
             "link": "www.cookbooks.com/Recipe-Details.aspx?id=699419",
             "source": 0,
@@ -68,7 +74,11 @@ testset = Dataset.from_list(
                 "1/4 tsp. pepper",
             ],
             "directions": [
-                "In a slow cooker, combine all ingredients. Cover and cook on low for 4 hours or until heated through and cheese is melted. Stir well before serving. Yields 6 servings."
+                (
+                    "In a slow cooker, combine all ingredients. Cover and cook on low for 4 hours "
+                    "or until heated through and cheese is melted. Stir well before serving. "
+                    "Yields 6 servings."
+                )
             ],
             "link": "www.cookbooks.com/Recipe-Details.aspx?id=10570",
             "source": 0,

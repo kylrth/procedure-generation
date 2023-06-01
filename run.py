@@ -13,6 +13,9 @@ def evaluate(model: SystemInterface, data: Dataset):
         res = model.generate(title)
 
         # TODO evaluate
+        _ = ingredients
+        _ = directions
+        _ = res
 
 
 def main(model: str, data_dir: str = "./data"):
