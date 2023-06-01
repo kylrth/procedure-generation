@@ -2,13 +2,12 @@
 specific LMs."""
 
 
-from .few_shot import FewShot, format_recipe
+from .few_shot import FewShot
 from .interface import SystemInterface
 from .model import Model
 from .zero_shot import ZeroShot
 
 __all__ = [
-    "format_recipe",
     "SystemInterface",
     "Model",
     # systems

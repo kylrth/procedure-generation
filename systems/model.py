@@ -49,7 +49,7 @@ class Model:
 
         raise NotImplementedError(f"service '{service}' not added yet")
 
-    def __call__(
+    async def __call__(
         self,
         prompt: str,
         context: Optional[str] = None,
@@ -89,12 +89,12 @@ class Model:
             Human: {prompt}
         """
         prompt = self.build_prompt(prompt, context, examples)
-        return self.generate(prompt)
+        return await self.generate(prompt)
 
-    def generate(self, final_prompt: Union[str, List[BaseMessage]]) -> List[str]:
+    async def generate(self, final_prompt: Union[str, List[BaseMessage]]) -> List[str]:
         """Calls the model on the already-constructed prompt. Can be used in conjunction with
         build_prompt to re-use constructed prompts."""
-        out = self.model.generate([final_prompt])
+        out = await self.model.agenerate([final_prompt])
 
         # In the future we may surface other information from the results, but for now we just need
         # the strings.
