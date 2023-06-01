@@ -6,6 +6,7 @@ from langchain.prompts.example_selector import SemanticSimilarityExampleSelector
 from langchain.vectorstores import FAISS
 import numpy as np
 
+import recipenlg
 import systems
 
 from .mock_model import MockModel
@@ -93,6 +94,7 @@ example_data = [
 few_shot_formatted = """
 ===BEGIN EXAMPLE===
 Corn Casserole
+Ingredients:
 - 1 small onion, chopped very fine
 - 1 can corn or 6 ears fresh corn cut off the cob
 - 2 level Tbsp. melted butter
@@ -101,7 +103,7 @@ Corn Casserole
 - 2 eggs
 - 1 tsp. salt
 - 1 1/2 c. milk
-
+Instructions:
 1. Heat milk, add butter and salt.
 2. Cool slightly and add the corn meal and baking powder which have been sifted together, then the \
 beaten eggs and chopped onion.
@@ -115,11 +117,12 @@ slightly.
 
 ===BEGIN EXAMPLE===
 Orange Crinkles Cookies
+Ingredients:
 - 1 box orange Duncan Hines cake mix
 - 1/2 c. oil
 - 2 eggs
 - 1/2 c. finely chopped nuts
-
+Instructions:
 1. Note:
 2. Different flavors cake mix can be used.
 ===END EXAMPLE===
@@ -133,7 +136,7 @@ class TestFewShot(unittest.TestCase):
         data = [
             {
                 "title": example["title"],
-                "recipe": systems.format_recipe(example["ingredients"], example["directions"]),
+                "recipe": recipenlg.format_recipe(example["ingredients"], example["directions"]),
             }
             for example in example_data
         ]

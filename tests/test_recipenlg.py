@@ -133,5 +133,14 @@ class TestPreprocess(unittest.TestCase):
         self.assertEqual(testset[3], got[3])
 
 
+class TestRecipeFormat(unittest.TestCase):
+    def test_reversible(self):
+        s = recipenlg.format_recipe(id2_formatted["ingredients"], id2_formatted["directions"])
+        got_i, got_d = recipenlg.parse_recipe(s)
+
+        self.assertEqual(id2_formatted["ingredients"], got_i)
+        self.assertEqual(id2_formatted["directions"], got_d)
+
+
 if __name__ == "__main__":
     unittest.main()

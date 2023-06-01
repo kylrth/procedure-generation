@@ -1,7 +1,9 @@
 """ RECIPE EVALUATION"""
 import ast
 import re
-
+import time
+from typing import Any, Dict
+import asyncio
 import evaluate
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage
@@ -139,7 +141,7 @@ def linguistic_correctness(recipe: str) -> int:
     return len(filteredMatches)
 
 
-def ingredient_comparison(recipe: str, gold: str) -> str:
+async def ingredient_comparison(recipe: str, gold: str) -> float:
     """LLM Based Evaluation
     How well the ingredients from the recipe match the ingredients from the gold recipe according to
     an LLM
@@ -157,44 +159,55 @@ def ingredient_comparison(recipe: str, gold: str) -> str:
     messages[1].content = messages[1].content.format(
         recipeIngredients=recipeIngredients, goldIngredients=goldIngredients
     )
-    matches = int(chatgpt(messages).content.split()[2][:5])
+    resp = await chatgpt.agenerate(messages=[messages])
+    matches = int(resp.generations[0][0].text.split()[2][:5])
     numRecipeIngredients = len(recipeIngredients.split("\n"))
     numGoldIngredients = len(goldIngredients.split("\n"))
-    return str(round((matches / numRecipeIngredients + matches / numGoldIngredients) / 2, 3))
+    return round((matches / numRecipeIngredients + matches / numGoldIngredients) / 2, 3)
 
 
-def ingredient_consistency(recipe: str) -> str:
+async def ingredient_consistency(recipe: str) -> int:
     """Model Based Evaluation
     Does the ingredients' list accurately reflect the exact ingredients and amounts used in
     the directions according to an LLM?"""
 
     messages = evaluation_messages["ingredient_consistency"]
     messages[1].content = messages[1].content.format(recipe=recipe)
-    response = chatgpt(messages).content
+    resp = await chatgpt.agenerate(messages=[messages])
+    response = resp.generations[0][0].text
     pattern = r"\d+"
     match = re.search(pattern, response)
-    return match.group() if match else 0
+
+    out = match.group() if match else 0
+
+    return int(out)
 
 
-def step_order(recipe: str) -> str:
+async def step_order(recipe: str) -> bool:
     """Model Based Evaluation
     Does the order of the steps make sense according to an LLM?"""
 
     messages = evaluation_messages["step_order"]
     messages[1].content = messages[1].content.format(recipe=recipe)
-    return chatgpt(messages).content.split()[0]
+    resp = await chatgpt.agenerate(messages=[messages])
+    answer = resp.generations[0][0].text.split()[0]
+
+    return answer.lower().startswith("true")
 
 
-def coherence(recipe: str) -> str:
+async def coherence(recipe: str) -> int:
     """Model Based Evaluation
     Is the recipe clear and readable according to an LLM?"""
 
     messages = evaluation_messages["coherence"]
     messages[1].content = messages[1].content.format(recipe=recipe)
-    return chatgpt(messages).content.split()[0].strip(".")
+    resp = await chatgpt.agenerate(messages=[messages])
+    answer = resp.generations[0][0].text.split()[0].strip(".")
+
+    return int(answer.split("/")[0])
 
 
-def ingredient_relevance(recipe: str) -> str:
+async def ingredient_relevance(recipe: str) -> bool:
     """Model Based Evaluation
     Does the list of ingredients align with the culinary expectations of the recipe (e.g. no-bake,
     gluten-free...)?
@@ -202,20 +215,30 @@ def ingredient_relevance(recipe: str) -> str:
 
     messages = evaluation_messages["ingredient_relevance"]
     messages[1].content = messages[1].content.format(recipe=recipe)
-    return chatgpt(messages).content.split()[0]
+    resp = await chatgpt.agenerate(messages=[messages])
+    answer = resp.generations[0][0].text.split()[0]
+
+    return answer.lower().startswith("true")
 
 
-def evaluation(recipe: str, gold: str) -> None:
+async def evaluation(recipe: str, gold: str) -> Dict[str, Any]:
     """Evaluates a generated recipe using all the above defined metrics"""
-
-    print(
-        f"Rouge: {rouge(recipe, gold)}\n"
-        f"Bleu: {bleu(recipe, gold)}\n"
-        f"Cosine Similarity: {cosine_sim(recipe, gold)}\n"
-        f"Linguistic Errors: {linguistic_correctness(recipe)}\n"
-        f"Ingredient Similarity Ratio: {ingredient_comparison(recipe, gold)}\n"
-        f"Ingredient Inconsistencies: {ingredient_consistency(recipe)}\n"
-        f"Ingredient Relevance: {ingredient_relevance(recipe)}\n"
-        f"Step Order: {step_order(recipe)}\n"
-        f"Coherence: {coherence(recipe)}"
-    )
+    async_tasks = [
+        ingredient_comparison(recipe, gold),
+        ingredient_consistency(recipe),
+        ingredient_relevance(recipe),
+        step_order(recipe),
+        coherence(recipe)
+    ]
+    resp = await asyncio.gather(*async_tasks)
+    return {
+        "rouge": rouge(recipe, gold),
+        "bleu": bleu(recipe, gold),
+        "cosine similarity": cosine_sim(recipe, gold),
+        "linguistic errors": linguistic_correctness(recipe),
+        "ingredient similarity ratio": resp[0],
+        "ingredient inconsistencies": resp[1],
+        "ingredient relevance": resp[2],
+        "step order": resp[3],
+        "coherence": resp[4],
+    }

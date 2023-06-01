@@ -1,6 +1,6 @@
 """Tools for the RecipeNLG data"""
 
-from typing import List
+from typing import List, Tuple
 
 from datasets import Dataset, load_dataset
 import numpy as np
@@ -62,3 +62,29 @@ def _split_steps(steps: List[str]) -> List[str]:
             out.append(step + ".")
 
     return out
+
+
+def format_recipe(ingredients: List[str], directions: List[str]) -> str:
+    """This is how we format recipes as text for models."""
+    return "\n".join(
+        (
+            "Ingredients:",
+            "\n".join("- " + ingredient for ingredient in ingredients),
+            "Instructions:",
+            "\n".join(f"{i+1}. {step}" for i, step in enumerate(directions)),
+        )
+    )
+
+
+def parse_recipe(s: str) -> Tuple[List[str], List[str]]:
+    """Takes a recipe (title optional) and returns the list of ingredients and the list of
+    instructions."""
+    start, end = s.index("Ingredients:\n") + len("Ingredients:\n"), s.index("\nInstructions:")
+    ingredients = s[start:end]
+    ingredients = [ingredient.strip("- ") for ingredient in ingredients.split("\n")]
+
+    start = s.index("Instructions:\n") + len("Instructions:\n")
+    instructions = s[start:]
+    instructions = [instruction.split(". ", 1)[1] for instruction in instructions.split("\n")]
+
+    return ingredients, instructions
