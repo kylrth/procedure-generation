@@ -1,12 +1,13 @@
 """ RECIPE EVALUATION"""
-import evaluate
-import re
 import ast
+import re
+
+import evaluate
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage
+import language_tool_python
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-import language_tool_python
 
 evaluation_messages = {
     "ingredient_comparison": [
@@ -20,51 +21,55 @@ evaluation_messages = {
             "lists: peanuts and jelly; There are 0 matching ingredients between the two lists"
         ),
         HumanMessage(
-            content="Here are the two ingredients' lists : ---LIST 1 START---\n{recipeIngredients}\n"
-            "---LIST 1 END---\n---LIST 2 START---\n{goldIngredients}\n---LIST 2 END---\n"
+            content=(
+                "Here are the two ingredients' lists : ---LIST 1 START---\n{recipeIngredients}\n"
+                "---LIST 1 END---\n---LIST 2 START---\n{goldIngredients}\n---LIST 2 END---\n"
+            )
         ),
     ],
     "ingredient_consistency": [
         SystemMessage(
-            content="You are evaluating recipes to count the number of inconsistencies between the steps "
-            "and the ingredient list. An inconsistency is using an ingredient in the steps that is "
-            "not mentioned in the ingredients' list, or not using the same amount of an ingredient as"
-            " mentioned in the ingredients' list, etc... Start your response by stating the number of "
-            "inconsistencies that there are. For example :There are 0 inconsistencies; "
-            "There is 1 inconsistency; There are 2 inconsistencies; "
-            "There are 4 inconsistencies; etc..."
+            content=(
+                "You are evaluating recipes to count the number of inconsistencies between the "
+                "steps and the ingredient list. An inconsistency is using an ingredient in the "
+                "steps that is not mentioned in the ingredients' list, or not using the same "
+                "amount of an ingredient as mentioned in the ingredients' list, etc... Start your "
+                "response by stating the number of inconsistencies that there are. For example: "
+                "There are 0 inconsistencies; There is 1 inconsistency; There are 2 "
+                "inconsistencies; There are 4 inconsistencies; etc..."
+            )
         ),
         HumanMessage(content="Evaluate this recipe :\n{recipe}"),
     ],
     "step_order": [
         SystemMessage(
-            content="You are a evaluating recipes to make sure that the steps are in the correct, cohesive "
-            "order. The answer is True if the steps are in the correct order, and False if the"
-            "steps are in incorrect order. Start your answer by stating your answer : True or False."
-            "Followed by your justification. For example: True. The recipe's steps are in a logical"
-            "order; False. Step 3 should come after Step 4 because...; etc..."
+            content="You are a evaluating recipes to make sure that the steps are in the correct, "
+            "cohesive order. The answer is True if the steps are in the correct order, and False "
+            "if the steps are in incorrect order. Start your answer by stating your answer: True "
+            "or False, followed by your justification. For example: True. The recipe's steps are "
+            "in a logical order; False. Step 3 should come after Step 4 because...; etc..."
         ),
         HumanMessage(content="Evaluate this recipe :\n{recipe}"),
     ],
     "coherence": [
         SystemMessage(
-            content="You are a evaluating recipes to make sure that the recipe is coherent, clear and "
-            "readable. You will give the recipe a score out of 10. Start your output with the"
+            content="You are a evaluating recipes to make sure that the recipe is coherent, clear "
+            "and readable. You will give the recipe a score out of 10. Start your output with the "
             "score, then follow up with your justifications. For example : 10/10. The recipe is "
-            "perfectly coherent; 9/10. The recipe is well-structured but has a minor imperfection...;"
-            "etc... "
+            "perfectly coherent; 9/10. The recipe is well-structured but has a minor "
+            "imperfection...; etc..."
         ),
         HumanMessage(content="Evaluate this recipe :\n{recipe}"),
     ],
     "ingredient_relevance": [
         SystemMessage(
-            content="You are a evaluating recipes to make sure that the ingredients and steps are in "
-            "alignment with the title. Do the ingredients and recipe produce the dish in the title "
-            "and are culinary conditions respected. The answer is True if there is alignment and"
-            " False if not, followed by your explanation. For example: False. The recipe title indicates"
-            "that it is gluten-free but some ingredients have gluten; True. The ingredients align"
-            "with the culinary expectations of the recipe; False. The recipe title indicates that it"
-            "is no-bake but the steps include a baking step; etc..."
+            content="You are a evaluating recipes to make sure that the ingredients and steps are "
+            "in alignment with the title. Do the ingredients and recipe produce the dish in the "
+            "title and are culinary conditions respected. The answer is True if there is alignment "
+            "and False if not, followed by your explanation. For example: False. The recipe title "
+            "indicates that it is gluten-free but some ingredients have gluten; True. The "
+            "ingredients align with the culinary expectations of the recipe; False. The recipe "
+            "title indicates that it is no-bake but the steps include a baking step; etc..."
         ),
         HumanMessage(content="Evaluate this recipe :\n{recipe}"),
     ],
@@ -75,7 +80,8 @@ chatgpt = ChatOpenAI()
 
 
 def format_recipe(recipe) -> str:
-    """Formats a recipe taken directly from the RecipeNLG dataset into a string we can use for our evaluation"""
+    """Formats a recipe taken directly from the RecipeNLG dataset into a string we can use for our
+    evaluation."""
 
     title = recipe.loc["title"]
     steps = ast.literal_eval(recipe.loc["directions"])
@@ -109,7 +115,8 @@ def bleu(recipe: str, gold: str) -> float:
 
 def cosine_sim(recipe: str, gold: str) -> float:
     """Metric Based Evaluation
-    Calculates cosine similarity on TF-IDF representation to measure similarity between generated and gold recipe
+    Calculates cosine similarity on TF-IDF representation to measure similarity between generated
+    and gold recipe
     """
 
     vectorizer = TfidfVectorizer()
@@ -134,7 +141,8 @@ def linguistic_correctness(recipe: str) -> int:
 
 def ingredient_comparison(recipe: str, gold: str) -> str:
     """LLM Based Evaluation
-    How well the ingredients from the recipe match the ingredients from the gold recipe according to an LLM
+    How well the ingredients from the recipe match the ingredients from the gold recipe according to
+    an LLM
     """
     recipeStartIdx, recipeEndIdx = recipe.index("Ingredients:\n") + len(
         "Ingredients:\n"
@@ -188,7 +196,8 @@ def coherence(recipe: str) -> str:
 
 def ingredient_relevance(recipe: str) -> str:
     """Model Based Evaluation
-    Does the list of ingredients align with the culinary expectations of the recipe (e.g. no-bake, gluten-free...)?
+    Does the list of ingredients align with the culinary expectations of the recipe (e.g. no-bake,
+    gluten-free...)?
     """
 
     messages = evaluation_messages["ingredient_relevance"]

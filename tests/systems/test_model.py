@@ -1,4 +1,3 @@
-from typing import List
 import unittest
 
 from langchain.llms.fake import FakeListLLM
@@ -18,7 +17,8 @@ class FakeChatModel:
 
 
 class TestModel(unittest.TestCase):
-    """The basic tests don't really test the construction code, so we test those separately below."""
+    """The basic tests don't really test the construction code, so we test those separately
+    below."""
 
     def test_basic_completion(self):
         response = "Hi there, I'm a fake completion model."

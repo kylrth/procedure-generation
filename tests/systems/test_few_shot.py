@@ -1,3 +1,4 @@
+import os
 import unittest
 
 from langchain.embeddings import FakeEmbeddings
@@ -24,9 +25,15 @@ example_data = [
         ],
         "directions": [
             "Heat milk, add butter and salt.",
-            "Cool slightly and add the corn meal and baking powder which have been sifted together, then the beaten eggs and chopped onion.",
+            (
+                "Cool slightly and add the corn meal and baking powder which have been sifted "
+                "together, then the beaten eggs and chopped onion."
+            ),
             "Stir well together.",
-            "Place the corn in a greased casserole and put the corn meal mixture over, mixing ever so slightly.",
+            (
+                "Place the corn in a greased casserole and put the corn meal mixture over, mixing "
+                "ever so slightly."
+            ),
             "Mixture should be very thin.",
             "If necessary add a bit more milk.",
             "Bake, uncovered, in a moderate oven (350°) for 45 minutes or until nicely browned.",
@@ -56,12 +63,24 @@ example_data = [
         ],
         "directions": [
             "This recipe contains no carbonation and no ice cream.",
-            "I have not tried it spiked, but you could probably add in rum to it (I'm not up on alcohol, but I believe which's supposed to be good in punch).",
+            (
+                "I have not tried it spiked, but you could probably add in rum to it (I'm not up "
+                "on alcohol, but I believe which's supposed to be good in punch)."
+            ),
             "This is our family's punch recipe-we serve it for all special occasions.",
-            "I will give what I think are the proportions first, then I'll give the exact amounts my mother-in-law uses for the 11 people in our extended family.",
-            '*Sorry, I do not know the size of the "tall can", but it\'s the standard U.S. size which is larger than the 12-ounce.-can size.',
+            (
+                "I will give what I think are the proportions first, then I'll give the exact "
+                "amounts my mother-in-law uses for the 11 people in our extended family."
+            ),
+            (
+                '*Sorry, I do not know the size of the "tall can", but it\'s the standard U.S. '
+                "size which is larger than the 12-ounce.-can size."
+            ),
             "Prepare lemonade.",
-            "Reconstitute orange juice, pineapple juice,and grapefruit juice, according to package directions, and in separate containers.",
+            (
+                "Reconstitute orange juice, pineapple juice,and grapefruit juice, according to "
+                "package directions, and in separate containers."
+            ),
             "Add in lemonade to punch bowl.",
             "Add in all of the orange juice, 1/2",
             "(up to 3/4) of the pineapple juice, and 1/2 of the grapefruit juice.",
@@ -84,9 +103,11 @@ Corn Casserole
 - 1 1/2 c. milk
 
 1. Heat milk, add butter and salt.
-2. Cool slightly and add the corn meal and baking powder which have been sifted together, then the beaten eggs and chopped onion.
+2. Cool slightly and add the corn meal and baking powder which have been sifted together, then the \
+beaten eggs and chopped onion.
 3. Stir well together.
-4. Place the corn in a greased casserole and put the corn meal mixture over, mixing ever so slightly.
+4. Place the corn in a greased casserole and put the corn meal mixture over, mixing ever so \
+slightly.
 5. Mixture should be very thin.
 6. If necessary add a bit more milk.
 7. Bake, uncovered, in a moderate oven (350°) for 45 minutes or until nicely browned.
