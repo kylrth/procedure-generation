@@ -1,12 +1,14 @@
 """ RECIPE EVALUATION"""
 import ast
-import re
-import time
-from typing import Any, Dict
 import asyncio
+import logging
+import re
+import textwrap
+from typing import Any, Dict, List
+
 import evaluate
 from langchain.chat_models import ChatOpenAI
-from langchain.schema import HumanMessage, SystemMessage
+from langchain.schema import BaseMessage, HumanMessage, SystemMessage
 import language_tool_python
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -141,7 +143,12 @@ def linguistic_correctness(recipe: str) -> int:
     return len(filteredMatches)
 
 
-async def ingredient_comparison(recipe: str, gold: str) -> float:
+def log_messages(logger: logging.Logger, prefix: str, messages: List[BaseMessage]):
+    text = textwrap.indent("\n".join(repr(msg) for msg in messages), "  ")
+    logger.debug(prefix + text)
+
+
+async def ingredient_comparison(recipe: str, gold: str, logger: logging.Logger) -> float:
     """LLM Based Evaluation
     How well the ingredients from the recipe match the ingredients from the gold recipe according to
     an LLM
@@ -159,55 +166,78 @@ async def ingredient_comparison(recipe: str, gold: str) -> float:
     messages[1].content = messages[1].content.format(
         recipeIngredients=recipeIngredients, goldIngredients=goldIngredients
     )
+
     resp = await chatgpt.agenerate(messages=[messages])
-    matches = int(resp.generations[0][0].text.split()[2][:5])
+    log_messages(logger, "ingredient_comparison prompt:\n", messages)
+    logger.debug(f"ingredient_comparison response: {resp.generations[0][0].text}")
+
+    matches = int(resp.generations[0][0].text.split()[2])
     numRecipeIngredients = len(recipeIngredients.split("\n"))
     numGoldIngredients = len(goldIngredients.split("\n"))
-    return round((matches / numRecipeIngredients + matches / numGoldIngredients) / 2, 3)
+
+    out = round((matches / numRecipeIngredients + matches / numGoldIngredients) / 2, 3)
+    logger.debug(f"ingredient_comparison result: {out}")
+    return out
 
 
-async def ingredient_consistency(recipe: str) -> int:
+async def ingredient_consistency(recipe: str, logger: logging.Logger) -> int:
     """Model Based Evaluation
     Does the ingredients' list accurately reflect the exact ingredients and amounts used in
     the directions according to an LLM?"""
 
     messages = evaluation_messages["ingredient_consistency"]
     messages[1].content = messages[1].content.format(recipe=recipe)
+
     resp = await chatgpt.agenerate(messages=[messages])
+    log_messages(logger, "ingredient_consistency prompt:\n", messages)
+    logger.debug(f"ingredient_consistency response: {resp.generations[0][0].text}")
+
     response = resp.generations[0][0].text
     pattern = r"\d+"
     match = re.search(pattern, response)
 
-    out = match.group() if match else 0
+    out = int(match.group() if match else 0)
+    logger.debug(f"ingredient_consistency result: {out}")
+    return out
 
-    return int(out)
 
-
-async def step_order(recipe: str) -> bool:
+async def step_order(recipe: str, logger: logging.Logger) -> bool:
     """Model Based Evaluation
     Does the order of the steps make sense according to an LLM?"""
 
     messages = evaluation_messages["step_order"]
     messages[1].content = messages[1].content.format(recipe=recipe)
+
     resp = await chatgpt.agenerate(messages=[messages])
+    log_messages(logger, "step_order prompt:\n", messages)
+    logger.debug(f"step_order response: {resp.generations[0][0].text}")
+
     answer = resp.generations[0][0].text.split()[0]
+    out = answer.lower().startswith("true")
 
-    return answer.lower().startswith("true")
+    logger.debug(f"step_order result: {out}")
+    return out
 
 
-async def coherence(recipe: str) -> int:
+async def coherence(recipe: str, logger: logging.Logger) -> int:
     """Model Based Evaluation
     Is the recipe clear and readable according to an LLM?"""
 
     messages = evaluation_messages["coherence"]
     messages[1].content = messages[1].content.format(recipe=recipe)
+
     resp = await chatgpt.agenerate(messages=[messages])
+    log_messages(logger, "coherence prompt:\n", messages)
+    logger.debug(f"coherence response: {resp.generations[0][0].text}")
+
     answer = resp.generations[0][0].text.split()[0].strip(".")
+    out = int(answer.split("/")[0])
 
-    return int(answer.split("/")[0])
+    logger.debug(f"coherence result: {out}")
+    return out
 
 
-async def ingredient_relevance(recipe: str) -> bool:
+async def ingredient_relevance(recipe: str, logger: logging.Logger) -> bool:
     """Model Based Evaluation
     Does the list of ingredients align with the culinary expectations of the recipe (e.g. no-bake,
     gluten-free...)?
@@ -215,20 +245,26 @@ async def ingredient_relevance(recipe: str) -> bool:
 
     messages = evaluation_messages["ingredient_relevance"]
     messages[1].content = messages[1].content.format(recipe=recipe)
+
     resp = await chatgpt.agenerate(messages=[messages])
+    log_messages(logger, "ingredient_relevance prompt:\n", messages)
+    logger.debug(f"ingredient_relevance response: {resp.generations[0][0].text}")
+
     answer = resp.generations[0][0].text.split()[0]
+    out = answer.lower().startswith("true")
 
-    return answer.lower().startswith("true")
+    logger.debug(f"ingredient_relevance result: {out}")
+    return out
 
 
-async def evaluation(recipe: str, gold: str) -> Dict[str, Any]:
+async def evaluation(recipe: str, gold: str, logger: logging.Logger) -> Dict[str, Any]:
     """Evaluates a generated recipe using all the above defined metrics"""
     async_tasks = [
-        ingredient_comparison(recipe, gold),
-        ingredient_consistency(recipe),
-        ingredient_relevance(recipe),
-        step_order(recipe),
-        coherence(recipe)
+        ingredient_comparison(recipe, gold, logger),
+        ingredient_consistency(recipe, logger),
+        ingredient_relevance(recipe, logger),
+        step_order(recipe, logger),
+        coherence(recipe, logger),
     ]
     resp = await asyncio.gather(*async_tasks)
     return {

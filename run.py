@@ -1,6 +1,9 @@
 import argparse
 import asyncio
 from collections import defaultdict
+import logging
+import os
+from typing import Any, Dict
 
 from datasets import Dataset
 import numpy as np
@@ -10,11 +13,26 @@ import recipenlg
 from systems import Model, SystemInterface, ZeroShot
 
 
-async def _evaluate(model, recipe):
+def make_logger(name: str) -> logging.Logger:
+    """Create a new logger that writes to logs/{name}.log (and nowhere else)."""
+    os.makedirs("logs", exist_ok=True)
+    logger = logging.getLogger(name)
+    logger.propagate = False
+    logger.addHandler(logging.FileHandler(f"logs/{name}.log", "w"))
+    logger.setLevel(logging.DEBUG)
+
+    return logger
+
+
+async def generate_and_evaluate(model: SystemInterface, recipe: Dict[str, Any]):
+    """Generate a recipe with the model, and then evaluate."""
     title = recipe["title"][0]
     ingredients = recipe["ingredients"][0]
     directions = recipe["directions"][0]
-    res = await model.generate(title)
+
+    logger = make_logger(str(recipe["id"][0]))
+
+    res = await model.agenerate(title, logger)
 
     scores = defaultdict(list)
     for completion in res:
@@ -22,14 +40,21 @@ async def _evaluate(model, recipe):
         if "Instructions" not in completion or "Ingredients" not in completion:
             continue
 
-        evals = await evaluation(completion, recipenlg.format_recipe(ingredients, directions))
+        evals = await evaluation(
+            completion, recipenlg.format_recipe(ingredients, directions), logger
+        )
         for metric in evals:
             scores[metric].append(evals[metric])
+
+    score_print = "\n".join(f"  {metric}: {scores[metric]}" for metric in scores)
+    logger.debug("final scores:\n" + score_print)
+
     return scores, recipe["id"][0]
 
 
 async def evaluate(model: SystemInterface, data: Dataset):
-    tasks = [_evaluate(model, recipe) for recipe in data.iter(1)]
+    """Evaluate the system with the given recipe data."""
+    tasks = [generate_and_evaluate(model, recipe) for recipe in data.iter(1)]
     results = await asyncio.gather(*tasks)
 
     # collect results
