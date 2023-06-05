@@ -13,6 +13,7 @@ class ZeroShot(SystemInterface):
 
     def __init__(self, model: Model, instructions: str):
         self.model = model
+        self.instructions = instructions
 
     def generate(self, title: str, logger: Optional[logging.Logger] = None) -> List[str]:
         prompt = self.model.build_prompt(title, self.instructions)
