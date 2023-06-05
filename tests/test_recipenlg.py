@@ -133,7 +133,99 @@ class TestPreprocess(unittest.TestCase):
         self.assertEqual(testset[3], got[3])
 
 
+format_variations = {
+    "basic": """Creamy Corn
+
+Ingredients:
+- 2 (16 oz.) pkg. frozen corn
+- 1 (8 oz.) pkg. cream cheese, cubed
+- 1/3 c. butter, cubed
+- 1/2 tsp. garlic powder
+- 1/2 tsp. salt
+- 1/4 tsp. pepper
+
+Instructions:
+1. In a slow cooker, combine all ingredients.
+2. Cover and cook on low for 4 hours or until heated through and cheese is melted.
+3. Stir well before serving.
+4. Yields 6 servings.
+
+Enjoy this recipe for creamy corn!
+""",
+    "directions_bullets": """Ingredients:
+- 2 (16 oz.) pkg. frozen corn
+- 1 (8 oz.) pkg. cream cheese, cubed
+- 1/3 c. butter, cubed
+- 1/2 tsp. garlic powder
+- 1/2 tsp. salt
+- 1/4 tsp. pepper
+
+Directions:
+- In a slow cooker, combine all ingredients.
+- Cover and cook on low for 4 hours or until heated through and cheese is melted.
+- Stir well before serving.
+- Yields 6 servings.
+""",
+    "alt_numbering": """Ingredients:
+* 2 (16 oz.) pkg. frozen corn
+* 1 (8 oz.) pkg. cream cheese, cubed
+* 1/3 c. butter, cubed
+* 1/2 tsp. garlic powder
+* 1/2 tsp. salt
+* 1/4 tsp. pepper
+
+Instructions:
+1. In a slow cooker, combine all ingredients.
+1. Cover and cook on low for 4 hours or until heated through and cheese is melted.
+10. Stir well before serving.
+1. Yields 6 servings.
+""",
+    "no_numbering": """Ingredients:
+2 (16 oz.) pkg. frozen corn
+1 (8 oz.) pkg. cream cheese, cubed
+1/3 c. butter, cubed
+1/2 tsp. garlic powder
+1/2 tsp. salt
+1/4 tsp. pepper
+
+Instructions:
+In a slow cooker, combine all ingredients.
+Cover and cook on low for 4 hours or until heated through and cheese is melted.
+Stir well before serving.
+Yields 6 servings.
+""",
+    "spread_out": """Creamy Corn
+
+Ingredients:
+- 2 (16 oz.) pkg. frozen corn
+- 1 (8 oz.) pkg. cream cheese, cubed
+- 1/3 c. butter, cubed
+- 1/2 tsp. garlic powder
+- 1/2 tsp. salt
+- 1/4 tsp. pepper
+
+Instructions:
+
+1. In a slow cooker, combine all ingredients.
+
+2. Cover and cook on low for 4 hours or until heated through and cheese is melted.
+
+3. Stir well before serving.
+
+4. Yields 6 servings.
+""",
+}
+
+
 class TestRecipeFormat(unittest.TestCase):
+    def test_parse_variations(self):
+        for name, variation in format_variations.items():
+            with self.subTest(name):
+                ingredients, instructions = recipenlg.parse_recipe(variation)
+
+                self.assertEqual(id2_formatted["ingredients"], ingredients)
+                self.assertEqual(id2_formatted["directions"], instructions)
+
     def test_reversible(self):
         s = recipenlg.format_recipe(id2_formatted["ingredients"], id2_formatted["directions"])
         got_i, got_d = recipenlg.parse_recipe(s)
