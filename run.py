@@ -36,8 +36,11 @@ async def generate_and_evaluate(model: SystemInterface, recipe: Dict[str, Any]):
 
     scores = defaultdict(list)
     for completion in res:
-        # if recipe was incorrectly generated
-        if "Instructions" not in completion or "Ingredients" not in completion:
+        # make sure the recipe is correctly generated
+        try:
+            recipenlg.parse_recipe(completion)
+        except ValueError:
+            logger.warning(f"malformed recipe: {completion}")
             continue
 
         evals = await evaluation(

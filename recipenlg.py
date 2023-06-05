@@ -1,5 +1,6 @@
 """Tools for the RecipeNLG data"""
 
+import re
 from typing import List, Tuple
 
 from datasets import Dataset, load_dataset
@@ -76,15 +77,48 @@ def format_recipe(ingredients: List[str], directions: List[str]) -> str:
     )
 
 
+# matches "- ", "* ", or "1. ", "2. ", etc.
+_markers = re.compile(r"([-*]|[0-9]+\.)\s*")
+
+
 def parse_recipe(s: str) -> Tuple[List[str], List[str]]:
     """Takes a recipe (title optional) and returns the list of ingredients and the list of
     instructions."""
-    start, end = s.index("Ingredients:\n") + len("Ingredients:\n"), s.index("\nInstructions:")
-    ingredients = s[start:end]
-    ingredients = [ingredient.strip("- ") for ingredient in ingredients.split("\n")]
+    start = s.index("Ingredients:\n") + len("Ingredients:\n")
+    try:
+        end = s.index("\nInstructions:")
+    except ValueError:
+        end = s.index("\nDirections:")
+    text = s[start:end]
 
-    start = s.index("Instructions:\n") + len("Instructions:\n")
-    instructions = s[start:]
-    instructions = [instruction.split(". ", 1)[1] for instruction in instructions.split("\n")]
+    ingredients = []
+    for t in text.split("\n"):
+        if not t.strip():
+            continue
+
+        # remove any list markers
+        ingredients.append(_markers.sub("", t))
+
+    try:
+        start = s.index("Instructions:\n") + len("Instructions:\n")
+    except ValueError:
+        start = s.index("Directions:\n") + len("Directions:\n")
+    text = s[start:]
+
+    instructions = []
+    using_markers = False
+    for t in text.split("\n"):
+        if not t.strip():
+            continue
+
+        if _markers.match(t):
+            using_markers = True
+        elif using_markers:
+            # If we've already seen instructions with markers, this line must not be part of the
+            # instructions.
+            break
+
+        # remove any list markers
+        instructions.append(_markers.sub("", t))
 
     return ingredients, instructions

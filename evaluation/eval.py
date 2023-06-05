@@ -1,5 +1,4 @@
 """ RECIPE EVALUATION"""
-import ast
 import asyncio
 import logging
 import re
@@ -81,24 +80,6 @@ evaluation_messages = {
 rouge_metric = evaluate.load("rouge")
 bleu_metric = evaluate.load("bleu")
 chatgpt = ChatOpenAI()
-
-
-def format_recipe(recipe) -> str:
-    """Formats a recipe taken directly from the RecipeNLG dataset into a string we can use for our
-    evaluation."""
-
-    title = recipe.loc["title"]
-    steps = ast.literal_eval(recipe.loc["directions"])
-    ingredients = ast.literal_eval(recipe.loc["ingredients"])
-    if len(steps) == 1:
-        steps = steps[0].split(". ")
-        steps = [step.strip('."') + "." for step in steps]
-    steps = [str(i + 1) + ". " + steps[i].strip(' "') for i in range(len(steps))]
-    ingredients = ["- " + ingredient.strip(' "') for ingredient in ingredients]
-    ingredients = "\n".join(ingredients)
-    steps = "\n".join(steps)
-    result = f"{title}\n\n" f"Ingredients:\n{ingredients}\n\n" f"Instructions:\n{steps}"
-    return result
 
 
 def rouge(recipe: str, gold: str) -> float:
