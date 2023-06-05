@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 from collections import defaultdict
 
@@ -63,6 +64,23 @@ def main(model: str, data_dir: str = "./data"):
     asyncio.run(evaluate(system, data))
 
 
-# ignore (the dataset directory on my computer) C:\\Users\\mk_ya\\Desktop\\dataset\\dataset
 if __name__ == "__main__":
-    main("openai-gpt-3.5-turbo", "/mnt/leftie/data/recipenlg")
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-d",
+        "--data-dir",
+        type=str,
+        default="./data",
+        help="directory containing the RecipeNLG dataset",
+    )
+    parser.add_argument(
+        "-m",
+        "--model",
+        type=str,
+        default="openai-gpt-3.5-turbo",
+        help="full name of service & model to use",
+    )
+
+    args = parser.parse_args()
+
+    main(args.model, args.data_dir)
