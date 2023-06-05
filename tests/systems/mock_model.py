@@ -12,14 +12,15 @@ class MockModel:
         self.expect = expect
         self.model = Model(FakeListLLM(responses=response))
 
-    def __call__(
+    def build_prompt(
         self,
         prompt: str,
         context: Optional[str] = None,
         examples: Optional[List[Tuple[str, str]]] = None,
-    ) -> List[str]:
-        s = self.model.build_completion_prompt(prompt, context, examples)
+    ) -> str:
+        return self.model.build_completion_prompt(prompt, context, examples)
 
+    def generate(self, s: str):
         # Here we're reaching inside the FakeListLLM in the Model to get the step number, so we know
         # which string to compare with.
         i = self.model.model.i

@@ -1,3 +1,5 @@
+import logging
+import textwrap
 from typing import List, Optional, Tuple, Union
 
 from langchain.base_language import BaseLanguageModel
@@ -49,7 +51,7 @@ class Model:
 
         raise NotImplementedError(f"service '{service}' not added yet")
 
-    async def __call__(
+    def __call__(
         self,
         prompt: str,
         context: Optional[str] = None,
@@ -89,11 +91,18 @@ class Model:
             Human: {prompt}
         """
         prompt = self.build_prompt(prompt, context, examples)
-        return await self.generate(prompt)
+        return self.generate(prompt)
 
-    async def generate(self, final_prompt: Union[str, List[BaseMessage]]) -> List[str]:
+    def generate(self, final_prompt: Union[str, List[BaseMessage]]) -> List[str]:
         """Calls the model on the already-constructed prompt. Can be used in conjunction with
         build_prompt to re-use constructed prompts."""
+        out = self.model.generate([final_prompt])
+
+        # In the future we may surface other information from the results, but for now we just need
+        # the strings.
+        return [r.text for r in out.generations[0]]
+
+    async def agenerate(self, final_prompt: Union[str, List[BaseMessage]]) -> List[str]:
         out = await self.model.agenerate([final_prompt])
 
         # In the future we may surface other information from the results, but for now we just need
@@ -151,3 +160,29 @@ class Model:
         out += prompt + "\n"
 
         return out
+
+
+def log(
+    logger: Optional[logging.Logger],
+    prefix: str,
+    prompt: Union[str, List[BaseMessage]],
+    completion: List[str],
+):
+    """Log the prompt and completion in a human-friendly way."""
+    if not logger:
+        return
+
+    if isinstance(prompt, list):
+        # chat model
+        logged_prompt = textwrap.indent("\n".join(repr(msg) for msg in prompt), "  ")
+    else:
+        # completion model
+        logged_prompt = textwrap.indent(prompt, "  ")
+    logger.debug(f"{prefix} prompt:\n{logged_prompt}")
+
+    logged_completion = (
+        "BEGIN COMPLETION:\n"
+        + "END COMPLETION\nBEGIN COMPLETION".join(completion)
+        + "\nEND COMPLETION"
+    )
+    logger.debug(f"{prefix} completion:\n{logged_completion}")
