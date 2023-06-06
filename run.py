@@ -3,6 +3,7 @@ import asyncio
 from collections import defaultdict
 import logging
 import os
+import sys
 from typing import Any, Dict
 
 from datasets import Dataset
@@ -29,6 +30,7 @@ async def generate_and_evaluate(model: SystemInterface, recipe: Dict[str, Any]):
     title = recipe["title"][0]
     ingredients = recipe["ingredients"][0]
     directions = recipe["directions"][0]
+    recipe_text = recipenlg.format_recipe(ingredients, directions)
 
     logger = make_logger(str(recipe["id"][0]))
 
@@ -43,9 +45,7 @@ async def generate_and_evaluate(model: SystemInterface, recipe: Dict[str, Any]):
             logger.warning(f"malformed recipe: {completion}")
             continue
 
-        evals = await evaluation(
-            completion, recipenlg.format_recipe(ingredients, directions), logger
-        )
+        evals = await evaluation(completion, recipe_text, logger)
         for metric in evals:
             scores[metric].append(evals[metric])
 
@@ -55,10 +55,32 @@ async def generate_and_evaluate(model: SystemInterface, recipe: Dict[str, Any]):
     return scores, recipe["id"][0]
 
 
-async def evaluate(model: SystemInterface, data: Dataset):
+async def worker(model, queue, results):
+    while True:
+        recipe = await queue.get()
+        try:
+            result = await generate_and_evaluate(model, recipe)
+            results.append(result)
+        finally:
+            queue.task_done()
+
+
+async def evaluate(model: SystemInterface, data: Dataset, n_workers: int = 10):
     """Evaluate the system with the given recipe data."""
-    tasks = [generate_and_evaluate(model, recipe) for recipe in data.iter(1)]
-    results = await asyncio.gather(*tasks)
+    queue = asyncio.Queue()
+    results = []
+
+    n_workers = max(n_workers, len(data))
+    workers = []
+    for _ in range(n_workers):
+        workers.append(asyncio.create_task(worker(model, queue, results)))
+
+    for recipe in data.iter(1):
+        await queue.put(recipe)
+
+    await queue.join()
+    for w in workers:
+        w.cancel()
 
     # collect results
     scores = defaultdict(list)
@@ -77,19 +99,21 @@ async def evaluate(model: SystemInterface, data: Dataset):
     scores_avg = defaultdict()
     for metric, score in scores.items():
         scores_avg[metric] = np.mean(score)
-
     print(scores_avg)
-    print("The model returned bad responses for these titles:")
-    print("\n".join(str(i) for i in broken))
+
+    if broken:
+        print("The model returned bad responses for these titles:", " ".join(broken))
 
 
-def main(model: str, data_dir: str = "./data"):
+def main(model: str, data_dir: str = "./data", n: int = sys.maxsize, n_workers: int = 10):
     model = Model.from_full_name(model)
-    system = ZeroShot(model, "Please generate a recipe")
+    system = ZeroShot(model)
 
-    data = recipenlg.load("val", data_dir).select(np.arange(0, 3))
+    data = recipenlg.load("val", data_dir)
+    n = min(n, len(data))
+    data = data.select(np.arange(0, n))
 
-    asyncio.run(evaluate(system, data))
+    asyncio.run(evaluate(system, data, n_workers))
 
 
 if __name__ == "__main__":
@@ -108,7 +132,11 @@ if __name__ == "__main__":
         default="openai-gpt-3.5-turbo",
         help="full name of service & model to use",
     )
+    parser.add_argument("-n", type=int, default=sys.maxsize, help="number of samples to use")
+    parser.add_argument(
+        "--workers", type=int, default=10, help="number of concurrent requests to make to the LLM"
+    )
 
     args = parser.parse_args()
 
-    main(args.model, args.data_dir)
+    main(args.model, args.data_dir, args.n, args.workers)
