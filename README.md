@@ -30,6 +30,4 @@ We will evaluate the generated recipes using the following metrics. Those marked
 pip install -r requirements.txt
 ```
 
-### tests
-
-If you're doing development, also install `pytest`.
+If you're doing development, also run `pip install -r requirements_dev.txt`.
