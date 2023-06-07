@@ -3,14 +3,16 @@ import asyncio
 import logging
 import re
 import textwrap
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import evaluate
 from langchain.chat_models import ChatOpenAI
-from langchain.schema import BaseMessage, HumanMessage, SystemMessage
+from langchain.schema import HumanMessage, SystemMessage
 import language_tool_python
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+
+from recipenlg import parse_recipe
 
 evaluation_messages = {
     "ingredient_comparison": {
@@ -92,16 +94,24 @@ chatgpt = ChatOpenAI()
 def rouge(recipe: str, gold: str) -> float:
     """Metric Based Evaluation
     Calculates the ROUGE score"""
-
-    results = rouge_metric.compute(predictions=[recipe], references=[gold])
+    recipe_ingredients, recipe_instructions = parse_recipe(recipe)
+    gold_ingredients, gold_instructions = parse_recipe(gold)
+    results = rouge_metric.compute(
+        predictions=["\n".join(recipe_ingredients) + "\n" + "\n".join(recipe_instructions)],
+        references=["\n".join(gold_ingredients) + "\n" + "\n".join(gold_instructions)],
+    )
     return round(results["rougeL"], 3)
 
 
 def bleu(recipe: str, gold: str) -> float:
     """Metric Based Evaluation
     Calculates the BLEU score"""
-
-    results = bleu_metric.compute(predictions=[recipe], references=[gold])
+    recipe_ingredients, recipe_instructions = parse_recipe(recipe)
+    gold_ingredients, gold_instructions = parse_recipe(gold)
+    results = bleu_metric.compute(
+        predictions=["\n".join(recipe_ingredients) + "\n" + "\n".join(recipe_instructions)],
+        references=["\n".join(gold_ingredients) + "\n" + "\n".join(gold_instructions)],
+    )
     return round(results["bleu"], 3)
 
 
@@ -131,41 +141,34 @@ def linguistic_correctness(recipe: str) -> int:
     return len(filteredMatches)
 
 
-def log_messages(logger: logging.Logger, prefix: str, messages: List[BaseMessage]):
-    text = textwrap.indent("\n".join(repr(msg) for msg in messages), "  ")
-    logger.debug(prefix + text)
-
-
-async def ingredient_comparison(recipe: str, gold: str, logger: logging.Logger) -> float:
+async def ingredient_comparison(
+    recipe_ingredients: str, gold_ingredients: str, logger: logging.Logger
+) -> float:
     """LLM Based Evaluation
     How well the ingredients from the recipe match the ingredients from the gold recipe according to
     an LLM
     """
-    recipeStartIdx, recipeEndIdx = recipe.index("Ingredients:\n") + len(
-        "Ingredients:\n"
-    ), recipe.index("\nInstructions:")
-    goldStartIdx, goldEndIdx = gold.index("Ingredients:\n") + len("Ingredients:\n"), gold.index(
-        "\nInstructions:"
-    )
-    recipeIngredients = recipe[recipeStartIdx:recipeEndIdx]
-    goldIngredients = gold[goldStartIdx:goldEndIdx]
-
     messages = format_message_history(
         "ingredient_comparison",
-        recipeIngredients=recipeIngredients,
-        goldIngredients=goldIngredients,
+        recipeIngredients=recipe_ingredients,
+        goldIngredients=gold_ingredients,
     )
 
     resp = await chatgpt.agenerate(messages=[messages])
-    log_messages(logger, "ingredient_comparison prompt:\n", messages)
-    logger.debug(f"ingredient_comparison response: {resp.generations[0][0].text}")
+    log_text = (
+        "ingredient_comparison prompt:\n"
+        + textwrap.indent("\n".join(msg.content for msg in messages), "  ")
+        + f"\ningredient_comparison response: {resp.generations[0][0].text} "
+    )
 
-    matches = int(resp.generations[0][0].text.split()[2])
-    numRecipeIngredients = len(recipeIngredients.split("\n"))
-    numGoldIngredients = len(goldIngredients.split("\n"))
-
-    out = round((matches / numRecipeIngredients + matches / numGoldIngredients) / 2, 3)
-    logger.debug(f"ingredient_comparison result: {out}")
+    response = resp.generations[0][0].text
+    try:
+        matches = int(response.split()[2])
+        out = round((matches / len(recipe_ingredients) + matches / len(gold_ingredients)) / 2, 3)
+        logger.debug(log_text + f"\ningredient_comparison result: {out}\n\n\n")
+    except ValueError:
+        out = 0
+        logger.debug(f"FAIL- {log_text}\n\n\n")
     return out
 
 
@@ -176,15 +179,25 @@ async def ingredient_consistency(recipe: str, logger: logging.Logger) -> int:
     messages = format_message_history("ingredient_consistency", recipe=recipe)
 
     resp = await chatgpt.agenerate(messages=[messages])
-    log_messages(logger, "ingredient_consistency prompt:\n", messages)
-    logger.debug(f"ingredient_consistency response: {resp.generations[0][0].text}")
+    log_text = (
+        "ingredient_consistency prompt:\n"
+        + textwrap.indent("\n".join(msg.content for msg in messages), "  ")
+        + f"\ningredient_consistency response: {resp.generations[0][0].text}"
+    )
 
     response = resp.generations[0][0].text
     pattern = r"\d+"
     match = re.search(pattern, response)
 
-    out = int(match.group() if match else 0)
-    logger.debug(f"ingredient_consistency result: {out}")
+    try:
+        out = int(match.group())
+        logger.debug(f"{log_text}\n ingredient_consistency result: {out}\n\n\n")
+    except ValueError:
+        if response.split()[2] == "no":
+            logger.debug(f"{log_text}\n ingredient_consistency result: no\n\n\n")
+            return 0
+        out = 42
+        logger.debug(f"FAIL- {log_text}\n\n\n")
     return out
 
 
@@ -194,13 +207,22 @@ async def step_order(recipe: str, logger: logging.Logger) -> bool:
     messages = format_message_history("step_order", recipe=recipe)
 
     resp = await chatgpt.agenerate(messages=[messages])
-    log_messages(logger, "step_order prompt:\n", messages)
-    logger.debug(f"step_order response: {resp.generations[0][0].text}")
+    log_text = (
+        "step_order prompt:\n"
+        + textwrap.indent("\n".join(msg.content for msg in messages), "  ")
+        + f"\nstep_order response: {resp.generations[0][0].text}"
+    )
 
-    answer = resp.generations[0][0].text.split()[0]
-    out = answer.lower().startswith("true")
-
-    logger.debug(f"step_order result: {out}")
+    response = resp.generations[0][0].text
+    if response.lower().startswith("true"):
+        out = True
+        logger.debug(f"{log_text}\n ingredient_consistency result: {out}\n\n\n")
+    elif response.lower().startswith("false"):
+        out = False
+        logger.debug(f"{log_text}\n ingredient_consistency result: {out}\n\n\n")
+    else:
+        out = False
+        logger.debug(f"FAIL- {log_text}\n\n\n")
     return out
 
 
@@ -210,13 +232,19 @@ async def coherence(recipe: str, logger: logging.Logger) -> int:
     messages = format_message_history("coherence", recipe=recipe)
 
     resp = await chatgpt.agenerate(messages=[messages])
-    log_messages(logger, "coherence prompt:\n", messages)
-    logger.debug(f"coherence response: {resp.generations[0][0].text}")
+    log_text = (
+        "coherence prompt:\n"
+        + textwrap.indent("\n".join(msg.content for msg in messages), "  ")
+        + f"\ncoherence response: {resp.generations[0][0].text}"
+    )
 
-    answer = resp.generations[0][0].text.split()[0].strip(".")
-    out = int(answer.split("/")[0])
-
-    logger.debug(f"coherence result: {out}")
+    response = resp.generations[0][0].text
+    try:
+        out = int(response.split("/")[0])
+        logger.debug(f"{log_text}\n coherence result: {out}\n\n\n")
+    except ValueError:
+        out = 0
+        logger.debug(f"FAIL- {log_text}\n\n\n")
     return out
 
 
@@ -228,31 +256,57 @@ async def ingredient_relevance(recipe: str, logger: logging.Logger) -> bool:
     messages = format_message_history("ingredient_relevance", recipe=recipe)
 
     resp = await chatgpt.agenerate(messages=[messages])
-    log_messages(logger, "ingredient_relevance prompt:\n", messages)
-    logger.debug(f"ingredient_relevance response: {resp.generations[0][0].text}")
+    log_text = (
+        "ingredient_relevance prompt:\n"
+        + textwrap.indent("\n".join(msg.content for msg in messages), "  ")
+        + f"\ningredient_relevance response: {resp.generations[0][0].text}"
+    )
 
-    answer = resp.generations[0][0].text.split()[0]
-    out = answer.lower().startswith("true")
-
-    logger.debug(f"ingredient_relevance result: {out}")
+    response = resp.generations[0][0].text
+    if response.lower().startswith("true"):
+        out = True
+        logger.debug(f"{log_text}\ningredient_consistency result: {out}\n\n\n")
+    elif response.lower().startswith("false"):
+        out = False
+        logger.debug(f"{log_text}\ningredient_consistency result: {out}\n\n\n")
+    else:
+        out = False
+        logger.debug(f"FAIL- {log_text}\n\n\n")
     return out
 
 
-async def evaluation(recipe: str, gold: str, logger: logging.Logger) -> Dict[str, Any]:
+async def evaluation(recipe: str, gold: Dict[str, str], logger: logging.Logger) -> Dict[str, Any]:
     """Evaluates a generated recipe using all the above defined metrics"""
+    title = gold["title"]
+    gold_ingredients = "Ingredients:\n" + "\n".join(gold["ingredients"])
+    gold_instructions = "Instructions:\n" + "\n".join(gold["directions"])
+    ings, dirs = parse_recipe(recipe)
+    recipe_ingredients = "Ingredients:\n" + "\n".join(ings)
+    recipe_instructions = "Instructions:\n" + "\n".join(dirs)
     async_tasks = [
-        ingredient_comparison(recipe, gold, logger),
-        ingredient_consistency(recipe, logger),
-        ingredient_relevance(recipe, logger),
-        step_order(recipe, logger),
-        coherence(recipe, logger),
+        ingredient_comparison(recipe_ingredients, gold_ingredients, logger),
+        ingredient_consistency(recipe_ingredients + recipe_instructions, logger),
+        ingredient_relevance(title + "\n" + recipe_ingredients, logger),
+        step_order(recipe_instructions, logger),
+        coherence(recipe_ingredients + "\n\n" + recipe_instructions, logger),
     ]
     resp = await asyncio.gather(*async_tasks)
     return {
-        "rouge": rouge(recipe, gold),
-        "bleu": bleu(recipe, gold),
-        "cosine similarity": cosine_sim(recipe, gold),
-        "linguistic errors": linguistic_correctness(recipe),
+        "rouge": rouge(
+            recipe_ingredients + "\n" + recipe_instructions,
+            gold_ingredients + "\n" + gold_instructions,
+        ),
+        "bleu": bleu(
+            recipe_ingredients + "\n" + recipe_instructions,
+            gold_ingredients + "\n" + gold_instructions,
+        ),
+        "cosine similarity": cosine_sim(
+            recipe_ingredients + "\n" + recipe_instructions,
+            gold_ingredients + "\n" + gold_instructions,
+        ),
+        "linguistic errors": linguistic_correctness(
+            recipe_ingredients + "\n" + recipe_instructions
+        ),
         "ingredient similarity ratio": resp[0],
         "ingredient inconsistencies": resp[1],
         "ingredient relevance": resp[2],
