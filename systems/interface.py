@@ -1,6 +1,5 @@
-from abc import ABC, abstractmethod
 import logging
-from typing import List, Optional
+from abc import ABC, abstractmethod
 
 
 class SystemInterface(ABC):
@@ -8,11 +7,9 @@ class SystemInterface(ABC):
     type annotations."""
 
     @abstractmethod
-    def generate(self, title: str, logger: Optional[logging.Logger]) -> List[str]:
+    def generate(self, title: str, logger: logging.Logger | None) -> list[str]:
         """The output is a list of generations, in case of n > 1."""
-        pass
 
     @abstractmethod
-    async def agenerate(self, title: str, logger: Optional[logging.Logger]) -> List[str]:
+    async def agenerate(self, title: str, logger: logging.Logger | None) -> list[str]:
         """The output is a list of generations, in case of n > 1."""
-        pass
