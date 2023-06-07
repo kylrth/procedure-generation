@@ -1,10 +1,10 @@
 """Tools for the RecipeNLG data"""
 
 import re
-from typing import List, Tuple
 
-from datasets import Dataset, load_dataset
 import numpy as np
+from datasets import Dataset, load_dataset
+
 
 # deterministic shuffle not tied to any seed value anywhere else
 rng = np.random.default_rng(27)
@@ -22,7 +22,7 @@ def load(split: str = "train", data_dir: str = "./data") -> Dataset:
     }
 
     if split not in splits:
-        raise ValueError(f"split must be one of {splits.keys()}")
+        raise ValueError("split must be one of", splits.keys())
 
     ds = load_dataset("recipe_nlg", data_dir=data_dir)["train"]
     ds = ds.shuffle(generator=rng)
@@ -48,7 +48,7 @@ def _preprocess(ds: Dataset) -> Dataset:
     return ds
 
 
-def _split_steps(steps: List[str]) -> List[str]:
+def _split_steps(steps: list[str]) -> list[str]:
     """Some recipes have steps that were not split correctly, so they ended up as a single step
     with several sentences. This splits those up."""
     if len(steps) != 1:
@@ -58,14 +58,14 @@ def _split_steps(steps: List[str]) -> List[str]:
 
     out = []
     for step in steps:
-        step = step.strip()
-        if step:
-            out.append(step + ".")
+        stripped = step.strip()
+        if stripped:
+            out.append(stripped + ".")
 
     return out
 
 
-def format_recipe(ingredients: List[str], directions: List[str]) -> str:
+def format_recipe(ingredients: list[str], directions: list[str]) -> str:
     """This is how we format recipes as text for models."""
     return "\n".join(
         (
@@ -81,7 +81,7 @@ def format_recipe(ingredients: List[str], directions: List[str]) -> str:
 _markers = re.compile(r"([-*]|[0-9]+\.)\s*")
 
 
-def parse_recipe(s: str) -> Tuple[List[str], List[str]]:
+def parse_recipe(s: str) -> tuple[list[str], list[str]]:
     """Takes a recipe (title optional) and returns the list of ingredients and the list of
     instructions."""
     start = s.index("Ingredients:\n") + len("Ingredients:\n")

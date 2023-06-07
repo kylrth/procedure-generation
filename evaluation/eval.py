@@ -3,14 +3,15 @@ import asyncio
 import logging
 import re
 import textwrap
-from typing import Any, Dict, List
+from typing import Any
 
 import evaluate
+import language_tool_python
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import BaseMessage, HumanMessage, SystemMessage
-import language_tool_python
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+
 
 evaluation_messages = {
     "ingredient_comparison": {
@@ -123,15 +124,15 @@ def linguistic_correctness(recipe: str) -> int:
     tool = language_tool_python.LanguageTool("en-US")
     matches = tool.check(recipe)
     tool.close()
-    filteredMatches = [
+    filtered_matches = [
         match
         for match in matches
         if match.ruleId not in ["UPPERCASE_SENTENCE_START", "WHITESPACE_RULE"]
     ]
-    return len(filteredMatches)
+    return len(filtered_matches)
 
 
-def log_messages(logger: logging.Logger, prefix: str, messages: List[BaseMessage]):
+def log_messages(logger: logging.Logger, prefix: str, messages: list[BaseMessage]):
     text = textwrap.indent("\n".join(repr(msg) for msg in messages), "  ")
     logger.debug(prefix + text)
 
@@ -141,19 +142,19 @@ async def ingredient_comparison(recipe: str, gold: str, logger: logging.Logger) 
     How well the ingredients from the recipe match the ingredients from the gold recipe according to
     an LLM
     """
-    recipeStartIdx, recipeEndIdx = recipe.index("Ingredients:\n") + len(
-        "Ingredients:\n"
-    ), recipe.index("\nInstructions:")
-    goldStartIdx, goldEndIdx = gold.index("Ingredients:\n") + len("Ingredients:\n"), gold.index(
+    r_start, r_end = recipe.index("Ingredients:\n") + len("Ingredients:\n"), recipe.index(
         "\nInstructions:"
     )
-    recipeIngredients = recipe[recipeStartIdx:recipeEndIdx]
-    goldIngredients = gold[goldStartIdx:goldEndIdx]
+    g_start, g_end = gold.index("Ingredients:\n") + len("Ingredients:\n"), gold.index(
+        "\nInstructions:"
+    )
+    r_ingredients = recipe[r_start:r_end]
+    g_ingredients = gold[g_start:g_end]
 
     messages = format_message_history(
         "ingredient_comparison",
-        recipeIngredients=recipeIngredients,
-        goldIngredients=goldIngredients,
+        recipeIngredients=r_ingredients,
+        goldIngredients=g_ingredients,
     )
 
     resp = await chatgpt.agenerate(messages=[messages])
@@ -161,10 +162,10 @@ async def ingredient_comparison(recipe: str, gold: str, logger: logging.Logger) 
     logger.debug(f"ingredient_comparison response: {resp.generations[0][0].text}")
 
     matches = int(resp.generations[0][0].text.split()[2])
-    numRecipeIngredients = len(recipeIngredients.split("\n"))
-    numGoldIngredients = len(goldIngredients.split("\n"))
+    num_r_ingredients = len(r_ingredients.split("\n"))
+    num_g_ingredients = len(g_ingredients.split("\n"))
 
-    out = round((matches / numRecipeIngredients + matches / numGoldIngredients) / 2, 3)
+    out = round((matches / num_r_ingredients + matches / num_g_ingredients) / 2, 3)
     logger.debug(f"ingredient_comparison result: {out}")
     return out
 
@@ -238,7 +239,7 @@ async def ingredient_relevance(recipe: str, logger: logging.Logger) -> bool:
     return out
 
 
-async def evaluation(recipe: str, gold: str, logger: logging.Logger) -> Dict[str, Any]:
+async def evaluation(recipe: str, gold: str, logger: logging.Logger) -> dict[str, Any]:
     """Evaluates a generated recipe using all the above defined metrics"""
     async_tasks = [
         ingredient_comparison(recipe, gold, logger),

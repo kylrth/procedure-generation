@@ -1,5 +1,4 @@
 import logging
-from typing import List, Optional, Tuple
 
 from langchain.prompts.example_selector.base import BaseExampleSelector
 
@@ -16,7 +15,7 @@ class FewShot(SystemInterface):
         self.instructions = instructions
         self.selector = selector
 
-    def generate(self, title: str, logger: Optional[logging.Logger] = None) -> List[str]:
+    def generate(self, title: str, logger: logging.Logger | None = None) -> list[str]:
         prompt = self.model.build_prompt(title, self.instructions, self.get_examples(title))
         completion = self.model.generate(prompt)
 
@@ -24,7 +23,7 @@ class FewShot(SystemInterface):
 
         return completion
 
-    async def agenerate(self, title: str, logger: Optional[logging.Logger] = None) -> List[str]:
+    async def agenerate(self, title: str, logger: logging.Logger | None = None) -> list[str]:
         prompt = self.model.build_prompt(title, self.instructions, self.get_examples(title))
         completion = await self.model.agenerate(prompt)
 
@@ -32,7 +31,7 @@ class FewShot(SystemInterface):
 
         return completion
 
-    def get_examples(self, title: str) -> List[Tuple[str, str]]:
+    def get_examples(self, title: str) -> list[tuple[str, str]]:
         """Returns the examples that will be inserted into the prompt."""
         examples = self.selector.select_examples({"title": title})
 

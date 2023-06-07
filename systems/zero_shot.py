@@ -1,5 +1,4 @@
 import logging
-from typing import List, Optional
 
 from .interface import SystemInterface
 from .model import Model, log
@@ -15,7 +14,7 @@ class ZeroShot(SystemInterface):
         self.model = model
         self.instructions = instructions
 
-    def generate(self, title: str, logger: Optional[logging.Logger] = None) -> List[str]:
+    def generate(self, title: str, logger: logging.Logger | None = None) -> list[str]:
         prompt = self.model.build_prompt(title, self.instructions)
         completion = self.model.generate(prompt)
 
@@ -23,7 +22,7 @@ class ZeroShot(SystemInterface):
 
         return completion
 
-    async def agenerate(self, title: str, logger: Optional[logging.Logger] = None) -> List[str]:
+    async def agenerate(self, title: str, logger: logging.Logger | None = None) -> list[str]:
         prompt = self.model.build_prompt(title, self.instructions)
         completion = await self.model.agenerate(prompt)
 

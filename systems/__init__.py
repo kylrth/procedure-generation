@@ -7,6 +7,7 @@ from .interface import SystemInterface
 from .model import Model
 from .zero_shot import ZeroShot
 
+
 __all__ = [
     "SystemInterface",
     "Model",
