@@ -24,7 +24,6 @@ def make_logger(name: str) -> logging.Logger:
     logger.propagate = False
     logger.addHandler(logging.FileHandler(log_file, "w"))
     logger.setLevel(logging.DEBUG)
-
     return logger
 
 
@@ -73,7 +72,7 @@ async def evaluate(model: SystemInterface, data: Dataset, n_workers: int = 10):
     queue = asyncio.Queue()
     results = []
 
-    n_workers = max(n_workers, len(data))
+    n_workers = min(n_workers, len(data))
     workers = []
     for _ in range(n_workers):
         workers.append(asyncio.create_task(worker(model, queue, results)))
