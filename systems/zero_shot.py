@@ -10,9 +10,13 @@ class ZeroShot(SystemInterface):
     The template should expect a "title" input variable.
     """
 
-    def __init__(self, model: Model, instructions: str):
+    instructions: str = (
+        "Please generate a recipe from the given title. Provide a list of ingredients and a list "
+        "of instructions."
+    )
+
+    def __init__(self, model: Model):
         self.model = model
-        self.instructions = instructions
 
     def generate(self, title: str, logger: logging.Logger | None = None) -> list[str]:
         prompt = self.model.build_prompt(title, self.instructions)
