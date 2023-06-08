@@ -54,25 +54,55 @@ evaluation_messages = {
     },
     "coherence": {
         "system": (
-            "You are a evaluating recipes to make sure that the recipe is coherent, clear and "
-            "readable. You will give the recipe a score out of 10. Start your output with the "
-            "score, then follow up with your justifications. For example : 10/10. The recipe is "
-            "perfectly coherent; 9/10. The recipe is well-structured but has a minor "
-            "imperfection...; etc..."
-        ),
-        "human": "Evaluate this recipe :\n{recipe}",
+            "You will be given one recipe's ingredients and instructions. "
+            "Your task is to rate the summary on one criteria. "
+            "Please make sure you read and understand the following instructions carefully. Please keep the"
+            "recipe open while reviewing, and refer to it as needed.\n"
+            "Evaluation Criteria:"
+            "Coherence (1-10) - The collective quality of all sentences. Recipe coherence refers to the logical sense "
+            "and clarity of a generated recipe. It assesses whether the recipe makes sense. It also evaluates the "
+            "grammatical quality and simplicity of the "
+            "recipe's language, ensuring that it is well-written and easy to understand. The recipe should not just "
+            "be an ambiguous heap of related ingredients and steps, "
+            "but should build step by step using the ingredients to give a coherent recipe."
+            "Evaluation Steps:"
+            "1. Read the recipe carefully and identify the ingredients and steps."
+            "2. Read the recipe and evaluate its coherence. Check if the recipe contains any non-sense or gibberish"
+            ", and if it is presented in a clear and logical order."
+            "3. Assign a score for coherence on a scale of 1 to 10, where 1 is the lowest and 10 is the highest, and "
+            "follow up with justifications for your evaluation"
+            "Note: Coherence should not be confused with consistency, relevance and structural correctness"
+            " of ingredients and instructions. Do not be concerned with any mistake that isn't directly related to "
+            "coherence."),
+        "human": "Evaluate this recipe :\n{recipe}\nScore: ",
     },
     "ingredient_relevance": {
         "system": (
-            "You are a evaluating recipes to make sure that the ingredients and steps are in "
-            "alignment with the title. Do the ingredients and recipe produce the dish in the title "
-            "and are culinary conditions respected. The answer is True if there is alignment and "
-            "False if not, followed by your explanation. For example: False. The recipe title "
-            "indicates that it is gluten-free but some ingredients have gluten; True. The "
-            "ingredients align with the culinary expectations of the recipe; False. The recipe "
-            "title indicates that it is no-bake but the steps include a baking step; etc..."
+            "You will be given one recipe's ingredients and instructions. "
+            "Your task is to rate the summary on one criteria. "
+            "Please make sure you read and understand the following instructions carefully. Please keep the"
+            "recipe open while reviewing, and refer to it as needed. \n"
+            "Evaluation Criteria:"
+            "Relevance (1-10) - Recipe relevance refers to the extent to which the ingredients and steps included in "
+            "the recipe align with the title of the intended dish, and its culinary restrictions (spicy, vegan, "
+            "no-gluten, no bake, etc...) if and only if it is specified in the title. It assesses whether all the "
+            "ingredients are relevant "
+            "to the recipe and if all the steps contribute to achieving the desired outcome stated in the title. "
+            "There should be no ingredients included that are unrelated or unnecessary for the specific recipe or "
+            "that violate the culinary description. "
+            "There should be no superfluous or unrelated steps that do not contribute to the intended dish.\n"
+            "Evaluation Steps:"
+            "1. Read the recipe carefully and identify the ingredients and steps.\n"
+            "2. Read the recipe and evaluate its relevance. Check if the recipe contains any irrelevant ingredients or"
+            "instructions that don't contribute to achieving the dish in the title. Make sure the recipe doesn't "
+            "break the culinary restrictions of the title if and only if there is a restriction in the title.\n"
+            "3. Assign a score for relevance on a scale of 1 to 10, where 1 is the lowest and 10 is the highest, and "
+            "follow up with justifications for your evaluation"
+            "IMPORTANT NOTE: Relevance should NOT be associated with consistency, coherence and structural correctness"
+            "of ingredients and instructions. DO NOT be concerned with any mistake that isn't directly related to "
+            "relevance."
         ),
-        "human": "Evaluate this recipe :\n{recipe}",
+        "human": "Evaluate this recipe :\n{recipe}\nScore: ",
     },
 }
 
