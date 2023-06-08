@@ -3,16 +3,14 @@ import asyncio
 import logging
 import re
 import textwrap
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import evaluate
 from langchain.chat_models import ChatOpenAI
-from langchain.schema import HumanMessage, SystemMessage
+from langchain.schema import BaseMessage, HumanMessage, SystemMessage
 import language_tool_python
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-
-from recipenlg import parse_recipe
 
 evaluation_messages = {
     "ingredient_comparison": {
@@ -163,12 +161,12 @@ def linguistic_correctness(recipe: str) -> int:
     tool = language_tool_python.LanguageTool("en-US")
     matches = tool.check(recipe)
     tool.close()
-    filteredMatches = [
+    filtered_matches = [
         match
         for match in matches
         if match.ruleId not in ["UPPERCASE_SENTENCE_START", "WHITESPACE_RULE"]
     ]
-    return len(filteredMatches)
+    return len(filtered_matches)
 
 
 async def ingredient_comparison(
@@ -178,10 +176,19 @@ async def ingredient_comparison(
     How well the ingredients from the recipe match the ingredients from the gold recipe according to
     an LLM
     """
+    r_start, r_end = recipe.index("Ingredients:\n") + len("Ingredients:\n"), recipe.index(
+        "\nInstructions:"
+    )
+    g_start, g_end = gold.index("Ingredients:\n") + len("Ingredients:\n"), gold.index(
+        "\nInstructions:"
+    )
+    r_ingredients = recipe[r_start:r_end]
+    g_ingredients = gold[g_start:g_end]
+
     messages = format_message_history(
         "ingredient_comparison",
-        recipeIngredients=recipe_ingredients,
-        goldIngredients=gold_ingredients,
+        recipeIngredients=r_ingredients,
+        goldIngredients=g_ingredients,
     )
 
     resp = await chatgpt.agenerate(messages=[messages])
@@ -191,6 +198,12 @@ async def ingredient_comparison(
         + f"\ningredient_comparison response: {resp.generations[0][0].text} "
     )
 
+    matches = int(resp.generations[0][0].text.split()[2])
+    num_r_ingredients = len(r_ingredients.split("\n"))
+    num_g_ingredients = len(g_ingredients.split("\n"))
+
+    out = round((matches / num_r_ingredients + matches / num_g_ingredients) / 2, 3)
+    logger.debug(f"ingredient_comparison result: {out}")
     response = resp.generations[0][0].text
     try:
         matches = int(response.split()[2])

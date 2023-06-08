@@ -1,6 +1,5 @@
 import logging
 import textwrap
-from typing import List, Optional, Tuple, Union
 
 from langchain.base_language import BaseLanguageModel
 from langchain.chat_models import ChatOpenAI
@@ -16,7 +15,7 @@ class Model:
     example_fmt: str = "===BEGIN EXAMPLE===\n{title}\n{recipe}\n===END EXAMPLE==="
 
     def __init__(
-        self, model: BaseLanguageModel, chat: bool = False, example_fmt: Optional[str] = None
+        self, model: BaseLanguageModel, chat: bool = False, example_fmt: str | None = None
     ):
         self.model = model
         self.chat = chat
@@ -24,7 +23,7 @@ class Model:
             self.example_fmt = example_fmt
 
     @classmethod
-    def from_full_name(cls, full_name: str, example_fmt: Optional[str] = None, **kwargs) -> "Model":
+    def from_full_name(cls, full_name: str, example_fmt: str | None = None, **kwargs) -> "Model":
         """Create a new model from a full name, which includes the service and model name.
 
         The full_name parameter combines the name of an LLM service (e.g. "openai") with the name of
@@ -41,7 +40,7 @@ class Model:
         return cls(model, chat, example_fmt)
 
     @staticmethod
-    def get_model_factory(service: str, model: str) -> Tuple[type, bool]:
+    def get_model_factory(service: str, model: str) -> tuple[type, bool]:
         """Returns the factory for the specified model from langchain, and whether the model is a
         chat model."""
         if service == "openai":
@@ -49,14 +48,14 @@ class Model:
                 return ChatOpenAI, True
             return OpenAI, False
 
-        raise NotImplementedError(f"service '{service}' not added yet")
+        raise NotImplementedError(service)
 
     def __call__(
         self,
         prompt: str,
-        context: Optional[str] = None,
-        examples: Optional[List[Tuple[str, str]]] = None,
-    ) -> List[str]:
+        context: str | None = None,
+        examples: list[tuple[str, str]] | None = None,
+    ) -> list[str]:
         """Generate calls the model with the prompt and returns the response text.
 
         If context is provided, it is added before the prompt. If example are provided, they are
@@ -93,7 +92,7 @@ class Model:
         prompt = self.build_prompt(prompt, context, examples)
         return self.generate(prompt)
 
-    def generate(self, final_prompt: Union[str, List[BaseMessage]]) -> List[str]:
+    def generate(self, final_prompt: str | list[BaseMessage]) -> list[str]:
         """Calls the model on the already-constructed prompt. Can be used in conjunction with
         build_prompt to re-use constructed prompts."""
         out = self.model.generate([final_prompt])
@@ -102,7 +101,7 @@ class Model:
         # the strings.
         return [r.text for r in out.generations[0]]
 
-    async def agenerate(self, final_prompt: Union[str, List[BaseMessage]]) -> List[str]:
+    async def agenerate(self, final_prompt: str | list[BaseMessage]) -> list[str]:
         out = await self.model.agenerate([final_prompt])
 
         # In the future we may surface other information from the results, but for now we just need
@@ -112,9 +111,9 @@ class Model:
     def build_prompt(
         self,
         prompt: str,
-        context: Optional[str] = None,
-        examples: Optional[List[Tuple[str, str]]] = None,
-    ) -> Union[str, List[BaseMessage]]:
+        context: str | None = None,
+        examples: list[tuple[str, str]] | None = None,
+    ) -> str | list[BaseMessage]:
         """Builds the final prompt as described in documentation for __call__, but returns the
         constructed prompt instead of running the model.
 
@@ -126,8 +125,8 @@ class Model:
 
     @staticmethod
     def build_chat_prompt(
-        prompt: str, context: Optional[str] = None, examples: Optional[List[Tuple[str, str]]] = None
-    ) -> List[BaseMessage]:
+        prompt: str, context: str | None = None, examples: list[tuple[str, str]] | None = None
+    ) -> list[BaseMessage]:
         out = []
 
         if context:
@@ -145,8 +144,8 @@ class Model:
     def build_completion_prompt(
         self,
         prompt: str,
-        context: Optional[str] = None,
-        examples: Optional[List[Tuple[str, str]]] = None,
+        context: str | None = None,
+        examples: list[tuple[str, str]] | None = None,
     ) -> str:
         out = ""
 
@@ -163,10 +162,10 @@ class Model:
 
 
 def log(
-    logger: Optional[logging.Logger],
+    logger: logging.Logger | None,
     prefix: str,
-    prompt: Union[str, List[BaseMessage]],
-    completion: List[str],
+    prompt: str | list[BaseMessage],
+    completion: list[str],
 ):
     """Log the prompt and completion in a human-friendly way."""
     if not logger:

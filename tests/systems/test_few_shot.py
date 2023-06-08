@@ -1,14 +1,15 @@
 import unittest
 
+import numpy as np
 from langchain.embeddings import FakeEmbeddings
 from langchain.prompts.example_selector import SemanticSimilarityExampleSelector
 from langchain.vectorstores import FAISS
-import numpy as np
 
 import recipenlg
 import systems
 
 from .mock_model import MockModel
+
 
 example_data = [
     {
@@ -148,7 +149,8 @@ class TestFewShot(unittest.TestCase):
         ]
         model = MockModel(self, expected_prompts, responses)
 
-        np.random.seed(27)  # seed for the fake embeddings so they're the same every time
+        # seed for the fake embeddings so they're the same every time
+        np.random.seed(27)  # noqa: NPY002  # FakeEmbeddings doesn't use Generator objects.
         selector = SemanticSimilarityExampleSelector.from_examples(
             data, FakeEmbeddings(size=10), FAISS, k=2
         )

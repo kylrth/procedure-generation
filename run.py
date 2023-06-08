@@ -1,30 +1,33 @@
 import argparse
 import asyncio
-from collections import defaultdict
 import logging
-import os
 import sys
-from typing import Any, Dict
+from collections import defaultdict
+from pathlib import Path
+from typing import Any
 
-from datasets import Dataset
 import numpy as np
+from datasets import Dataset
 
-from evaluation.eval import evaluation
 import recipenlg
+from evaluation.eval import evaluation
 from systems import Model, SystemInterface, ZeroShot
 
 
 def make_logger(name: str) -> logging.Logger:
     """Create a new logger that writes to logs/{name}.log (and nowhere else)."""
-    os.makedirs("logs", exist_ok=True)
+    log_dir = Path("logs")
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / f"{name}.log"
+
     logger = logging.getLogger(name)
     logger.propagate = False
-    logger.addHandler(logging.FileHandler(f"logs/{name}.log", "w"))
+    logger.addHandler(logging.FileHandler(log_file, "w"))
     logger.setLevel(logging.DEBUG)
     return logger
 
 
-async def generate_and_evaluate(model: SystemInterface, recipe: Dict[str, Any]):
+async def generate_and_evaluate(model: SystemInterface, recipe: dict[str, Any]):
     """Generate a recipe with the model, and then evaluate."""
     title = recipe["title"][0]
     ingredients = recipe["ingredients"][0]
