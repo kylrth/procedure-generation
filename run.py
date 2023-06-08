@@ -106,7 +106,7 @@ async def evaluate(model: SystemInterface, data: Dataset, n_workers: int = 10):
 
 def main(model: str, data_dir: str = "./data", n: int = sys.maxsize, n_workers: int = 10):
     model = Model.from_full_name(model)
-    system = ZeroShot(model, "Generate a recipe based on the title provided.\nRecipe:")
+    system = ZeroShot(model)
 
     data = recipenlg.load("val", data_dir)
     n = min(n, len(data))
