@@ -7,17 +7,18 @@ from .mock_model import MockModel
 
 class TestZeroShot(unittest.TestCase):
     def test_all(self):
-        instructions = "Generate a recipe based on the title provided."
         titles = ["No Bake Nut Cookies", "Spinach Dip", "Artichoke Casserole"]
 
-        expected_prompts = [instructions + "\n\n" + title + "\n" for title in titles]
+        expected_prompts = [
+            systems.ZeroShot.instructions + "\n\n" + title + "\n" for title in titles
+        ]
         responses = [
             "one",
             "two",
             "three",
         ]
         model = MockModel(self, expected_prompts, responses)
-        system = systems.ZeroShot(model, instructions)
+        system = systems.ZeroShot(model)
 
         self.assertEqual(responses[0], system.generate(titles[0])[0])
         self.assertEqual(responses[1], system.generate(titles[1])[0])
