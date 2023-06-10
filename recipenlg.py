@@ -10,7 +10,7 @@ from datasets import Dataset, load_dataset
 rng = np.random.default_rng(27)
 
 
-def load(split: str = "train", data_dir: str = "./data") -> Dataset:
+def load(split: str = "train", data_dir: str = "./data", hf_cache: str | None = None) -> Dataset:
     """Load the specified split of the RecipeNLG dataset. This dataset does not have set splits, so
     we specify them with a separate random number generator seeded with a constant value."""
     split = split.lower()
@@ -24,7 +24,7 @@ def load(split: str = "train", data_dir: str = "./data") -> Dataset:
     if split not in splits:
         raise ValueError("split must be one of", splits.keys())
 
-    ds = load_dataset("recipe_nlg", data_dir=data_dir)["train"]
+    ds = load_dataset("recipe_nlg", data_dir=data_dir, cache_dir=hf_cache)["train"]
     ds = ds.shuffle(generator=rng)
 
     begin_val = int(len(ds) * splits["val"])
@@ -39,13 +39,14 @@ def load(split: str = "train", data_dir: str = "./data") -> Dataset:
 
 
 def _preprocess(ds: Dataset) -> Dataset:
-    ds = ds.map(
-        lambda x: {
-            "directions": _split_steps(x["directions"]),
+    def map_fn(x):
+        directions = _split_steps(x["directions"])
+        return {
+            "directions": directions,
+            "formatted": (x["title"] + "\n\n" + format_recipe(x["ingredients"], directions)),
         }
-    )
 
-    return ds
+    return ds.map(map_fn)
 
 
 def _split_steps(steps: list[str]) -> list[str]:

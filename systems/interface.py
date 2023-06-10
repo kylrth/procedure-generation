@@ -2,7 +2,7 @@ import logging
 from abc import ABC, abstractmethod
 
 
-class SystemInterface(ABC):
+class System(ABC):
     """This is the interface that all systems in this package will implement. It can be imported for
     type annotations."""
 
