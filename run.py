@@ -1,3 +1,6 @@
+# ruff: noqa: T201
+# This script needs to print.
+
 import argparse
 import asyncio
 import logging
@@ -11,7 +14,7 @@ from datasets import Dataset
 
 import recipenlg
 from evaluation.eval import evaluation
-from systems import Model, SystemInterface, ZeroShot
+from systems import FewShot, Model, System, ZeroShot
 
 
 def make_logger(name: str) -> logging.Logger:
@@ -27,7 +30,7 @@ def make_logger(name: str) -> logging.Logger:
     return logger
 
 
-async def generate_and_evaluate(model: SystemInterface, recipe: dict[str, Any]):
+async def generate_and_evaluate(model: System, recipe: dict[str, Any]):
     """Generate a recipe with the model, and then evaluate."""
     title = recipe["title"][0]
 
@@ -64,7 +67,7 @@ async def worker(model, queue, results):
             queue.task_done()
 
 
-async def evaluate(model: SystemInterface, data: Dataset, n_workers: int = 10):
+async def evaluate(model: System, data: Dataset, n_workers: int = 10):
     """Evaluate the system with the given recipe data."""
     queue = asyncio.Queue()
     results = []
@@ -104,17 +107,6 @@ async def evaluate(model: SystemInterface, data: Dataset, n_workers: int = 10):
         print("The model returned bad responses for these titles:", " ".join(broken))
 
 
-def main(model: str, data_dir: str = "./data", n: int = sys.maxsize, n_workers: int = 10):
-    model = Model.from_full_name(model)
-    system = ZeroShot(model)
-
-    data = recipenlg.load("val", data_dir)
-    n = min(n, len(data))
-    data = data.select(np.arange(0, n))
-
-    asyncio.run(evaluate(system, data, n_workers))
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -123,6 +115,13 @@ if __name__ == "__main__":
         type=str,
         default="./data",
         help="directory containing the RecipeNLG dataset",
+    )
+    parser.add_argument(
+        "-s",
+        "--system",
+        type=str,
+        default="ZeroShot",
+        help="system to generate recipes",
     )
     parser.add_argument(
         "-m",
@@ -136,6 +135,34 @@ if __name__ == "__main__":
         "--workers", type=int, default=10, help="number of concurrent requests to make to the LLM"
     )
 
+    few_shot_options = parser.add_argument_group("FewShot")
+    few_shot_options.add_argument(
+        "--few-shot-k",
+        type=int,
+        default=3,
+        help="maximum number of examples to provide (fewer are provided if they don't fit)",
+    )
+    few_shot_options.add_argument(
+        "--few-shot-embeddings",
+        type=str,
+        default="sentence-transformers/all-mpnet-base-v2",
+        help="HuggingFace model to use for embeddings",
+    )
+
     args = parser.parse_args()
 
-    main(args.model, args.data_dir, args.n, args.workers)
+    model = Model.from_full_name(args.model)
+
+    system = args.system.lower()
+    if system == "zeroshot":
+        system = ZeroShot(model)
+    elif system == "fewshot":
+        system = FewShot(model, args.few_shot_k, args.few_shot_embeddings, data_dir=args.data_dir)
+    else:
+        raise NotImplementedError(args.system)
+
+    data = recipenlg.load("val", args.data_dir)
+    n = min(args.n, len(data))
+    data = data.select(np.arange(0, n))
+
+    asyncio.run(evaluate(system, data, args.workers))

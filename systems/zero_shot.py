@@ -1,14 +1,11 @@
 import logging
 
-from .interface import SystemInterface
+from .interface import System
 from .model import Model, log
 
 
-class ZeroShot(SystemInterface):
-    """This model prompts an LM to generate text zero-shot, meaning no examples are provided.
-
-    The template should expect a "title" input variable.
-    """
+class ZeroShot(System):
+    """This model prompts an LM to generate text zero-shot, meaning no examples are provided."""
 
     instructions: str = (
         "Please generate a recipe from the given title. Provide a list of ingredients and a list "

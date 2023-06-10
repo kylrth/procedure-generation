@@ -3,13 +3,13 @@ specific LMs."""
 
 
 from .few_shot import FewShot
-from .interface import SystemInterface
+from .interface import System
 from .model import Model
 from .zero_shot import ZeroShot
 
 
 __all__ = [
-    "SystemInterface",
+    "System",
     "Model",
     # systems
     "ZeroShot",

@@ -99,6 +99,13 @@ testset = Dataset.from_list(
         },
     ]
 )
+testset = testset.map(
+    lambda x: {
+        "formatted": (x["title"])
+        + "\n\n"
+        + recipenlg.format_recipe(x["ingredients"], x["directions"]),
+    },
+)
 
 # This is what the recipe for id 2 should look like after formatting the directions.
 id2_formatted = {
@@ -118,6 +125,21 @@ id2_formatted = {
         "Stir well before serving.",
         "Yields 6 servings.",
     ],
+    "formatted": """Creamy Corn
+
+Ingredients:
+- 2 (16 oz.) pkg. frozen corn
+- 1 (8 oz.) pkg. cream cheese, cubed
+- 1/3 c. butter, cubed
+- 1/2 tsp. garlic powder
+- 1/2 tsp. salt
+- 1/4 tsp. pepper
+Instructions:
+1. In a slow cooker, combine all ingredients.
+2. Cover and cook on low for 4 hours or until heated through and cheese is melted.
+3. Stir well before serving.
+4. Yields 6 servings.
+""".strip(),
     "link": "www.cookbooks.com/Recipe-Details.aspx?id=10570",
     "source": 0,
     "ner": ["frozen corn", "cream cheese", "butter", "garlic powder", "salt", "pepper"],
@@ -126,6 +148,7 @@ id2_formatted = {
 
 class TestPreprocess(unittest.TestCase):
     def test_basic(self):
+        self.maxDiff = None
         got = recipenlg._preprocess(testset)
 
         self.assertEqual(testset[0], got[0])
