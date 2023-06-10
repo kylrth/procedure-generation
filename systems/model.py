@@ -1,10 +1,35 @@
+import asyncio
 import logging
 import textwrap
+from collections.abc import Callable
+from dataclasses import dataclass
 
 from langchain.base_language import BaseLanguageModel
 from langchain.chat_models import ChatOpenAI
 from langchain.llms import OpenAI
 from langchain.schema import AIMessage, BaseMessage, HumanMessage, SystemMessage
+
+
+@dataclass
+class ModelDetails:
+    is_chat: bool
+    max_tokens: int
+    langchain_model: Callable[..., BaseLanguageModel]
+
+
+# enumerates the models that we can use
+model_info: dict[str, dict[str, ModelDetails]] = {
+    "openai": {
+        "gpt-3.5-turbo": ModelDetails(True, 4096, ChatOpenAI),
+        "gpt-4": ModelDetails(True, 8192, ChatOpenAI),
+        "gpt-4-32k": ModelDetails(True, 32768, ChatOpenAI),
+        "text-davinci-003": ModelDetails(False, 4097, OpenAI),
+        "text-davinci-002": ModelDetails(False, 4097, OpenAI),
+        "text-curie-001": ModelDetails(False, 2049, OpenAI),
+        "text-babbage-001": ModelDetails(False, 2049, OpenAI),
+        "text-ada-001": ModelDetails(False, 2049, OpenAI),
+    }
+}
 
 
 class Model:
@@ -14,16 +39,15 @@ class Model:
     # This is the string used to format examples into the prompts for completion models.
     example_fmt: str = "===BEGIN EXAMPLE===\n{title}\n{recipe}\n===END EXAMPLE==="
 
-    def __init__(
-        self, model: BaseLanguageModel, chat: bool = False, example_fmt: str | None = None
-    ):
+    # the number of tokens this model supports; set automatically by from_full_name
+    max_tokens: int | None = None
+
+    def __init__(self, model: BaseLanguageModel, chat: bool = False):
         self.model = model
         self.chat = chat
-        if example_fmt:
-            self.example_fmt = example_fmt
 
     @classmethod
-    def from_full_name(cls, full_name: str, example_fmt: str | None = None, **kwargs) -> "Model":
+    def from_full_name(cls, full_name: str, **kwargs) -> "Model":
         """Create a new model from a full name, which includes the service and model name.
 
         The full_name parameter combines the name of an LLM service (e.g. "openai") with the name of
@@ -33,22 +57,17 @@ class Model:
         """
         service, model = full_name.lower().split("-", 1)
 
-        factory, chat = cls.get_model_factory(service, model)
+        try:
+            details = model_info[service][model]
+        except KeyError:
+            raise NotImplementedError(full_name) from None
 
-        model = factory(model=model, **kwargs)
+        model = details.langchain_model(model=model, **kwargs)
 
-        return cls(model, chat, example_fmt)
+        out = cls(model, details.is_chat)
+        out.max_tokens = details.max_tokens
 
-    @staticmethod
-    def get_model_factory(service: str, model: str) -> tuple[type, bool]:
-        """Returns the factory for the specified model from langchain, and whether the model is a
-        chat model."""
-        if service == "openai":
-            if "gpt-4" in model or "gpt-3.5-turbo" in model:
-                return ChatOpenAI, True
-            return OpenAI, False
-
-        raise NotImplementedError(service)
+        return out
 
     def __call__(
         self,
@@ -159,6 +178,21 @@ class Model:
         out += prompt + "\n"
 
         return out
+
+    def get_num_tokens(self, example: tuple[str, str]) -> int:
+        """Get the number of tokens that would be used for this example, including all necessary
+        formatting."""
+        if self.chat:
+            return self.model.get_num_tokens_from_messages(
+                [
+                    HumanMessage(content=example[0]),
+                    AIMessage(content=example[1]),
+                ]
+            )
+
+        return self.model.get_num_tokens(
+            self.example_fmt.format(title=example[0], recipe=example[1]) + "\n\n"
+        )
 
 
 def log(
