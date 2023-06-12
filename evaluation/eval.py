@@ -207,6 +207,8 @@ async def evaluation(recipe: str, gold: dict[str, Any], logger: logging.Logger) 
     """Evaluates a generated recipe using all the above defined metrics"""
     title = gold["title"][0]
     gold = format_recipe(gold["ingredients"][0], gold["directions"][0])
+    r_ingredients, r_instructions = parse_recipe(recipe)
+    recipe = format_recipe(r_ingredients, r_instructions)
     async_tasks = [
         consistency(recipe, logger),
         relevance(title + "\n" + recipe, logger),
