@@ -30,9 +30,8 @@ def make_logger(name: str) -> logging.Logger:
 async def generate_and_evaluate(model: SystemInterface, recipe: dict[str, Any]):
     """Generate a recipe with the model, and then evaluate."""
     title = recipe["title"][0]
-    ingredients = recipe["ingredients"][0]
-    directions = recipe["directions"][0]
-    #recipe_text = recipenlg.format_recipe(ingredients, directions)
+    recipe["ingredients"][0]
+    recipe["directions"][0]
 
     logger = make_logger(str(recipe["id"][0]))
 
@@ -100,7 +99,7 @@ async def evaluate(model: SystemInterface, data: Dataset, n_workers: int = 10):
     # average the results
     scores_avg = defaultdict()
     for metric, score in scores.items():
-        scores_avg[metric] = np.mean(score)
+        scores_avg[metric] = np.round(np.mean(score), 3)
     print(scores_avg)
 
     if broken:
