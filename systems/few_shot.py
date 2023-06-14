@@ -1,4 +1,5 @@
 import logging
+import sys
 from os import PathLike
 from pathlib import Path
 
@@ -14,6 +15,29 @@ from .model import Model, log
 from .zero_shot import ZeroShot
 
 
+def load_embeddings(path: str | PathLike, max_rows: int | None = sys.maxsize) -> np.ndarray:
+    """Use np.loadtxt to read each embedding file in path until the concatenated result has max_rows
+    rows."""
+    tot = 0
+    arrays = []
+
+    i = 1
+    while True:
+        path = Path(path) / f"{i}.txt.gz"
+        try:
+            array = np.loadtxt(path, max_rows=max_rows - tot)
+        except FileNotFoundError:
+            break
+
+        arrays.append(array)
+        tot += len(array)
+
+        if tot >= max_rows:
+            break
+
+    return np.concatenate(arrays)
+
+
 class FewShot(System):
     """This model prompts an LM to generate text few-shot, with the examples provided by searching a
     vector store for texts with similar embeddings to the title."""
@@ -25,29 +49,36 @@ class FewShot(System):
         model: Model,
         k: int,
         embedding_model: str,
+        embedding_n: int = sys.maxsize,
         vs_path: str | PathLike = "vectors",
         emb_path: str | PathLike = "embeddings",
         data_dir: str | PathLike = "data",
     ):
         self.model = model
 
+        embedder = HuggingFaceEmbeddings(
+            model_name=embedding_model, encode_kwargs={"device": "cpu"}
+        )
+
         vs_path = Path(vs_path)
         if vs_path.exists():
-            embeddings = HuggingFaceEmbeddings(
-                model_name=embedding_model, encode_kwargs={"device": "cpu"}
-            )
-            store = FAISS.load_local(vs_path, embeddings)
+            store = FAISS.load_local(vs_path, embedder)
         else:
-            ds = recipenlg.load("train", data_dir)
             emb_path = Path(emb_path) / embedding_model
-            embeds = np.concatenate(np.loadtxt(file) for file in emb_path.glob("*.txt.gz"))
+            embeds = load_embeddings(emb_path, max_rows=embedding_n)
 
-            # TODO remove this
-            keep = 100000
-            ds = ds.select(np.arange(0, keep))
-            embeds = embeds[:keep]
+            ds = recipenlg.load("train", data_dir)
+            ds = ds.select(np.arange(0, len(embeds)))
 
-            store = FAISS.from_embeddings(zip(ds["formatted"], embeds, strict=True))
+            # We would use FAISS.from_embeddings, but it has a stupid list[tuple[str, list[float]]]
+            # argument.
+            store = FAISS._FAISS__from(
+                texts=ds["formatted"],
+                embeddings=embeds,
+                embedding=embedder,
+                metadatas=ds,
+                ids=list(map(str, ds["id"])),
+            )
             store.save_local(vs_path)
 
         self.selector = SemanticSimilarityExampleSelector(vectorstore=store, k=k)
@@ -62,7 +93,7 @@ class FewShot(System):
         return completion
 
     async def agenerate(self, title: str, logger: logging.Logger | None = None) -> list[str]:
-        examples = self.get_examples(title)
+        examples = self.get_examples(title, logger)
         prompt = self.model.build_prompt(title, self.instructions, examples)
         completion = await self.model.agenerate(prompt)
 
@@ -75,7 +106,12 @@ class FewShot(System):
     ) -> list[tuple[str, str]]:
         """Returns the examples that will be inserted into the prompt."""
         examples = self.selector.select_examples({"title": title})
-        examples = [(example["title"], example["recipe"]) for example in examples]
+        for i in range(len(examples)):
+            # split the title from the recipe
+            recipe = examples[i]["formatted"].split("\n\n", 1)[1]
+            examples[i] = (examples[i]["title"], recipe)
+
+        logger.debug(f"got {len(examples)} examples: {', '.join(ex[0] for ex in examples)}")
 
         token_budget = self.model.max_tokens
         if token_budget is not None:
