@@ -128,10 +128,19 @@ if __name__ == "__main__":
         help="maximum number of examples to provide (fewer are provided if they don't fit)",
     )
     few_shot_options.add_argument(
-        "--few-shot-embeddings",
+        "--few-shot-embed-model",
         type=str,
         default="sentence-transformers/all-mpnet-base-v2",
         help="HuggingFace model to use for embeddings",
+    )
+    few_shot_options.add_argument(
+        "--few-shot-embed-n",
+        type=int,
+        default=sys.maxsize,
+        help=(
+            "number of samples to use in the vector store. This is ignored when the vectors/ "
+            "directory exists"
+        ),
     )
 
     args = parser.parse_args()
@@ -142,7 +151,13 @@ if __name__ == "__main__":
     if system == "zeroshot":
         system = ZeroShot(model)
     elif system == "fewshot":
-        system = FewShot(model, args.few_shot_k, args.few_shot_embeddings, data_dir=args.data_dir)
+        system = FewShot(
+            model,
+            args.few_shot_k,
+            args.few_shot_embed_model,
+            args.few_shot_embed_n,
+            data_dir=args.data_dir,
+        )
     else:
         raise NotImplementedError(args.system)
 
