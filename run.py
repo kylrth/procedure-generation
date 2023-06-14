@@ -12,6 +12,7 @@ from datasets import Dataset
 import recipenlg
 from evaluation.eval import evaluation
 from systems import FewShot, Model, System, ZeroShot
+from workers import spread_gather
 
 
 def make_logger(name: str) -> logging.Logger:
@@ -56,32 +57,12 @@ async def generate_and_evaluate(model: System, recipe: dict[str, Any]):
     return scores, recipe["id"][0]
 
 
-async def worker(model, queue, results):
-    while True:
-        recipe = await queue.get()
-        try:
-            result = await generate_and_evaluate(model, recipe)
-            results.append(result)
-        finally:
-            queue.task_done()
-
-
 async def evaluate(model: System, data: Dataset, n_workers: int = 10):
     """Evaluate the system with the given recipe data."""
-    queue = asyncio.Queue()
-    results = []
-
-    n_workers = min(n_workers, len(data))
-    workers = []
-    for _ in range(n_workers):
-        workers.append(asyncio.create_task(worker(model, queue, results)))
-
-    for recipe in data.iter(1):
-        await queue.put(recipe)
-
-    await queue.join()
-    for w in workers:
-        w.cancel()
+    n_workers = max(n_workers, len(data))
+    results = await spread_gather(
+        lambda recipe: generate_and_evaluate(model, recipe), data.iter(1), n_workers, len(data)
+    )
 
     # collect results
     scores = defaultdict(list)
