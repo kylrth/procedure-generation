@@ -207,7 +207,12 @@ def log(
 
     if isinstance(prompt, list):
         # chat model
-        logged_prompt = textwrap.indent("\n".join(repr(msg) for msg in prompt), "  ")
+        def _format(msg: BaseMessage) -> str:
+            if "\n" not in msg.content:
+                return msg.__class__.__name__ + "(" + msg.content + ")"
+            return msg.__class__.__name__ + "(\n  " + msg.content.replace("\n", "\n  ") + "\n)"
+
+        logged_prompt = textwrap.indent("\n".join(_format(msg) for msg in prompt), "  ")
     else:
         # completion model
         logged_prompt = textwrap.indent(prompt, "  ")
