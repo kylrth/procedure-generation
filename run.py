@@ -11,6 +11,7 @@ from typing import Any
 
 import numpy as np
 from datasets import Dataset
+from language_tool_python import LanguageTool
 
 import recipenlg
 from evaluation.eval import evaluation
@@ -31,7 +32,7 @@ def make_logger(name: str) -> logging.Logger:
     return logger
 
 
-async def generate_and_evaluate(model: System, recipe: dict[str, Any]):
+async def generate_and_evaluate(model: System, recipe: dict[str, Any], lt: LanguageTool):
     """Generate a recipe with the model, and then evaluate."""
     title = recipe["title"][0]
 
@@ -50,7 +51,7 @@ async def generate_and_evaluate(model: System, recipe: dict[str, Any]):
             continue
 
         try:
-            evals = await evaluation(completion, recipe, logger)
+            evals = await evaluation(completion, recipe, lt, logger)
         except Exception:
             logger.exception("exception during evaluation", exc_info=True)
             break
@@ -66,9 +67,13 @@ async def generate_and_evaluate(model: System, recipe: dict[str, Any]):
 async def evaluate(model: System, data: Dataset, n_workers: int = 10):
     """Evaluate the system with the given recipe data."""
     n_workers = max(n_workers, len(data))
-    results = await spread_gather(
-        lambda recipe: generate_and_evaluate(model, recipe), data.iter(1), n_workers, len(data)
-    )
+    with LanguageTool("en_US") as lt:
+        results = await spread_gather(
+            lambda recipe: generate_and_evaluate(model, recipe, lt),
+            data.iter(1),
+            n_workers,
+            len(data),
+        )
 
     # collect results
     scores = defaultdict(list)
