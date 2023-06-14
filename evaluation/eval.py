@@ -10,7 +10,7 @@ from typing import Any
 import evaluate
 import language_tool_python
 from langchain.chat_models import ChatOpenAI
-from langchain.schema import HumanMessage, SystemMessage
+from langchain.schema import BaseMessage, HumanMessage, SystemMessage
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -30,10 +30,15 @@ def format_message_history(key: str, **kwargs):
     ]
 
 
-def log_output(caller: str, messages, resp):
+def log_output(caller: str, messages: list[BaseMessage], resp):
+    def _format(msg: BaseMessage) -> str:
+        if "\n" not in msg.content:
+            return msg.__class__.__name__ + "(" + msg.content + ")"
+        return msg.__class__.__name__ + "(\n  " + msg.content.replace("\n", "\n  ") + "\n)"
+
     return (
         f"{caller} prompt:\n"
-        + textwrap.indent("\n".join(msg.content for msg in messages), "  ")
+        + textwrap.indent("\n".join(_format(msg) for msg in messages), "  ")
         + f"\n{caller} response: {resp.generations[0][0].text}"
     )
 

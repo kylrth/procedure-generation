@@ -38,6 +38,7 @@ async def generate_and_evaluate(model: System, recipe: dict[str, Any]):
     logger = make_logger(str(recipe["id"][0]))
 
     res = await model.agenerate(title, logger)
+    logger.debug(f"got {len(res)} generations")
 
     scores = defaultdict(list)
     for completion in res:
@@ -48,7 +49,11 @@ async def generate_and_evaluate(model: System, recipe: dict[str, Any]):
             logger.warning(f"malformed recipe: {completion}")
             continue
 
-        evals = await evaluation(completion, recipe, logger)
+        try:
+            evals = await evaluation(completion, recipe, logger)
+        except Exception:
+            logger.exception("exception during evaluation", exc_info=True)
+            break
         for metric in evals:
             scores[metric].append(evals[metric])
 
@@ -79,13 +84,12 @@ async def evaluate(model: System, data: Dataset, n_workers: int = 10):
                 scores[metric].append(v)
 
     # average the results
-    scores_avg = defaultdict()
     for metric, score in scores.items():
-        scores_avg[metric] = np.round(np.mean(score), 3)
-    print(scores_avg)
+        avg = np.round(np.mean(score), 3)
+        print(f"{metric}: {avg}")
 
     if broken:
-        print("The model returned bad responses for these titles:", " ".join(broken))
+        print("\nno evaluation results for these IDs:", " ".join(str(i) for i in broken))
 
 
 if __name__ == "__main__":
@@ -142,8 +146,10 @@ if __name__ == "__main__":
     else:
         raise NotImplementedError(args.system)
 
+    print("loading data...", file=sys.stderr)
     data = recipenlg.load("val", args.data_dir)
     n = min(args.n, len(data))
     data = data.select(np.arange(0, n))
 
+    print("running evaluation...", file=sys.stderr)
     asyncio.run(evaluate(system, data, args.workers))
