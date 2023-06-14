@@ -8,9 +8,9 @@ from pathlib import Path
 from typing import Any
 
 import evaluate
-import language_tool_python
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import BaseMessage, HumanMessage, SystemMessage
+from language_tool_python import LanguageTool
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -83,13 +83,10 @@ def cosine_sim(recipe: str, gold: str) -> float:
     return round(cosine_similarity(tfidf_matrix[0], tfidf_matrix[1])[0][0], 3)
 
 
-def linguistic_correctness(recipe: str) -> int:
+def linguistic_correctness(lt: LanguageTool, recipe: str) -> int:
     """Metric Based Evaluation
     Counts grammar and spelling mistakes detected using LanguageCheck"""
-
-    tool = language_tool_python.LanguageTool("en-US")
-    matches = tool.check(recipe)
-    tool.close()
+    matches = lt.check(recipe)
     filtered_matches = [
         match
         for match in matches
@@ -208,35 +205,34 @@ async def relevance(recipe: str, logger: logging.Logger) -> int:
     return out
 
 
-async def evaluation(recipe: str, gold: dict[str, Any], logger: logging.Logger) -> dict[str, Any]:
+async def evaluation(
+    recipe: str, gold: dict[str, Any], lt: LanguageTool, logger: logging.Logger
+) -> dict[str, Any]:
     """Evaluates a generated recipe using all the above defined metrics"""
     title = gold["title"][0]
     gold = format_recipe(gold["ingredients"][0], gold["directions"][0])
     r_ingredients, r_instructions = parse_recipe(recipe)
     recipe = format_recipe(r_ingredients, r_instructions)
-    async_tasks = [
-        consistency(recipe, logger),
-        relevance(title + "\n" + recipe, logger),
-        structure(recipe, logger),
-        coherence(title + "\n" + recipe, logger),
-    ]
-    resp = await asyncio.gather(*async_tasks)
-    return {
-        "rouge": rouge(
-            recipe,
-            gold,
-        ),
-        "bleu": bleu(
-            recipe,
-            gold,
-        ),
-        "cosine similarity": cosine_sim(
-            recipe,
-            gold,
-        ),
-        "linguistic errors": linguistic_correctness(recipe),
-        "consistency": resp[0],
-        "relevance": resp[1],
-        "structure": resp[2],
-        "coherence": resp[3],
+
+    # run synchronous evaluations
+    results = {
+        "rouge": rouge(recipe, gold),
+        "bleu": bleu(recipe, gold),
+        "cosine similarity": cosine_sim(recipe, gold),
     }
+
+    # run asynchronous evaluations
+    async_tasks = {
+        "linguistic errors": asyncio.to_thread(linguistic_correctness, lt, recipe),
+        "consistency": consistency(recipe, logger),
+        "relevance": relevance(title + "\n" + recipe, logger),
+        "structure": structure(recipe, logger),
+        "coherence": coherence(title + "\n" + recipe, logger),
+    }
+    resp = await asyncio.gather(*async_tasks.values())
+
+    # add async results to dict
+    for name, result in zip(async_tasks.keys(), resp, strict=True):
+        results[name] = result
+
+    return results
