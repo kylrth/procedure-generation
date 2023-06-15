@@ -15,13 +15,13 @@ We will evaluate the generated recipes using the following metrics. Those marked
 
 - **ROUGE**: summarization score using the recipes in the dataset
 - **BLEU**: translation-inspired score using the recipes in the dataset
-- **cosine similarity**: calculated on TF-IDF representation to measure text similarity between generated and gold recipe
-- **linguistic correctness**: number of spelling and grammar mistakes detected with LanguageCheck
-- **coherence** (model-based): Is the recipe clear and readable according to an LLM?
-- **ingredient comparison**: how well the ingredients match with the gold recipe
-- **ingredient relevance** (model-based): Does the list of ingredients align with the culinary expectations of the recipe (e.g. no-bake, gluten free, etc.)?
-- **ingredient consistency**: Does the ingredients list accurately reflect the exact ingredients and amounts used in the directions?
-- **step order** (model-based): Does the order of the steps make sense?
+- **Cosine Similarity**: calculated on TF-IDF representation to measure text similarity between generated and gold recipe
+- **Linguistic Correctness**: number of spelling and grammar mistakes detected with LanguageCheck
+- **Hallucination**: Hallucination refers to a phenomenon where a language model generates text that is factually incorrect or nonsensical, but appears coherent and plausible on the surface. Hallucination will be measured by comparing the different samples and evaluating their similarity on key points of the recipe.
+- **Coherence** (model-based): refers to the logical consistency and clarity of a recipe, including the sequential order of steps and absence of gibberish or nonsensical information. It also encompasses the grammatical correctness and simplicity of the recipe, ensuring that it is easily understandable and makes sense to the reader.
+- **Relevance** (model-based): refers to the appropriateness and alignment of the ingredients used in a recipe with its title, ensuring that all ingredients are relevant to the intended dish. It also involves ensuring that each step in the recipe contributes towards achieving the desired outcome mentioned in the recipe title, avoiding any unnecessary or unrelated instructions.
+- **Consistency** (model-based): refers to the alignment between the ingredients listed, their respective measurements, and their usage in the recipe steps, ensuring coherence and logical progression. It also encompasses the assurance that the recipe yields the intended dish, without contradictory instructions or logical inconsistencies throughout.
+- **Structure** (model-based): refers to the adherence to a standardized format, including an organized ingredients list and step-by-step instructions, facilitating clear understanding and easy execution. It ensures that all listed ingredients are actual ingredients, and the steps provided are actionable and sequentially structured, enhancing clarity and usability.
 - and more
 
 ## dependencies
