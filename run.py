@@ -30,9 +30,6 @@ def make_logger(name: str) -> logging.Logger:
 async def generate_and_evaluate(model: SystemInterface, recipe: dict[str, Any]):
     """Generate a recipe with the model, and then evaluate."""
     title = recipe["title"][0]
-    ingredients = recipe["ingredients"][0]
-    directions = recipe["directions"][0]
-    recipe_text = recipenlg.format_recipe(ingredients, directions)
 
     logger = make_logger(str(recipe["id"][0]))
 
@@ -47,7 +44,7 @@ async def generate_and_evaluate(model: SystemInterface, recipe: dict[str, Any]):
             logger.warning(f"malformed recipe: {completion}")
             continue
 
-        evals = await evaluation(completion, recipe_text, logger)
+        evals = await evaluation(completion, recipe, logger)
         for metric in evals:
             scores[metric].append(evals[metric])
 
@@ -100,7 +97,7 @@ async def evaluate(model: SystemInterface, data: Dataset, n_workers: int = 10):
     # average the results
     scores_avg = defaultdict()
     for metric, score in scores.items():
-        scores_avg[metric] = np.mean(score)
+        scores_avg[metric] = np.round(np.mean(score), 3)
     print(scores_avg)
 
     if broken:
@@ -109,7 +106,7 @@ async def evaluate(model: SystemInterface, data: Dataset, n_workers: int = 10):
 
 def main(model: str, data_dir: str = "./data", n: int = sys.maxsize, n_workers: int = 10):
     model = Model.from_full_name(model)
-    system = ZeroShot(model)
+    system = ZeroShot(model, "Generate a recipe based on the title provided.\nRecipe:")
 
     data = recipenlg.load("val", data_dir)
     n = min(n, len(data))

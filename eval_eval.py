@@ -7,55 +7,40 @@ import numpy as np
 import recipenlg
 from evaluation.eval import (
     coherence,
-    ingredient_comparison,
-    ingredient_consistency,
-    ingredient_relevance,
-    step_order,
+    consistency,
+    relevance,
+    structure,
 )
-from recipenlg import format_recipe, parse_recipe
+from recipenlg import format_recipe
 from run import make_logger
-from systems import Model, ZeroShot
 
 
-def ingredient_consistency_extraction(test_data):
-    logger = make_logger("ingredient_consistency")
+def consistency_extraction(test_data):
+    logger = make_logger("consistency")
     return [
-        ingredient_consistency(format_recipe(r["ingredients"], r["directions"]), logger)
+        consistency(format_recipe(r["ingredients"], r["directions"]), logger) for r in test_data
+    ]
+
+
+def relevance_extraction(test_data):
+    logger = make_logger("relevance")
+    return [
+        relevance(r["title"] + "\n" + format_recipe(r["ingredients"], r["directions"]), logger)
         for r in test_data
     ]
 
 
-def ingredient_relevance_extraction(test_data):
-    logger = make_logger("ingredient_relevance")
-    return [
-        ingredient_relevance(
-            r["title"] + "\n" + format_recipe(r["ingredients"], r["directions"]), logger
-        )
-        for r in test_data
-    ]
-
-
-def step_order_extraction(test_data):
-    logger = make_logger("step_order")
-    return [step_order("Instructions:\n" + "\n".join(r["directions"]), logger) for r in test_data]
+def structure_extraction(test_data):
+    logger = make_logger("structure")
+    return [structure(format_recipe(r["ingredients"], r["directions"]), logger) for r in test_data]
 
 
 def coherence_extraction(test_data):
     logger = make_logger("coherence")
-    return [coherence(format_recipe(r["ingredients"], r["directions"]), logger) for r in test_data]
-
-
-def ingredient_comparison_extraction(data):
-    logger = make_logger("ingredient_comparison")
-    model = Model.from_full_name("openai-gpt-3.5-turbo")
-    system = ZeroShot(model, "Please generate a recipe")
-
-    async def generate_and_compare(r):
-        generated = await system.agenerate(r["title"])
-        generated_ingredients, _ = parse_recipe(generated[0])
-        await ingredient_comparison("\n".join(generated_ingredients), r["ingredients"], logger)
-
-    return [generate_and_compare(r) for r in data]
+    return [
+        coherence(r["title"] + "\n" + format_recipe(r["ingredients"], r["directions"]), logger)
+        for r in test_data
+    ]
 
 
 async def worker(queue):
@@ -76,11 +61,10 @@ async def main(data_dir: str = "./data", n_workers: int = 20, n: int = 3):
         workers.append(asyncio.create_task(worker(queue)))
 
     tasks = [
-        ingredient_consistency_extraction(data),
-        ingredient_relevance_extraction(data),
+        consistency_extraction(data),
+        relevance_extraction(data),
         coherence_extraction(data),
-        step_order_extraction(data),
-        ingredient_comparison_extraction(data),
+        structure_extraction(data),
     ]
     for _task in tasks:
         for task in _task:
