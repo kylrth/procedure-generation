@@ -27,6 +27,9 @@ def load_embeddings(path: str | PathLike, max_rows: int | None = None) -> np.nda
                 max_rows=max_rows - tot if max_rows is not None else None,
             )
         except FileNotFoundError:
+            if len(arrays) == 0:
+                # the embeddings are missing
+                raise
             break
 
         arrays.append(array)
