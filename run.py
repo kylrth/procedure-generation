@@ -11,6 +11,7 @@ from typing import Any
 
 import numpy as np
 from datasets import Dataset
+from langchain.embeddings import HuggingFaceEmbeddings
 from language_tool_python import LanguageTool
 
 import recipenlg
@@ -147,22 +148,25 @@ if __name__ == "__main__":
             "directory exists"
         ),
     )
+    few_shot_options.add_argument(
+        "--few-shot-embed-gpu", action="store_true", help="compute embeddings on the GPU"
+    )
 
     args = parser.parse_args()
 
     model = Model.from_full_name(args.model)
 
+    print("creating system...", file=sys.stderr)
     system = args.system.lower()
     if system == "zeroshot":
         system = ZeroShot(model)
     elif system == "fewshot":
-        system = FewShot(
-            model,
-            args.few_shot_k,
-            args.few_shot_embed_model,
-            args.few_shot_embed_n,
-            data_dir=args.data_dir,
+        ds = recipenlg.load("train", args.data_dir)
+        embedder = HuggingFaceEmbeddings(
+            model_name=args.few_shot_embed_model,
+            encode_kwargs=None if args.few_shot_embed_gpu else {"device": "cpu"},
         )
+        system = FewShot(model, args.few_shot_k, ds, embedder, args.few_shot_embed_n)
     else:
         raise NotImplementedError(args.system)
 
