@@ -19,9 +19,10 @@ class ModelDetails:
 # enumerates the models that we can use
 model_info: dict[str, dict[str, ModelDetails]] = {
     "openai": {
-        "gpt-3.5-turbo": ModelDetails(True, 4096, ChatOpenAI),
-        "gpt-4": ModelDetails(True, 8192, ChatOpenAI),
-        "gpt-4-32k": ModelDetails(True, 32768, ChatOpenAI),
+        "gpt-3.5-turbo-0613": ModelDetails(True, 4096, ChatOpenAI),
+        "gpt-3.5-turbo-16k-0613": ModelDetails(True, 16384, ChatOpenAI),
+        "gpt-4-0613": ModelDetails(True, 8192, ChatOpenAI),
+        "gpt-4-32k-0613": ModelDetails(True, 32768, ChatOpenAI),
         "text-davinci-003": ModelDetails(False, 4097, OpenAI),
         "text-davinci-002": ModelDetails(False, 4097, OpenAI),
         "text-curie-001": ModelDetails(False, 2049, OpenAI),
