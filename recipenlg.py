@@ -7,6 +7,7 @@ from datasets import Dataset, load_dataset
 
 
 # deterministic shuffle not tied to any seed value anywhere else
+
 rng = np.random.default_rng(27)
 
 
@@ -85,7 +86,10 @@ _markers = re.compile(r"([-*]|[0-9]+\.)\s*")
 def parse_recipe(s: str) -> tuple[list[str], list[str]]:
     """Takes a recipe (title optional) and returns the list of ingredients and the list of
     instructions."""
-    start = s.index("Ingredients:\n") + len("Ingredients:\n")
+    try:
+        start = s.index("Ingredients:\n") + len("Ingredients:\n")
+    except ValueError:
+        return [], []
     try:
         end = s.index("\nInstructions:")
     except ValueError:

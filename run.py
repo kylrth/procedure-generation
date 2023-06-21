@@ -15,7 +15,7 @@ from langchain.embeddings import HuggingFaceEmbeddings
 from language_tool_python import LanguageTool
 
 import recipenlg
-from evaluation.eval import evaluation
+from evaluation.eval import evaluation, hallucination
 from systems import FewShot, Model, System, ZeroShot
 from workers import spread_gather
 
@@ -43,6 +43,7 @@ async def generate_and_evaluate(model: System, recipe: dict[str, Any], lt: Langu
     logger.debug(f"got {len(res)} generations")
 
     scores = defaultdict(list)
+    scores["hallucination"].append(hallucination(res, logger))
     for completion in res:
         # make sure the recipe is correctly generated
         try:
@@ -154,7 +155,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    model = Model.from_full_name(args.model)
+    model = Model.from_full_name(args.model, n=3)
 
     print("creating system...", file=sys.stderr)
     system = args.system.lower()

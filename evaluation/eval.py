@@ -7,10 +7,13 @@ import textwrap
 from pathlib import Path
 from typing import Any
 
+import bert_score
 import evaluate
+import numpy as np
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import BaseMessage, HumanMessage, SystemMessage
 from language_tool_python import LanguageTool
+from numpy import ndarray
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -95,7 +98,24 @@ def linguistic_correctness(lt: LanguageTool, recipe: str) -> int:
     return len(filtered_matches)
 
 
-async def hallucination() -> float:
+async def quality(recipe: str, logger: logging.Logger) -> float:
+    messages = format_message_history("quality", recipe=recipe)
+    resp = await chatgpt.agenerate(messages=[messages])
+    log_text = log_output("quality", messages, resp)
+    response = resp.generations[0][0].text
+    pattern = r"\d+"
+    match = re.findall(pattern, response)
+
+    if len(match) > 1:
+        out = int(match[-2])
+        logger.debug(f"{log_text}\n quality result: {out}\n\n\n")
+    else:
+        out = 0
+        logger.warning(f"FAIL- {log_text}\n\n\n")
+    return out
+
+
+def hallucination(completions, logger) -> ndarray:
     """LLM Based Evaluation
     Receives several samples of completions of a recipe.
     Hallucination refers to a phenomenon where a language model generates text that is factually
@@ -103,8 +123,51 @@ async def hallucination() -> float:
     Hallucination will be measured by comparing the different samples and evaluating their
     similarity on key points of the recipe.
     """
-    # Implement this function
-    return 0
+
+    # TO DO Add logging and async processing
+    def expand_list1(mylist, num):
+        """
+        in : [ri1, ri2, ri3], 2
+        out : [ri1, ri1, ri2, ri2, ri3, ri3]
+        """
+        expanded = []
+        for x in mylist:
+            for _ in range(num):
+                expanded.append(x)
+        return expanded
+
+    def expand_list2(mylist, num):
+        """
+        in : [si1, si2, si3], 2
+        out : [si1, si2, si3, si1, si2, si3]
+        """
+        expanded = []
+        for _ in range(num):
+            for x in mylist:
+                expanded.append(x)
+        return expanded
+
+    # example for ref(2 ingredients, 3 steps) and sample(3 ingredients, 2 steps)
+    res = []
+    completions = [parse_recipe(comp) for comp in completions]
+    ref = completions.pop(0)
+    for sample in completions:
+        r_ings = expand_list1(ref[0], len(sample[0]))
+        s_ings = expand_list2(sample[0], len(ref[0]))
+        r_steps = expand_list1(ref[1], len(sample[1]))
+        s_steps = expand_list2(sample[1], len(ref[1]))
+        # Calculate bert_score for ingredients
+        P_i, R_i, F1_i = bert_score.score(s_ings, r_ings, lang="en", idf=True)
+        # Calculate bert_score for steps
+        P_s, R_s, F1_s = bert_score.score(s_steps, r_steps, lang="en", idf=True)
+        F1_i = F1_i.reshape(len(sample[0]), len(ref[0]))
+        F1_s = F1_s.reshape(len(sample[1]), len(ref[1]))
+        F1_i_arr = F1_i.max(axis=0).values.numpy()
+        F1_s_arr = F1_s.max(axis=0).values.numpy()
+        F1_max = np.concatenate((F1_i_arr, F1_s_arr))
+        res.append(np.mean(F1_max))
+    res = np.mean(res)
+    return res
 
 
 async def consistency(recipe: str, logger: logging.Logger) -> int:
@@ -118,7 +181,7 @@ async def consistency(recipe: str, logger: logging.Logger) -> int:
     messages = format_message_history("consistency", recipe=recipe)
 
     resp = await chatgpt.agenerate(messages=[messages])
-    log_text = log_output("consistency", messages, resp)
+    log_text = log_output("consistency", [], resp)
     response = resp.generations[0][0].text
     pattern = r"\d+"
     match = re.search(pattern, response)
@@ -126,30 +189,6 @@ async def consistency(recipe: str, logger: logging.Logger) -> int:
     if match is not None:
         out = int(match.group())
         logger.debug(f"{log_text}\n consistency result: {out}\n\n\n")
-    else:
-        out = 0
-        logger.warning(f"FAIL- {log_text}\n\n\n")
-    return out
-
-
-async def structure(recipe: str, logger: logging.Logger) -> int:
-    """Model Based Evaluation Receives ingredients and instructions Recipe structure correctness
-    refers to the adherence to a standardized format, including an organized ingredients list and
-    step-by-step instructions, facilitating clear understanding and easy execution. It ensures
-    that all listed ingredients are actual ingredients, and the steps provided are actionable and
-    sequentially structured, enhancing clarity and usability."""
-    messages = format_message_history("structure", recipe=recipe)
-
-    resp = await chatgpt.agenerate(messages=[messages])
-    log_text = log_output("structure", messages, resp)
-
-    response = resp.generations[0][0].text
-    pattern = r"\d+"
-    match = re.search(pattern, response)
-
-    if match is not None:
-        out = int(match.group())
-        logger.debug(f"{log_text}\n structure result: {out}\n\n\n")
     else:
         out = 0
         logger.warning(f"FAIL- {log_text}\n\n\n")
@@ -165,9 +204,12 @@ async def coherence(recipe: str, logger: logging.Logger) -> int:
     messages = format_message_history("coherence", recipe=recipe)
 
     resp = await chatgpt.agenerate(messages=[messages])
-    log_text = log_output("coherence", messages, resp)
+    log_text = log_output("coherence", [], resp)
 
     response = resp.generations[0][0].text
+    pattern = r"\d+"
+    match = re.search(pattern, response)
+
     pattern = r"\d+"
     match = re.search(pattern, response)
 
@@ -190,7 +232,7 @@ async def relevance(recipe: str, logger: logging.Logger) -> int:
     messages = format_message_history("relevance", recipe=recipe)
 
     resp = await chatgpt.agenerate(messages=[messages])
-    log_text = log_output("relevance", messages, resp)
+    log_text = log_output("relevance", [], resp)
 
     response = resp.generations[0][0].text
     pattern = r"\d+"
@@ -226,8 +268,8 @@ async def evaluation(
         "linguistic errors": asyncio.to_thread(linguistic_correctness, lt, recipe),
         "consistency": consistency(recipe, logger),
         "relevance": relevance(title + "\n" + recipe, logger),
-        "structure": structure(recipe, logger),
         "coherence": coherence(title + "\n" + recipe, logger),
+        "quality": quality(title + "\n" + recipe, logger),
     }
     resp = await asyncio.gather(*async_tasks.values())
 
