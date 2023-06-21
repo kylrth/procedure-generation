@@ -166,7 +166,14 @@ if __name__ == "__main__":
             model_name=args.few_shot_embed_model,
             encode_kwargs=None if args.few_shot_embed_gpu else {"device": "cpu"},
         )
-        system = FewShot(model, args.few_shot_k, ds, embedder, args.few_shot_embed_n)
+        system = FewShot(
+            model,
+            args.few_shot_k,
+            ds,
+            embedder,
+            args.few_shot_embed_n,
+            Path("embeddings") / args.few_shot_embed_model,
+        )
     else:
         raise NotImplementedError(args.system)
 
