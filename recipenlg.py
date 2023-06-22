@@ -73,14 +73,14 @@ def format_recipe(ingredients: list[str], directions: list[str]) -> str:
         (
             "Ingredients:",
             "\n".join("- " + ingredient for ingredient in ingredients),
-            "Instructions:",
+            "\nInstructions:",
             "\n".join(f"{i+1}. {step}" for i, step in enumerate(directions)),
         )
     )
 
 
-# matches "- ", "* ", or "1. ", "2. ", etc.
-_markers = re.compile(r"([-*]|[0-9]+\.)\s*")
+# matches "- ", "* ", or "1. ", "2. ", etc. at the start of a line
+_markers = re.compile(r"^([-*]|[0-9]+\.)\s*")
 
 
 def parse_recipe(s: str) -> tuple[list[str], list[str]]:

@@ -1,3 +1,5 @@
+# ruff: noqa: E501
+
 import unittest
 
 from datasets import Dataset
@@ -134,6 +136,7 @@ Ingredients:
 - 1/2 tsp. garlic powder
 - 1/2 tsp. salt
 - 1/4 tsp. pepper
+
 Instructions:
 1. In a slow cooker, combine all ingredients.
 2. Cover and cook on low for 4 hours or until heated through and cheese is melted.
@@ -147,8 +150,9 @@ Instructions:
 
 
 class TestPreprocess(unittest.TestCase):
+    maxDiff = None
+
     def test_basic(self):
-        self.maxDiff = None
         got = recipenlg._preprocess(testset)
 
         self.assertEqual(testset[0], got[0])
@@ -242,6 +246,8 @@ Instructions:
 
 
 class TestRecipeFormat(unittest.TestCase):
+    maxDiff = None
+
     def test_parse_variations(self):
         for name, variation in format_variations.items():
             with self.subTest(name):
@@ -256,6 +262,36 @@ class TestRecipeFormat(unittest.TestCase):
 
         self.assertEqual(id2_formatted["ingredients"], got_i)
         self.assertEqual(id2_formatted["directions"], got_d)
+
+    def test_internal_numbers_hyphens(self):
+        # make sure internal numbers and hyphens are handled correctly
+        original = """Ingredients:
+- 1 can (15.25 oz) whole kernel corn, drained
+- 1 can (14.75 oz) cream-style corn
+- 1 cup cornmeal
+- 1/2 cup all-purpose flour
+- 1/4 cup granulated sugar
+- 1/2 teaspoon baking powder
+- 1/2 teaspoon salt
+- 1/4 teaspoon black pepper
+- 1/2 cup melted butter
+- 1 cup sour cream
+- 2 large eggs, beaten
+- 1 cup shredded cheddar cheese
+
+Instructions:
+1. Preheat the oven to 375°F (190°C). Grease a 9x9-inch baking dish.
+2. In a large bowl, combine the whole kernel corn, cream-style corn, cornmeal, flour, sugar, baking powder, salt, and black pepper. Mix well.
+3. Add the melted butter, sour cream, beaten eggs, and shredded cheddar cheese to the corn mixture. Stir until all ingredients are well combined.
+4. Pour the mixture into the greased baking dish, spreading it evenly.
+5. Bake in the preheated oven for 45-50 minutes, or until the top is golden brown and the casserole is set in the center.
+6. Remove from the oven and let it cool for a few minutes before serving.
+7. Serve warm as a side dish or as a main course with a salad or vegetables. Enjoy!"""
+
+        ing, ins = recipenlg.parse_recipe(original)
+        got = recipenlg.format_recipe(ing, ins)
+
+        self.assertEqual(original, got)
 
 
 if __name__ == "__main__":
