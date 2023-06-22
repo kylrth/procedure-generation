@@ -30,4 +30,4 @@ We will evaluate the generated recipes using the following metrics. Those marked
 pip install -r requirements.txt
 ```
 
-If you're doing development, also run `pip install -r requirements_dev.txt`.
+If you want CPU versions of PyTorch (a dependency of `sentence-transformers`), be sure to install them beforehand. If you're doing development, also run `pip install -r requirements_dev.txt`.
