@@ -18,6 +18,8 @@ from .mock_model import MockModel
 class SampleEmbeddingsFramework(unittest.TestCase):
     """Some setup and teardown for a temporary embeddings file for testing."""
 
+    maxDiff = None
+
     def setUp(self):
         self.temp_dir = tempfile.mkdtemp()
         rng = np.random.default_rng(27)
@@ -130,6 +132,7 @@ Ingredients:
 - 2 eggs
 - 1 tsp. salt
 - 1 1/2 c. milk
+
 Instructions:
 1. Heat milk, add butter and salt.
 2. Cool slightly and add the corn meal and baking powder which have been sifted together, then the \
@@ -153,6 +156,7 @@ Ingredients:
 - 1 can (12-ounce) frzn orange juice, reconstituted
 - 1/2 x "tall can" frzn pineapple juice, reconstituted
 - 1/2 x "tall can" grapefruit juice, reconstituted (optional)
+
 Instructions:
 1. This recipe contains no carbonation and no ice cream.
 2. I have not tried it spiked, but you could probably add in rum to it (I'm not up on alcohol, but I believe which's supposed to be good in punch).
@@ -172,7 +176,6 @@ Instructions:
 
 class TestFewShot(SampleEmbeddingsFramework):
     def test_all(self):
-        self.maxDiff = None
         titles = ["No Bake Nut Cookies"]
 
         expected_prompts = [
