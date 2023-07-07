@@ -48,7 +48,7 @@ def log_output(caller: str, messages: list[BaseMessage], resp):
 
 rouge_metric = evaluate.load("rouge")
 bleu_metric = evaluate.load("bleu")
-chatgpt = ChatOpenAI(temperature=0.3)
+chatgpt = ChatOpenAI(model="gpt-4-0613", temperature=0.3)
 
 
 def rouge(recipe: str, gold: str) -> float:
@@ -115,6 +115,9 @@ async def quality(recipe: str, logger: logging.Logger) -> float:
     return out
 
 
+_bert_scorer = bert_score.BERTScorer(lang="en")
+
+
 def hallucination(completions, logger) -> ndarray:
     """LLM Based Evaluation
     Receives several samples of completions of a recipe.
@@ -157,9 +160,9 @@ def hallucination(completions, logger) -> ndarray:
         r_steps = expand_list1(ref[1], len(sample[1]))
         s_steps = expand_list2(sample[1], len(ref[1]))
         # Calculate bert_score for ingredients
-        P_i, R_i, F1_i = bert_score.score(s_ings, r_ings, lang="en", idf=True)
+        P_i, R_i, F1_i = _bert_scorer.score(s_ings, r_ings)
         # Calculate bert_score for steps
-        P_s, R_s, F1_s = bert_score.score(s_steps, r_steps, lang="en", idf=True)
+        P_s, R_s, F1_s = _bert_scorer.score(s_steps, r_steps)
         F1_i = F1_i.reshape(len(sample[0]), len(ref[0]))
         F1_s = F1_s.reshape(len(sample[1]), len(ref[1]))
         F1_i_arr = F1_i.max(axis=0).values.numpy()
