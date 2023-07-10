@@ -3,7 +3,7 @@ line-length = 100
 
 [tool.ruff]
 select = ["A", "B", "C", "E", "F", "I", "N", "Q", "S", "T", "W", "ARG", "BLE", "DJ", "DTZ", "EM", "ERA", "EXE", "ICN", "ISC", "NPY", "PD", "PGH", "PIE", "PL", "PT", "PTH", "PYI", "RET", "RSE", "RUF", "SIM", "TCH", "TID", "TRY", "UP", "YTT"]
-ignore = ["EM101", "PLR0913", "PT009", "TRY003"]
+ignore = ["EM101", "PLC1901", "PLR0913", "PT009", "TRY003"]
 line-length = 100
 
 [tool.ruff.isort]
