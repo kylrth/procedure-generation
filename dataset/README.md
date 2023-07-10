@@ -18,3 +18,9 @@ docs/
 ```
 
 The `is_procedure(url: str) -> bool` function in [scrape.py](scrape.py) determines whether a document ends up in `concepts/` or `procedures/full/`.
+
+Next, format the procedures by running `format_procedure.py`. This runs all the procedures through GPT-4 to remove all unnecessary details and structure the procedures into a set of steps.
+The formatted procedures will be stored under `docs/procedures/formatted/`.
+
+The `count_markdown_files(path: str) -> int` function in [format_procedure.py](format_procedure.py) counts the number of markdown files in the specified directory, allowing you to get the total number of procedures in this dataset for any potential use.
+The `count_tokens(path: str) -> int` function in [format_procedure.py](format_procedure.py) counts the number of tokens in all the markdown files in the specified directory, allowing you to approximate the cost of running this pipeline using OpenAI's pricing.
