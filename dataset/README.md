@@ -24,3 +24,5 @@ The formatted procedures will be stored under `docs/procedures/formatted/`.
 
 The `count_markdown_files(path: str) -> int` function in [format_procedure.py](format_procedure.py) counts the number of markdown files in the specified directory, allowing you to get the total number of procedures in this dataset for any potential use.
 The `count_tokens(path: str) -> int` function in [format_procedure.py](format_procedure.py) counts the number of tokens in all the markdown files in the specified directory, allowing you to approximate the cost of running this pipeline using OpenAI's pricing.
+
+Finally, run `api_ref.py` to check out the LangChain repo, build the docs, and clean up the formatting. These end up in `docs/api`.
