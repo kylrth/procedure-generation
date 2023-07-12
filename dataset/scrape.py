@@ -85,19 +85,19 @@ def should_skip_page(body: bs4.Tag | bs4.NavigableString | None) -> bool:
 
 
 # for postprocessing
-h2t = HTML2Text(
+_h2t = HTML2Text(
     baseurl="https://python.langchain.com",
     bodywidth=0,  # no wrap
 )
-h2t.ignore_images = True
-h2t.mark_code = True
-h2t.skip_internal_links = True
-h2t.unicode_snob = True
+_h2t.ignore_images = True
+_h2t.mark_code = True
+_h2t.skip_internal_links = True
+_h2t.unicode_snob = True
 code_start = "[code]"
 code_end = "[/code]"
 
 
-def format_soup(body: bs4.Tag | bs4.NavigableString | None) -> str:
+def format_soup(body: bs4.Tag | bs4.NavigableString, h2t=_h2t) -> str:
     # convert to plaintext
     text = h2t.handle("\n".join(str(thing) for thing in body.contents))
 

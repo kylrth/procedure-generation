@@ -21,10 +21,11 @@ jobs:
         cache-dependency-path: |
           requirements.txt
           requirements_dev.txt
+          dataset/requirements.txt
     - name: install dependencies
       run: |
         pip install --upgrade pip
-        pip install -r requirements.txt -r requirements_dev.txt
+        pip install -r requirements.txt -r requirements_dev.txt -r dataset/requirements.txt
 
     - name: restore caches
       uses: actions/cache/restore@v3
