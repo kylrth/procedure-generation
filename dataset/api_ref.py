@@ -27,10 +27,12 @@ def get_api_reference(target_dir: str | PathLike) -> Path:
             ]
         )
 
+    # check out fixed version
+    subprocess.check_call(["git", "checkout", "v0.0.226"], cwd=target_dir)
+
     # build the API docs
     build_dir = target_dir / "docs" / "api_reference" / "_build"
-    if not build_dir.exists():
-        subprocess.check_call(["make", "html"], cwd=build_dir.parent)
+    subprocess.check_call(["make", "html"], cwd=build_dir.parent)
 
     return build_dir / "html"
 
