@@ -10,6 +10,7 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 from html2text import HTML2Text
 from scrape import format_soup
+from tqdm import tqdm
 
 
 def get_api_reference(target_dir: str | PathLike) -> Path:
@@ -26,9 +27,12 @@ def get_api_reference(target_dir: str | PathLike) -> Path:
                 subprocess.list2cmdline([target_dir]),  # escape
             ]
         )
+    else:
+        # fetch any new tags
+        subprocess.check_call(["git", "fetch"], cwd=target_dir)
 
     # check out fixed version
-    subprocess.check_call(["git", "checkout", "v0.0.226"], cwd=target_dir)
+    subprocess.check_call(["git", "checkout", "v0.0.249"], cwd=target_dir)
 
     # build the API docs
     build_dir = target_dir / "docs" / "api_reference" / "_build"
@@ -108,7 +112,8 @@ if __name__ == "__main__":
     doc_root = get_api_reference("_lc_api_ref_gen")
     out_root = Path("./docs") / "api"
 
-    for name, file in get_api_paths(doc_root / "api_reference.html"):
+    files = list(get_api_paths(doc_root / "api_reference.html"))
+    for name, file in tqdm(files, desc="formatting files"):
         doc = get_doc(file)
 
         out_path = out_root / name

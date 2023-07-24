@@ -17,7 +17,7 @@ from language_tool_python import LanguageTool
 import recipenlg
 from evaluation.eval import evaluation
 from systems import FewShot, Model, System, ZeroShot
-from workers import spread_gather
+from utils import spread_gather
 
 
 def make_logger(name: str) -> logging.Logger:
@@ -67,7 +67,7 @@ async def generate_and_evaluate(model: System, recipe: dict[str, Any], lt: Langu
 
 async def evaluate(model: System, data: Dataset, n_workers: int = 10):
     """Evaluate the system with the given recipe data."""
-    n_workers = max(n_workers, len(data))
+    n_workers = min(n_workers, len(data))
     with LanguageTool("en_US") as lt:
         results = await spread_gather(
             lambda recipe: generate_and_evaluate(model, recipe, lt),

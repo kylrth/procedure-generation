@@ -1,0 +1,7 @@
+Goal: track token usage for an OpenAI language model
+
+1. Initialize your Language Model using a suitable model, e.g `langchain.llms.OpenAI`.
+2. Execute all language model calls within the context manager `langchain.callbacks.get_openai_callback`.
+3. Read the total tokens by getting the context manager's `total_tokens` attribute.
+
+Side note: You can use `cb.prompt_tokens` to get the tokens used for the prompts, `cb.completion_tokens` to get the tokens used for the completions, and `cb.total_cost` to get the total cost.

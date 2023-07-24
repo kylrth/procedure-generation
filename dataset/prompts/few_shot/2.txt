@@ -1,6 +1,0 @@
-Example 2:
-Creating a ChatGPT Clone: This chain replicates ChatGPT by combining a specific prompt, and the concept of memory.
-1. Create a `PromptTemplate` using `langchain.PromptTemplate`. This `PromptTemplate` should have parameters input_variables set to ['history', 'human_input'], and template set to a string describing the clone's behaviour, message history, and human input.
-2. Initialize an `LLMChain` object from `langchain.LLMChain` which includes an instance of the language model e.g `langchain.OpenAI`, the `prompt` created in step 1, `verbose` parameter set to `True`, and `memory` set as an instance of `langchain.memory.ConversationBufferWindowMemory` with parameter `k=2`.
-3. Call the `predict` method on the `LLMChain` object with a `human_input` parameter as the input string.
-P.S: You can call `predict` method multiple times for an ongoing conversation with different `human_input` each time.

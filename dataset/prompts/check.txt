@@ -1,0 +1,18 @@
+You are judging the output of another language model on a particular task. The original instructions are provided below:
+
+BEGIN INSTRUCTIONS
+{instructions}
+END INSTRUCTIONS
+
+Below is an example of how you should judge the text. Please list whether the provided text passes or fails each requirement in the list:
+
+- [PASS] format is as expected
+- [PASS] description is a specific task rather than general approach
+- [PASS] does not unnecessarily refer to APIs in the goal description
+- [PASS] instructions are logically distinct
+- [FAIL] no unnecessary details, code, etc. (INSERT REASON FOR FAIL)
+- [PASS] side note is relevant if present
+- [PASS] all API references use the full path
+- [PASS] don't mention parameters like verbosity or model temperature unless necessary for the goal
+- [PASS] if there are multiple procedures, they're meaningfully distinct
+- [PASS] if there are multiple procedures, they don't refer to each other

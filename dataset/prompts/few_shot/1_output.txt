@@ -1,0 +1,10 @@
+Goal: build an autonomous GPT agent with tools for web search and file I/O, and memory for intermediate steps and chat history
+
+1. Initialize a search tool using `langchain.utilities.SerpAPIWrapper`.
+2. Set up other tools for file writing and reading using `langchain.tools.file_management`.WriteFileTool and `langchain.tools.file_management.ReadFileTool`.
+3. Initialize your embeddings model with `langchain.embeddings.OpenAIEmbeddings`.
+4. Initialize your vector store using `langchain.vectorstores.FAISS`, providing the embeddings model and vector size.
+5. Initialize your agent with `langchain.experimental.AutoGPT.from_llm_and_tools`, providing AI name, role, tools, the language model (e.g. `langchain.chat_models.ChatOpenAI`), and the vector store converted to retriever using vectorstore.as_retriever().
+6. Execute the `run` method on your agent with a list containing the request as a string.
+
+Side note: To use a file-based chat history memory, initialize the agent as above but with an additional `chat_history_memory` parameter, which is an instance of `langchain.memory.chat_message_histories.FileChatMessageHistory` with the name of the chat history file as an argument.
