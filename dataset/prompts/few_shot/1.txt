@@ -1,7 +1,0 @@
-For reference, here is what a procedure in the desired format looks like :
-Example 1:
-Tracking Token Usage: Track your token usage for specific calls.
-1. Initialize your Language Model using a suitable model e.g `langchain.llms.OpenAI`
-2. Execute all language model calls within the context manager `langchain.callbacks.get_openai_callback`.
-3. Read the total tokens by getting the context manager's `total_tokens` attribute.
-Side note : You can use `cb.prompt_tokens` to get the tokens used for the prompts, `cb.completion_tokens` to get the tokens used for the completions, `cb.total_cost` to get the total cost.

@@ -51,8 +51,6 @@ _specific_skip = [
     "https://python.langchain.com/docs/modules/agents/toolkits/",
     "https://python.langchain.com/docs/use_cases",
     "https://python.langchain.com/docs/use_cases/code/",
-    # too long
-    "https://python.langchain.com/docs/use_cases/agent_simulations/multiagent_authoritarian",
 ]
 
 

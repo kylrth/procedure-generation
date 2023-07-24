@@ -1,0 +1,6 @@
+Goal: create a ChatGPT clone with specific behavior and a memory of recent messages
+
+1. Create a prompt template using `langchain.PromptTemplate` describing the clone's behaviour, message history, and human input, with input variables `['history', 'human_input']`.
+2. Initialize a `langchain.LLMChain` with a language model (e.g `langchain.OpenAI`), the prompt template created in step 1, and a `langchain.memory.ConversationBufferWindowMemory` to provide message history.
+3. Call the `predict` method on the `LLMChain` object with a `human_input` parameter as the input string.
+4. Continue calling `predict` to continue the conversation with new `human_input`.
