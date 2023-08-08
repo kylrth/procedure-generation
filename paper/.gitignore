@@ -1,0 +1,10 @@
+aaai24.bst
+aaai24.sty
+
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.synctex.gz
