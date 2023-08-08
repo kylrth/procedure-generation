@@ -1,0 +1,48 @@
+\documentclass[letterpaper]{article}
+\usepackage[submission]{aaai24}
+\usepackage{times}
+\usepackage{helvet}
+\usepackage{courier}
+\usepackage[hyphens]{url}
+\usepackage{graphicx}
+\urlstyle{rm}
+\def\UrlFont{\rm}
+\usepackage{natbib}
+\usepackage{caption}
+\frenchspacing
+\setlength{\pdfpagewidth}{8.5in}
+\setlength{\pdfpageheight}{11in}
+
+\DeclareCaptionStyle{ruled}{labelfont=normalfont,labelsep=colon,strut=off}
+\pdfinfo{
+/TemplateVersion (2024.1)
+}
+
+\setcounter{secnumdepth}{0}
+
+\title{Procedural Knowledge Generation with Selective Retrieval from Past Outputs}
+\author{
+    Kyle Roth\textsuperscript{\rm 1},
+    Yacine Mkhinini\textsuperscript{\rm 1},
+    Simon Halle\textsuperscript{\rm 2},
+    Bang Liu\textsuperscript{\rm 1}
+}
+\affiliations{
+    \textsuperscript{\rm 1}Universit\'e de Montr\'eal \\
+    \textsuperscript{\rm 2}Thales Canada \\
+    kyle.roth@umontreal.ca, yacine.mkhinini@umontreal.ca,\\ simon.halle@thalesdigitalsolutions.ca, bang.liu@umontreal.ca
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+    Retrieval-augmented generation (RAG) has become a common approach to ground the output of large language models (LLMs), especially when the model has not been trained on the topic at hand. RAG requires careful search tuning to increase the chance that the model sees the documents necessary to answer the question. Often, much of the necessary information is more succinctly available in previous generations; retrieving over these samples would reduce the need to surface all the relevant material across many separate documents in order to respond to new queries. We propose allowing the model to selectively retrieve over its own previous outputs, after filtering by asking the model if the sample is useful for this particular generation.
+
+    To demonstrate that this approach more easily surfaces the necessary information, we create a new dataset called LCStep containing 120 clean, step-by-step procedures extracted from the LangChain Python documentation. We evaluate our system's ability to generate those steps when retrieving over LangChain's conceptual documentation and API reference. We demonstrate that collecting outputs into a library of procedures can provide further benefit to later generations as long as procedures retrieved from the library are highly relevant to the current generation.
+\end{abstract}
+
+\bibliography{submission}
+
+\end{document}
