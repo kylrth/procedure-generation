@@ -136,7 +136,7 @@ def format_soup(body: bs4.Tag | bs4.NavigableString, h2t=_h2t) -> str:
 
         lines.append(line)
 
-    return "\n".join(lines)
+    return "\n".join(line.rstrip() for line in lines)
 
 
 def is_procedure(url: str) -> bool:
