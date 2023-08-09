@@ -132,16 +132,23 @@ def count_markdown_files(model: BaseChatModel, path: str, limit: int = 0) -> int
     return out
 
 
-def make_logger() -> logging.Logger:
+def make_logger(verbose: bool) -> logging.Logger:
     logger = logging.getLogger("main")
     logger.addHandler(logging.StreamHandler(sys.stderr))
-    logger.setLevel(logging.DEBUG)
+    if verbose:
+        logger.setLevel(logging.DEBUG)
+    else:
+        logger.setLevel(logging.INFO)
 
     return logger
 
 
 async def format_docs(
-    path: str | PathLike, n: int, few_shot_as_ex: bool = False, n_workers: int = 5
+    path: str | PathLike,
+    n: int,
+    logger: logging.Logger,
+    few_shot_as_ex: bool = False,
+    n_workers: int = 5,
 ):
     """Summarize all files in the directory and save in a separate tree under formatted/.
 
@@ -149,7 +156,6 @@ async def format_docs(
     if n == 0:
         return
 
-    logger = make_logger()
     n_workers = min(n_workers, n)
 
     prompt = get_prompt_messages(few_shot_as_ex)
@@ -187,8 +193,11 @@ if __name__ == "__main__":
             "examples in the system message"
         ),
     )
+    parser.add_argument("--verbose", action="store_true", help="show debug messages")
 
     args = parser.parse_args()
 
     data_dir = Path(args.data_dir) / "procedures" / "full"
-    asyncio.run(format_docs(data_dir, args.n, args.few_shot_as_examples))
+    logger = make_logger(args.verbose)
+
+    asyncio.run(format_docs(data_dir, args.n, logger, args.few_shot_as_examples))
