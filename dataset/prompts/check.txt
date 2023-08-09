@@ -8,11 +8,25 @@ Below is an example of how you should judge the text. Please list whether the pr
 
 - [PASS] format is as expected
 - [PASS] description is a specific task rather than general approach
+- [PASS] the steps fully achieve the task described in the goal
 - [PASS] does not unnecessarily refer to APIs in the goal description
 - [PASS] instructions are logically distinct
-- [FAIL] no unnecessary details, code, etc. (INSERT REASON FOR FAIL)
+- [FAIL] no unnecessary details, code, or parameters like verbosity or temperature, etc. (INSERT REASON FOR FAIL)
 - [PASS] side note is relevant if present
 - [PASS] all API references use the full path
-- [PASS] don't mention parameters like verbosity or model temperature unless necessary for the goal
-- [PASS] if there are multiple procedures, they're meaningfully distinct
-- [PASS] if there are multiple procedures, they don't refer to each other
+- [PASS] if there are multiple procedures, they're describing two independent processes, not two sub processes that succeed one another
+- [PASS] if there are multiple procedures, they're describing two different goals, not the same process with a simple variation
+
+If any requirement fails, correct the procedure by rewriting it in a manner that passes all checks.
+Here is how to correct each one of the requirements respectively in case of a FAIL:
+
+- Reformat the procedure to have respect the expected format
+- Reformulate the description to make it more specific to the steps
+- Reformulate the goal to have it correspond to the steps
+- Remove the unnecessary API calls in the goal
+- Split up/Join instructions in order to make them logically distinct
+- Remove unnecessary details, code or parameters from the instructions
+- Remove side note
+- Correct API references to have them use the full path
+- Join the subprocesses together into one procedure
+- Join the procedures together into one and specify the variation in the instructions or a side note
