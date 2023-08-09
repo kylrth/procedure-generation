@@ -156,8 +156,6 @@ async def format_docs(
     if n == 0:
         return
 
-    n_workers = min(n_workers, n)
-
     prompt = get_prompt_messages(few_shot_as_ex)
 
     chatgpt = ChatOpenAI(temperature=0.5, model_name="gpt-4-0613")
@@ -166,6 +164,9 @@ async def format_docs(
     files = list(path.glob("**/*.md"))
     if n >= 0 and len(files) > n:
         files = files[:n]
+
+    n_workers = min(n_workers, len(files))
+    logger.debug(f"{len(files)} files, {n_workers} workers")
 
     await spread_gather(
         lambda fp: format_procedure(chatgpt, prompt, fp, logger),
