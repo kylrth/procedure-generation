@@ -36,27 +36,33 @@ async def judge_doc(
     model: BaseChatModel,
     prompt: list[BaseMessage],
     formatted_path: str | PathLike,
-    logger: logging.Logger,
 ):
-    full_path = Path(str(formatted_path).replace("formatted", "full"))
+    if "fixed" in str(formatted_path):
+        return
+
+    formatted_path = Path(formatted_path)
 
     messages = prompt.copy()
-    with Path(formatted_path).open() as f:
+    with formatted_path.open() as f:
         messages.append(HumanMessage(content=f.read().strip()))
 
-    # TODO:
-    # - judge with model
-    # - judge by searching text for verbosity, model temp
-    #   - should this be a demerit or should this info just get included in the prompt for the model
-    #     to decide?
+    resp = await model.agenerate(messages=[messages])
+    judgement = resp.generations[0][0].text
+    if "[FAIL]" in judgement:
+        stem = formatted_path.stem
+        fixed_path = formatted_path.parent / (stem + "_fixed" + formatted_path.suffix)
+        logger = make_logger(stem)
+        logger.debug(judgement)
+        with fixed_path.open("w") as f:
+            if "Goal:" in judgement:
+                f.write(judgement[judgement.index("Goal:") :])
+            else:
+                f.write(judgement)
 
 
 async def check_docs(root: str | PathLike, n: int, n_workers: int = 5):
     if n == 0:
         return
-
-    logger = make_logger()
-    n_workers = min(n_workers, n)
 
     prompt = get_prompt_messages()
 
@@ -68,8 +74,10 @@ async def check_docs(root: str | PathLike, n: int, n_workers: int = 5):
     if n >= 0 and len(files) > n:
         files = files[:n]
 
+    n_workers = min(n_workers, len(files))
+
     await spread_gather(
-        lambda fp: judge_doc(chatgpt, prompt, fp, logger),
+        lambda fp: judge_doc(chatgpt, prompt, fp),
         files,
         n_workers,
         len(files),
