@@ -2,6 +2,12 @@
 
 The dataset can be downloaded from <https://dl.kylrth.com/langchain_procedures.tar.gz>.
 
+```sh
+# in dataset/
+wget -O langchain_procedures.tar.gz https://dl.kylrth.com/langchain_procedures.tar.gz
+tar -xzf langchain_procedures.tar.gz docs/
+```
+
 ## building the dataset
 
 To build the dataset yourself, first install the requirements with `pip install -r requirements.txt`. Then run `build.sh`. The following sections detail what the each of the Python scripts do when the script calls them.
