@@ -14,7 +14,7 @@ from datasets import Dataset
 from langchain.embeddings import HuggingFaceEmbeddings
 from language_tool_python import LanguageTool
 
-import recipenlg
+import langchain_data
 from evaluation.eval import evaluation
 from systems import FewShot, Model, System, ZeroShot
 from utils import spread_gather
@@ -33,28 +33,21 @@ def make_logger(name: str) -> logging.Logger:
     return logger
 
 
-async def generate_and_evaluate(model: System, recipe: dict[str, Any], lt: LanguageTool):
-    """Generate a recipe with the model, and then evaluate."""
-    title = recipe["title"][0]
+async def generate_and_evaluate(model: System, item: dict[str, Any]):
+    """Generate a procedure for this item with the model, and then evaluate it."""
+    goal = item["goal"][0]
 
-    logger = make_logger(str(recipe["id"][0]))
+    logger = make_logger(str(item["path"][0]))
 
-    res = await model.agenerate(title, logger)
+    res = await model.agenerate(goal, logger)
     logger.debug(f"got {len(res)} generations")
 
     scores = defaultdict(list)
     for completion in res:
-        # make sure the recipe is correctly generated
         try:
-            recipenlg.parse_recipe(completion)
-        except ValueError:
-            logger.warning(f"malformed recipe: {completion}")
-            continue
-
-        try:
-            evals = await evaluation(completion, recipe, lt, logger)
+            evals = await evaluation(completion, item, logger)
         except Exception:
-            logger.exception("exception during evaluation", exc_info=True)
+            logger.exception("exception during evaluation")
             break
         for metric in evals:
             scores[metric].append(evals[metric])
@@ -62,27 +55,25 @@ async def generate_and_evaluate(model: System, recipe: dict[str, Any], lt: Langu
     score_print = "\n".join(f"  {metric}: {scores[metric]}" for metric in scores)
     logger.debug("final scores:\n" + score_print)
 
-    return scores, recipe["id"][0]
+    return scores, item["path"][0]
 
 
 async def evaluate(model: System, data: Dataset, n_workers: int = 10):
-    """Evaluate the system with the given recipe data."""
-    n_workers = min(n_workers, len(data))
-    with LanguageTool("en_US") as lt:
-        results = await spread_gather(
-            lambda recipe: generate_and_evaluate(model, recipe, lt),
-            data.iter(1),
-            n_workers,
-            len(data),
-        )
+    """Evaluate the system with the given text generation dataset."""
+    results = await spread_gather(
+        lambda prompt: generate_and_evaluate(model, prompt),
+        data.iter(1),
+        n_workers,
+        len(data),
+    )
 
     # collect results
     scores = defaultdict(list)
     broken = []
-    for evals, rid in results:
-        # if recipe had no correct completions
+    for evals, path in results:
+        # if prompt had no correct completions
         if len(evals) == 0:
-            broken.append(rid)
+            broken.append(path)
             continue
         # collect all scores of a metric
         for metric, values in evals.items():
@@ -104,15 +95,15 @@ if __name__ == "__main__":
         "-d",
         "--data-dir",
         type=str,
-        default="./data",
-        help="directory containing the RecipeNLG dataset",
+        default="./dataset/docs",
+        help="directory containing the LCStep dataset",
     )
     parser.add_argument(
         "-s",
         "--system",
         type=str,
-        default="ZeroShot",
-        help="system to generate recipes",
+        default="FewShot",
+        help="system to perform generation",
     )
     parser.add_argument(
         "-m",
@@ -160,8 +151,9 @@ if __name__ == "__main__":
     system = args.system.lower()
     if system == "zeroshot":
         system = ZeroShot(model)
-    elif system == "fewshot":
-        ds = recipenlg.load("train", args.data_dir)
+    elif system == "rag":
+        api_refs = langchain_data.load_api_ref(args.data_dir)
+        concept_docs = langchain_data.load_api_ref(args.data_dir)
         embedder = HuggingFaceEmbeddings(
             model_name=args.few_shot_embed_model,
             encode_kwargs=None if args.few_shot_embed_gpu else {"device": "cpu"},
@@ -169,7 +161,7 @@ if __name__ == "__main__":
         system = FewShot(
             model,
             args.few_shot_k,
-            ds,
+            api_refs,  # TODO handle api_refs and concept_docs
             embedder,
             args.few_shot_embed_n,
             Path("embeddings") / args.few_shot_embed_model,
@@ -178,9 +170,9 @@ if __name__ == "__main__":
         raise NotImplementedError(args.system)
 
     print("loading data...", file=sys.stderr)
-    data = recipenlg.load("val", args.data_dir)
+    data = langchain_data.load_formatted_docs(args.data_dir)
     n = min(args.n, len(data))
     data = data.select(np.arange(0, n))
 
     print("running evaluation...", file=sys.stderr)
-    asyncio.run(evaluate(system, data, args.workers))
+    asyncio.run(evaluate(system, data, min(args.workers, n)))
