@@ -99,9 +99,9 @@ class Model:
 
         For a chat model, the messages look like this:
 
-            Human: {context}
+            System: {context}
 
-                   {examples[0][0]}
+            Human: {examples[0][0]}
             Model: {examples[0][1]}
             Human: {examples[1][0]}
             Model: {examples[1][1]}

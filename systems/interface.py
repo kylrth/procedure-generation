@@ -7,9 +7,9 @@ class System(ABC):
     type annotations."""
 
     @abstractmethod
-    def generate(self, title: str, logger: logging.Logger | None) -> list[str]:
+    def generate(self, goal: str, logger: logging.Logger | None) -> list[str]:
         """The output is a list of generations, in case of n > 1."""
 
     @abstractmethod
-    async def agenerate(self, title: str, logger: logging.Logger | None) -> list[str]:
+    async def agenerate(self, goal: str, logger: logging.Logger | None) -> list[str]:
         """The output is a list of generations, in case of n > 1."""
