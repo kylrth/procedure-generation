@@ -1,7 +1,6 @@
 import argparse
 import asyncio
 import logging
-import sys
 from os import PathLike
 from pathlib import Path
 
@@ -24,11 +23,15 @@ def get_prompt_messages() -> list[BaseMessage]:
     return [SystemMessage(content=sys_msg)]
 
 
-def make_logger() -> logging.Logger:
-    logger = logging.getLogger("main")
-    logger.addHandler(logging.StreamHandler(sys.stderr))
-    logger.setLevel(logging.DEBUG)
+def make_logger(name: str) -> logging.Logger:
+    log_dir = Path("checks_logs")
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / f"{name}.log"
 
+    logger = logging.getLogger(name)
+    logger.propagate = False
+    logger.addHandler(logging.FileHandler(log_file, "w"))
+    logger.setLevel(logging.DEBUG)
     return logger
 
 
