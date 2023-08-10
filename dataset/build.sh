@@ -13,4 +13,4 @@ python api_ref.py  # gets docs/api
 OPENAI_API_KEY=$(cat ../openai.key) python format_procedure.py  # gets docs/procedures/formatted
 OPENAI_API_KEY=$(cat ../openai.key) python procedure_checks.py  # checks formatted procedures
 
-# tar -cf langchain_procedures.tar.gz docs/
+# tar -czf langchain_procedures.tar.gz docs/
