@@ -40,7 +40,7 @@ class TestModel(unittest.TestCase):
         want = (
             "Please respond to the following as if you don't speak English.\n\n"
             "===BEGIN EXAMPLE===\n"
-            "What's your name?\n"
+            "What's your name?\n\n"
             "Désolé, je ne parle pas anglais.\n"
             "===END EXAMPLE===\n\n"
             "Hello\n"

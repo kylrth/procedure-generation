@@ -37,7 +37,7 @@ class Model:
     project, so that we can use chat and completion models with the same code."""
 
     # This is the string used to format examples into the prompts for completion models.
-    example_fmt: str = "===BEGIN EXAMPLE===\n{title}\n{recipe}\n===END EXAMPLE==="
+    example_fmt: str = "===BEGIN EXAMPLE===\n{input}\n\n{output}\n===END EXAMPLE==="
 
     # the number of tokens this model supports; set automatically by from_full_name
     max_tokens: int | None = None
@@ -85,11 +85,13 @@ class Model:
 
             ===BEGIN EXAMPLE===
             {examples[0][0]}
+
             {examples[0][1]}
             ===END EXAMPLE===
 
             ===BEGIN EXAMPLE===
             {examples[1][0]}
+
             {examples[1][1]}
             ===END EXAMPLE===
 
@@ -100,7 +102,6 @@ class Model:
         For a chat model, the messages look like this:
 
             System: {context}
-
             Human: {examples[0][0]}
             Model: {examples[0][1]}
             Human: {examples[1][0]}
@@ -173,7 +174,7 @@ class Model:
 
         if examples:
             for example in examples:
-                out += self.example_fmt.format(title=example[0], recipe=example[1]) + "\n\n"
+                out += self.example_fmt.format(input=example[0], output=example[1]) + "\n\n"
 
         out += prompt + "\n"
 
@@ -191,7 +192,7 @@ class Model:
             )
 
         return self.model.get_num_tokens(
-            self.example_fmt.format(title=example[0], recipe=example[1]) + "\n\n"
+            self.example_fmt.format(input=example[0], output=example[1]) + "\n\n"
         )
 
 

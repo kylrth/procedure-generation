@@ -1,4 +1,4 @@
-"""Tools for the LangChain data"""
+"""tools for the LCStep dataset"""
 
 import bisect
 import re
@@ -82,8 +82,8 @@ def procedure_from_text(text: str) -> tuple[str, list[str], str]:
 
 
 def text_from_procedure(goal: str, steps: list[str], side_note: str) -> str:
-    """Format the text of a procedure."""
-    out = "Goal: " + goal + "\n\n"
+    """Format the text of a procedure. `goal` and `side_note` are optional and ignored if empty."""
+    out = "Goal: " + goal + "\n\n" if goal else ""  # allow blank goal if formatting just steps
 
     for i, step in enumerate(steps):
         out += f"{i+1}. {step}\n"

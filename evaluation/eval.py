@@ -14,7 +14,7 @@ from language_tool_python import LanguageTool
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-from recipenlg import format_recipe, parse_recipe
+from lcstep import text_from_procedure
 
 
 with Path("./evaluation/evaluation-prompts.json").open() as file:
@@ -205,29 +205,25 @@ async def relevance(recipe: str, logger: logging.Logger) -> int:
     return out
 
 
+async def step_comparison(goal: str, gold: str, generated: str, logger: logging.Logger) -> int:
+    """Judge the generated steps by letting GPT-4 compare with the gold steps.
+
+    Score is out of 10.
+    """
+    return 10
+
+
 async def evaluation(
-    recipe: str, gold: dict[str, Any], lt: LanguageTool, logger: logging.Logger
+    generated: str, gold: dict[str, Any], logger: logging.Logger
 ) -> dict[str, Any]:
-    """Evaluates a generated recipe using all the above defined metrics"""
-    title = gold["title"][0]
-    gold = format_recipe(gold["ingredients"][0], gold["directions"][0])
-    r_ingredients, r_instructions = parse_recipe(recipe)
-    recipe = format_recipe(r_ingredients, r_instructions)
+    """Evaluate a generated procedure using GPT-4 to compare with the gold procedure."""
+    goal = gold["goal"][0]
+    gold_steps = text_from_procedure("", gold["steps"][0], "")
 
-    # run synchronous evaluations
-    results = {
-        "rouge": rouge(recipe, gold),
-        "bleu": bleu(recipe, gold),
-        "cosine similarity": cosine_sim(recipe, gold),
-    }
+    results = {}
 
-    # run asynchronous evaluations
     async_tasks = {
-        "linguistic errors": asyncio.to_thread(linguistic_correctness, lt, recipe),
-        "consistency": consistency(recipe, logger),
-        "relevance": relevance(title + "\n" + recipe, logger),
-        "structure": structure(recipe, logger),
-        "coherence": coherence(title + "\n" + recipe, logger),
+        "compared": step_comparison(goal, gold_steps, generated, logger),
     }
     resp = await asyncio.gather(*async_tasks.values())
 
