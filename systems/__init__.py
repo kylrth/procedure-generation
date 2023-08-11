@@ -5,13 +5,13 @@ specific LMs."""
 from .few_shot import FewShot
 from .interface import System
 from .model import Model
-from .zero_shot import ZeroShot
+from .rag import RAG
 
 
 __all__ = [
     "System",
     "Model",
     # systems
-    "ZeroShot",
     "FewShot",
+    "RAG",
 ]

@@ -12,19 +12,19 @@ from typing import Any
 import numpy as np
 from datasets import Dataset
 from langchain.embeddings import HuggingFaceEmbeddings
-from language_tool_python import LanguageTool
 
-import langchain_data
+import lcstep
 from evaluation.eval import evaluation
-from systems import FewShot, Model, System, ZeroShot
+from systems import RAG, FewShot, Model, System
 from utils import spread_gather
 
 
-def make_logger(name: str) -> logging.Logger:
-    """Create a new logger that writes to logs/{name}.log (and nowhere else)."""
-    log_dir = Path("logs")
-    log_dir.mkdir(parents=True, exist_ok=True)
-    log_file = log_dir / f"{name}.log"
+def make_logger(for_file: str) -> logging.Logger:
+    """Create a new logger that writes to logs/{name}.log, where `name` is converted from `for_file`
+    with directory separators replaced with dashes."""
+    name = for_file.replace("/", "-")
+    log_file = Path("logs") / f"{name}.log"
+    log_file.parent.mkdir(parents=True, exist_ok=True)
 
     logger = logging.getLogger(name)
     logger.propagate = False
@@ -116,22 +116,25 @@ if __name__ == "__main__":
     parser.add_argument(
         "--workers", type=int, default=10, help="number of concurrent requests to make to the LLM"
     )
+    parser.add_argument(
+        "-k",
+        type=int,
+        default=3,
+        help=(
+            "maximum number of examples to provide for FewShot and RAG (fewer are provided if they "
+            "don't fit)"
+        ),
+    )
 
     few_shot_options = parser.add_argument_group("FewShot")
     few_shot_options.add_argument(
-        "--few-shot-k",
-        type=int,
-        default=3,
-        help="maximum number of examples to provide (fewer are provided if they don't fit)",
-    )
-    few_shot_options.add_argument(
-        "--few-shot-embed-model",
+        "--rag-embed-model",
         type=str,
         default="sentence-transformers/all-mpnet-base-v2",
         help="HuggingFace model to use for embeddings",
     )
     few_shot_options.add_argument(
-        "--few-shot-embed-n",
+        "--rag-embed-n",
         type=int,
         default=sys.maxsize,
         help=(
@@ -140,25 +143,46 @@ if __name__ == "__main__":
         ),
     )
     few_shot_options.add_argument(
-        "--few-shot-embed-gpu", action="store_true", help="compute embeddings on the GPU"
+        "--rag-embed-gpu", action="store_true", help="compute embeddings on the GPU"
     )
 
     args = parser.parse_args()
 
-    model = Model.from_full_name(args.model)
+    print("loading data...", file=sys.stderr)
+    data = lcstep.load_formatted_docs(args.data_dir)
+
+    # reserve a few examples for few-shot
+    max_k = 5
+    if args.k > max_k:
+        raise argparse.ArgumentError(f"-k must be <= {max_k}")
+    examples = data.select(np.arange(0, args.k))
+    data = data.select(np.arange(5, len(data)))
+
+    # shorten dataset according to -n
+    n = min(args.n, len(data))
+    data = data.select(np.arange(0, n))
 
     print("creating system...", file=sys.stderr)
+    model = Model.from_full_name(args.model)
     system = args.system.lower()
-    if system == "zeroshot":
-        system = ZeroShot(model)
+    if system == "fewshot":
+        # prepare examples
+        shots = []
+        for _, item in zip(range(args.k), examples.iter(1), strict=False):
+            proc = lcstep.text_from_procedure(item["goal"][0], item["steps"][0], "")
+            goal, steps = proc.strip().split("\n\n")
+            print(goal, steps)
+            shots.append((goal, steps))
+
+        system = FewShot(model, shots=shots)
     elif system == "rag":
-        api_refs = langchain_data.load_api_ref(args.data_dir)
-        concept_docs = langchain_data.load_api_ref(args.data_dir)
+        api_refs = lcstep.load_api_ref(args.data_dir)
+        concept_docs = lcstep.load_api_ref(args.data_dir)
         embedder = HuggingFaceEmbeddings(
             model_name=args.few_shot_embed_model,
             encode_kwargs=None if args.few_shot_embed_gpu else {"device": "cpu"},
         )
-        system = FewShot(
+        system = RAG(
             model,
             args.few_shot_k,
             api_refs,  # TODO handle api_refs and concept_docs
@@ -168,11 +192,6 @@ if __name__ == "__main__":
         )
     else:
         raise NotImplementedError(args.system)
-
-    print("loading data...", file=sys.stderr)
-    data = langchain_data.load_formatted_docs(args.data_dir)
-    n = min(args.n, len(data))
-    data = data.select(np.arange(0, n))
 
     print("running evaluation...", file=sys.stderr)
     asyncio.run(evaluate(system, data, min(args.workers, n)))
