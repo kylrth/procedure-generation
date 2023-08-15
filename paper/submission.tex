@@ -1,48 +1,46 @@
-\documentclass[letterpaper]{article}
-\usepackage[submission]{aaai24}
-\usepackage{times}
-\usepackage{helvet}
-\usepackage{courier}
-\usepackage[hyphens]{url}
-\usepackage{graphicx}
-\urlstyle{rm}
-\def\UrlFont{\rm}
-\usepackage{natbib}
-\usepackage{caption}
-\frenchspacing
-\setlength{\pdfpagewidth}{8.5in}
-\setlength{\pdfpageheight}{11in}
+\documentclass{article}
+\usepackage{iclr2024,times}
 
-\DeclareCaptionStyle{ruled}{labelfont=normalfont,labelsep=colon,strut=off}
-\pdfinfo{
-/TemplateVersion (2024.1)
-}
+\input{math_commands.tex}
 
-\setcounter{secnumdepth}{0}
+\usepackage{hyperref}
+\usepackage{url}
+
 
 \title{Procedural Knowledge Generation with Selective Retrieval from Past Outputs}
-\author{
-    Kyle Roth\textsuperscript{\rm 1},
-    Yacine Mkhinini\textsuperscript{\rm 1},
-    Simon Halle\textsuperscript{\rm 2},
-    Bang Liu\textsuperscript{\rm 1}
-}
-\affiliations{
-    \textsuperscript{\rm 1}Universit\'e de Montr\'eal \\
-    \textsuperscript{\rm 2}Thales Canada \\
-    kyle.roth@umontreal.ca, yacine.mkhinini@umontreal.ca,\\ simon.halle@thalesdigitalsolutions.ca, bang.liu@umontreal.ca
+
+\author{Kyle Roth \& Yacine Mkhinini \\
+D\'epartement d'Informatique et de Recherche Operationelle \\
+Universit\'e de Montr\'eal \\
+Montr\'eal, QC, Canada \\
+\texttt{\{kyle.roth,yacine.mkhinini\}@umontreal.ca} \\
+\And
+Simon Halle \\
+Thales Canada \\
+Quebec City, QC, Canada \\
+\texttt{simon.halle@thalesdigitalsolutions.ca} \\
+\And
+Bang Liu \\
+D\'epartement d'Informatique et de Recherche Operationelle \\
+Universit\'e de Montr\'eal \\
+Montr\'eal, QC, Canada \\
+\texttt{bang.liu@umontreal.ca}
 }
 
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+% \iclrfinalcopy % Uncomment for camera-ready version, but NOT for submission.
 \begin{document}
+
 
 \maketitle
 
 \begin{abstract}
-    Retrieval-augmented generation (RAG) has become a common approach to ground the output of large language models (LLMs). For topics unseen in training, RAG requires careful search tuning to ensure the model sees the information necessary to answer the question, especially if it is dispersed across many documents. If we instead answer requests one at a time and store the responses, some information for later outputs will likely be densely available in earlier responses. We propose a new augmentation technique called Selective Retrieval from Past Outputs (SRPO) which searches a library of previous responses using model-generated queries, and filters them by having the model decide if each document is relevant.
-
-    To demonstrate that this approach more easily surfaces useful information, we publish a new dataset called LCStep containing 120 clean, step-by-step procedures extracted from the LangChain Python documentation (created after the OpenAI knowledge cutoff date), along with a model-based evaluation metric that judges the quality of generated procedures. We show that GPT-4 cannot reliably generate these procedures from a candidate goal, even when augmented with retrieved texts from LangChain's conceptual documentation and API reference. We demonstrate that collecting outputs into a library of retrievable procedures can improve later responses, as long as retrieved procedures are highly relevant to the current generation.
+   Retrieval-augmented generation (RAG) has become a common approach to ground the output of large language models (LLMs). For topics unseen in training, RAG requires careful search tuning to ensure the model sees the information necessary to answer the question, especially if it is dispersed across many documents. If we instead answer requests one at a time and store the responses, some information for later outputs will likely be densely available in earlier responses. We propose a new augmentation technique called Selective Retrieval from Past Outputs (SRPO) which searches a library of previous responses using model-generated queries, and filters them by having the model decide if each document is relevant.To demonstrate that this approach more easily surfaces useful information, we publish a new dataset called LCStep containing 120 clean, step-by-step procedures extracted from the LangChain Python documentation (created after the OpenAI knowledge cutoff date), along with a model-based evaluation metric that judges the quality of generated procedures. We show that GPT-4 cannot reliably generate these procedures from a candidate goal, even when augmented with retrieved texts from LangChain's conceptual documentation and API reference. We demonstrate that collecting outputs into a library of retrievable procedures can improve later responses, as long as retrieved procedures are highly relevant to the current generation.
 \end{abstract}
 
 \bibliography{submission}
+\bibliographystyle{iclr2024}
 
 \end{document}

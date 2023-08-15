@@ -1,10 +1,14 @@
-aaai24.bst
-aaai24.sty
+# style files from the publication target
+*.bst
+*.sty
+math_commands.tex
 
+# intermediate files generated during LaTeX compilation
 *.aux
 *.bbl
 *.blg
 *.fdb_latexmk
 *.fls
 *.log
+*.out
 *.synctex.gz
