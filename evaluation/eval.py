@@ -14,7 +14,7 @@ from language_tool_python import LanguageTool
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-from lcstep import text_from_procedure
+import lcstep
 
 
 with Path("./evaluation/evaluation-prompts.json").open() as file:
@@ -51,11 +51,12 @@ chatgpt = ChatOpenAI(temperature=0.3)
 def rouge(recipe: str, gold: str) -> float:
     """Metric Based Evaluation
     Calculates the ROUGE score"""
-    r_ingredients, r_instructions = parse_recipe(recipe)
-    g_ingredients, g_instructions = parse_recipe(gold)
+    _, r_steps, _ = lcstep.procedure_from_text(recipe)
+    _, g_steps, _ = lcstep.procedure_from_text(gold)
+
     results = rouge_metric.compute(
-        predictions=["\n".join(r_ingredients) + "\n" + "\n".join(r_instructions)],
-        references=["\n".join(g_ingredients) + "\n" + "\n".join(g_instructions)],
+        predictions=["\n".join(r_steps)],
+        references=["\n".join(g_steps)],
     )
     return round(results["rougeL"], 3)
 
@@ -63,11 +64,12 @@ def rouge(recipe: str, gold: str) -> float:
 def bleu(recipe: str, gold: str) -> float:
     """Metric Based Evaluation
     Calculates the BLEU score"""
-    r_ingredients, r_instructions = parse_recipe(recipe)
-    g_ingredients, g_instructions = parse_recipe(gold)
+    _, r_steps, _ = lcstep.procedure_from_text(recipe)
+    _, g_steps, _ = lcstep.procedure_from_text(gold)
+
     results = bleu_metric.compute(
-        predictions=["\n".join(r_ingredients) + "\n" + "\n".join(r_instructions)],
-        references=["\n".join(g_ingredients) + "\n" + "\n".join(g_instructions)],
+        predictions=["\n".join(r_steps)],
+        references=["\n".join(g_steps)],
     )
     return round(results["bleu"], 3)
 
@@ -210,6 +212,11 @@ async def step_comparison(goal: str, gold: str, generated: str, logger: logging.
 
     Score is out of 10.
     """
+    _ = goal
+    _ = gold
+    _ = generated
+    _ = logger
+
     return 10
 
 
@@ -218,7 +225,7 @@ async def evaluation(
 ) -> dict[str, Any]:
     """Evaluate a generated procedure using GPT-4 to compare with the gold procedure."""
     goal = gold["goal"][0]
-    gold_steps = text_from_procedure("", gold["steps"][0], "")
+    gold_steps = lcstep.text_from_procedure("", gold["steps"][0], "")
 
     results = {}
 
