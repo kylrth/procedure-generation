@@ -3,8 +3,10 @@
 
 \input{math_commands.tex}
 
+\usepackage{graphicx}
 \usepackage{hyperref}
 \usepackage{url}
+\usepackage{verbatim}
 
 
 \title{Procedural Knowledge Generation with Selective Retrieval from Past Outputs}
@@ -37,10 +39,55 @@ Montr\'eal, QC, Canada \\
 \maketitle
 
 \begin{abstract}
-   Retrieval-augmented generation (RAG) has become a common approach to ground the output of large language models (LLMs). For topics unseen in training, RAG requires careful search tuning to ensure the model sees the information necessary to answer the question, especially if it is dispersed across many documents. If we instead answer requests one at a time and store the responses, some information for later outputs will likely be densely available in earlier responses. We propose a new augmentation technique called Selective Retrieval from Past Outputs (SRPO) which searches a library of previous responses using model-generated queries, and filters them by having the model decide if each document is relevant.To demonstrate that this approach more easily surfaces useful information, we publish a new dataset called LCStep containing 120 clean, step-by-step procedures extracted from the LangChain Python documentation (created after the OpenAI knowledge cutoff date), along with a model-based evaluation metric that judges the quality of generated procedures. We show that GPT-4 cannot reliably generate these procedures from a candidate goal, even when augmented with retrieved texts from LangChain's conceptual documentation and API reference. We demonstrate that collecting outputs into a library of retrievable procedures can improve later responses, as long as retrieved procedures are highly relevant to the current generation.
+   Retrieval-augmented generation (RAG) has become a common approach to ground the output of large language models (LLMs). For topics unseen in training, RAG requires careful search tuning to ensure the model sees the information necessary to answer the question, especially if it is dispersed across many documents. If we instead answer requests one at a time and store the responses, some information for later outputs will likely be densely available in earlier responses. We propose a new augmentation technique called Selective Retrieval from Past Outputs (SRPO) which searches a library of previous responses using model-generated queries, and filters them by having the model decide if each document is relevant. To demonstrate that this approach more easily surfaces useful information, we publish a new dataset called LCStep containing 120 clean, step-by-step procedures extracted from the LangChain Python documentation (created after the OpenAI knowledge cutoff date), along with a model-based evaluation metric that judges the quality of generated procedures. We show that GPT-4 cannot reliably generate these procedures from a candidate goal, even when augmented with retrieved texts from LangChain's conceptual documentation and API reference. We demonstrate that collecting outputs into a library of retrievable procedures can improve later responses, as long as retrieved procedures are highly relevant to the current generation.
 \end{abstract}
+
+\section{LCStep}
+
+LCStep contains three sets of documents: API reference, conceptual documentation, and procedures. See Figure~\ref{fig:dataset-workflow} for a diagram of the process of generating the LCStep data.
+
+\begin{figure}[h]
+   \centering
+   \includegraphics[width=\textwidth]{figures/dataset\_workflow.drawio.png}
+   \caption{The workflow used to generate the LCStep dataset.}\label{fig:dataset-workflow}
+\end{figure}
+
+\subsection{API reference}
+
+We generate the API reference material from the source files in the LangChain GitHub repository\footnote{https://github.com/langchain-ai/langchain/} using Sphinx. These files contain descriptions of all APIs in the Python package, including call signatures and argument descriptions. These files do not contain any usage examples or high-level explanation.
+
+\subsection{Conceptual documentation and procedures}
+
+We collect these documents by scraping the LangChain Python docs\footnote{https://python.langchain.com/}. We manually filter out topic pages and stubs, leaving 228 documents. We then manually classified these into 137 documents of conceptual documentation, and 91 documents containing tutorials/guides.
+
+For the 91 tutorials/guides, we prompted GPT-4\footnote{See Appendix~\ref{sec:lcstep-formatting} for the full prompt.} to extract a list of high-level steps necessary to accomplish the goal. We then prompted GPT-4\footnote{See Appendix~\ref{sec:lcstep-validation} for the full prompt.} to rate those extracted procedures using a list of criteria. We found that this caught many mistakes where GPT-4 did not follow all the stated instructions. In those cases, we had the model revise the steps to meet the requirements, and then we manually checked the revised versions.
+
+\section{Selective retrieval from past outputs}
+
+TODO
+
+\section{Experiments}
+
+To demonstrate that SRPO can overcome shortcomings of standard retrieval, we pit the two methods against each other on the task of generating the procedures in LCStep. We also test against a few baselines and oracles which we explain below. All methods are used with \texttt{GPT-4-0614} from OpenAI as well as a version of LLaMA2 instruction-tuned by Thales. Both methods have access to the API reference and conceptual documentation from the dataset. For comparison, we also test a simple few-shot approach (which should fail due to a lack of knowledge of LangChain in the models' training data).
+
+\subsection{Baselines}
+
+The \textbf{few-shot} approach will prompt GPT-4 with a basic instruction and a few examples
+
+\subsection{Evaluation}
 
 \bibliography{submission}
 \bibliographystyle{iclr2024}
+
+\appendix
+\section{LCStep prompts}
+
+\subsection{Instructions for formatting procedures}\label{sec:lcstep-formatting}
+
+\input{../dataset/prompts/context.txt}
+
+\subsection{Instructions for validating procedures}\label{sec:lcstep-validation}
+
+TODO
 
 \end{document}
