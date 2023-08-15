@@ -139,6 +139,77 @@ def format_soup(body: bs4.Tag | bs4.NavigableString, h2t=_h2t) -> str:
     return "\n".join(line.rstrip() for line in lines)
 
 
+# pages manually marked as procedures rather than concept docs
+manually_procedures = [
+    "docs/modules/agents",
+    "docs/modules/agents/tools/custom_tools",
+    "docs/modules/agents/tools/human_approval",
+    "docs/modules/agents/tools/multi_input_tool",
+    "docs/modules/agents/tools/tools_as_openai_functions",
+    "docs/modules/agents/tools/tool_input_validation",
+    "docs/modules/callbacks/async_callbacks",
+    "docs/modules/callbacks/custom_callbacks",
+    "docs/modules/callbacks/custom_chain",
+    "docs/modules/callbacks/filecallbackhandler",
+    "docs/modules/callbacks/multiple_callbacks",
+    "docs/modules/callbacks/tags",
+    "docs/modules/callbacks/token_counting",
+    "docs/modules/chains/foundational/llm_chain",
+    "docs/modules/data_connection/document_loaders/csv",
+    "docs/modules/data_connection/document_loaders/file_directory",
+    "docs/modules/data_connection/document_loaders/html",
+    "docs/modules/data_connection/document_loaders/json",
+    "docs/modules/data_connection/document_loaders/markdown",
+    "docs/modules/data_connection/document_loaders/pdf",
+    "docs/modules/data_connection/retrievers/contextual_compression",
+    "docs/modules/data_connection/retrievers/MultiQueryRetriever",
+    "docs/modules/data_connection/retrievers/self_query",
+    "docs/modules/data_connection/retrievers/time_weighted_vectorstore",
+    "docs/modules/data_connection/retrievers/vectorstore",
+    "docs/modules/data_connection/retrievers/self_query/chroma_self_query",
+    "docs/modules/data_connection/retrievers/self_query/myscale_self_query",
+    "docs/modules/data_connection/retrievers/self_query/pinecone",
+    "docs/modules/data_connection/retrievers/self_query/qdrant_self_query",
+    "docs/modules/data_connection/retrievers/self_query/weaviate_self_query",
+    "docs/modules/memory",
+    "docs/modules/memory/adding_memory",
+    "docs/modules/memory/adding_memory_chain_multiple_inputs",
+    "docs/modules/memory/agent_with_memory",
+    "docs/modules/memory/agent_with_memory_in_db",
+    "docs/modules/memory/types/buffer",
+    "docs/modules/memory/types/buffer_window",
+    "docs/modules/memory/conversational_customization",
+    "docs/modules/memory/custom_memory",
+    "docs/modules/memory/types/entity_summary_memory",
+    "docs/modules/memory/types/kg",
+    "docs/modules/memory/multiple_memory",
+    "docs/modules/memory/types/summary",
+    "docs/modules/memory/types/summary_buffer",
+    "docs/modules/memory/types/token_buffer",
+    "docs/modules/memory/types/vectorstore_retriever_memory",
+    "docs/modules/model_io/models/chat/chat_model_caching",
+    "docs/modules/model_io/models/chat/human_input_chat_model",
+    "docs/modules/model_io/models/chat/prompts",
+    "docs/modules/model_io/models/chat/streaming",
+    "docs/modules/model_io/models/llms/async_llm",
+    "docs/modules/model_io/models/llms/custom_llm",
+    "docs/modules/model_io/models/llms/fake_llm",
+    "docs/modules/model_io/models/llms/human_input_llm",
+    "docs/modules/model_io/models/llms/llm_caching",
+    "docs/modules/model_io/models/llms/llm_serialization",
+    "docs/modules/model_io/models/llms/streaming_llm",
+    "docs/modules/model_io/models/llms/token_usage_tracking",
+    "docs/use_cases/agent_simulations",
+    "docs/use_cases/apis",
+    "docs/use_cases/autonomous_agents",
+    "docs/use_cases/chatbots",
+    "docs/use_cases/extraction",
+    "docs/use_cases/question_answering",
+    "docs/use_cases/summarization",
+    "docs/use_cases/tabular",
+]
+
+
 def is_procedure(url: str) -> bool:
     if "how_to/" in url:
         return True
@@ -150,7 +221,9 @@ def is_procedure(url: str) -> bool:
         if len(parts) == 2 and parts[1] != "":  # noqa: PLR2004
             return True
 
-    return False
+    url = url.rstrip("/")
+
+    return any(url.endswith(path) for path in manually_procedures)
 
 
 def scrape_langchain():
