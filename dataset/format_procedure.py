@@ -1,6 +1,5 @@
 import argparse
 import asyncio
-import glob
 import hashlib
 import logging
 import re
@@ -324,9 +323,9 @@ async def format_procedure(
 def count_tokens(model: BaseChatModel, path: str) -> int:
     """Counts the tokens of all markdown files in a directory"""
     total_tokens = 0
-    for filepath in glob.iglob(path + "/**/*.md", recursive=True):
-        with Path(filepath).open(encoding="utf-8") as file:
-            content = file.read()
+    for file in Path(path).glob("**/*.md"):
+        with file.open(encoding="utf-8") as f:
+            content = f.read()
             total_tokens += model.get_num_tokens(content)
     return total_tokens
 
@@ -334,9 +333,9 @@ def count_tokens(model: BaseChatModel, path: str) -> int:
 def count_markdown_files(model: BaseChatModel, path: str, limit: int = 0) -> int:
     """Counts markdown files in a directory that have more than `limit` tokens"""
     out = 0
-    for filepath in glob.iglob(path + "/**/*.md", recursive=True):
-        with Path(filepath).open(encoding="utf-8") as file:
-            content = file.read()
+    for file in Path(path).glob("**/*.md"):
+        with file.open(encoding="utf-8") as f:
+            content = f.read()
             if model.get_num_tokens(content) > limit:
                 out += 1
     return out
