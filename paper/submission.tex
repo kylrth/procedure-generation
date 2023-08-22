@@ -39,7 +39,7 @@ Montr\'eal, QC, Canada \\
 \maketitle
 
 \begin{abstract}
-   Retrieval-augmented generation (RAG) has become a common approach to ground the output of large language models (LLMs). For topics unseen in training, RAG requires careful search tuning to ensure the model sees the information necessary to answer the question, especially if it is dispersed across many documents. If we instead answer requests one at a time and store the responses, some information for later outputs will likely be densely available in earlier responses. We propose a new augmentation technique called Selective Retrieval from Past Outputs (SRPO) which searches a library of previous responses using model-generated queries, and filters them by having the model decide if each document is relevant. To demonstrate that this approach more easily surfaces useful information, we publish a new dataset called LCStep containing 120 clean, step-by-step procedures extracted from the LangChain Python documentation (created after the OpenAI knowledge cutoff date), along with a model-based evaluation metric that judges the quality of generated procedures. We show that GPT-4 cannot reliably generate these procedures from a candidate goal, even when augmented with retrieved texts from LangChain's conceptual documentation and API reference. We demonstrate that collecting outputs into a library of retrievable procedures can improve later responses, as long as retrieved procedures are highly relevant to the current generation.
+   Retrieval-augmented generation (RAG) \citep{atlas} has become a common approach to ground the output of large language models (LLMs). For topics unseen in training, RAG requires careful search tuning to ensure the model sees the information necessary to answer the question, especially if it is dispersed across many documents. If we instead answer requests one at a time and store the responses, some information for later outputs will likely be densely available in earlier responses. We propose a new augmentation technique called Selective Retrieval from Past Outputs (SRPO) which searches a library of previous responses using model-generated queries, and filters them by having the model decide if each document is relevant. To demonstrate that this approach more easily surfaces useful information, we publish a new dataset called LCStep containing 120 clean, step-by-step procedures extracted from the LangChain Python documentation (created after the OpenAI knowledge cutoff date), along with a model-based evaluation metric that judges the quality of generated procedures. We show that GPT-4 cannot reliably generate these procedures from a candidate goal, even when augmented with retrieved texts from LangChain's conceptual documentation and API reference. We demonstrate that collecting outputs into a library of retrievable procedures can improve later responses, as long as retrieved procedures are highly relevant to the current generation.
 \end{abstract}
 
 \section{LCStep}
@@ -62,19 +62,55 @@ We collect these documents by scraping the LangChain Python docs\footnote{https:
 
 For the 91 tutorials/guides, we prompted GPT-4\footnote{See Appendix~\ref{sec:lcstep-formatting} for the full prompt.} to extract a list of high-level steps necessary to accomplish the goal. We then prompted GPT-4\footnote{See Appendix~\ref{sec:lcstep-validation} for the full prompt.} to rate those extracted procedures using a list of criteria. We found that this caught many mistakes where GPT-4 did not follow all the stated instructions. In those cases, we had the model revise the steps to meet the requirements, and then we manually checked the revised versions.
 
-\section{Selective retrieval from past outputs}
+\section{Methods}\label{sec:method}
 
-TODO
+Selective retrieval from past outputs (SRPO) involves two parts: selecting candidate documents from source material and past generations, and then the selection and refinement of those documents.
+
+\subsection{Retrieval from past outputs}
+
+The performance of retrieval-augmented generation (RAG) is highly dependent on the number and size of the documents, as well as the density of relevant information (citation needed). To reliably discover the information the model needs, it is already established practice to threshhold retrieved documents based on embedding similarity with the query\footnote{\url{https://python.langchain.com/docs/modules/data\_connection/retrievers/contextual\_compression/\#embeddingsfilter}}, or to prompt an LLM to filter\footnote{\url{https://python.langchain.com/docs/modules/data\_connection/retrievers/contextual\_compression/\#llmchainfilter}} or compress\footnote{\url{https://python.langchain.com/docs/modules/data\_connection/retrievers/contextual\_compression/\#adding-contextual-compression-with-an-llmchainextractor}. \cite{compression} study GPT-4's ability to compress texts, but ask the model to remove extraneous information. Should we include a study of the value of contextual compression as described in that LangChain doc? I can't find any papers that look into this.} documents to include just the relevant information in the final prompt to answer the query.
+
+For many tasks, a lot of the knowledge to be retrieved is the same for many queries. In our case, many procedures involving the LangChain library require connecting to a language model, creating a prompt template, and constructing a chain. Instead of collecting this information anew for each similar query, selective retrieval from past outputs (SRPO) searches over past outputs to find procedures similar to the current query, and then includes them in the set of retrieved candidate documents to include in the final prompt.
+
+\subsection{Selection and refinement}
+
+Once we have a set of candidate documents, we apply similar filtering/compression techniques as is common, but we encourage the model to
 
 \section{Experiments}
 
-To demonstrate that SRPO can overcome shortcomings of standard retrieval, we pit the two methods against each other on the task of generating the procedures in LCStep. We also test against a few baselines and oracles which we explain below. All methods are used with \texttt{GPT-4-0614} from OpenAI as well as a version of LLaMA2 instruction-tuned by Thales. Both methods have access to the API reference and conceptual documentation from the dataset. For comparison, we also test a simple few-shot approach (which should fail due to a lack of knowledge of LangChain in the models' training data).
+To demonstrate that SRPO can overcome shortcomings of standard retrieval, we pit the two methods against each other on the task of generating the procedures in LCStep. We also test against a few baselines and oracles which we explain below.  Both methods have access to the API reference and conceptual documentation from the dataset.
 
 \subsection{Baselines}
 
-The \textbf{few-shot} approach will prompt GPT-4 with a basic instruction and a few examples
+All prompting methods are performed with \texttt{GPT-4-0614} from OpenAI as well as a version of LLaMA2 instruction-tuned by Thales.
+
+\begin{itemize}
+   \item The \textbf{few-shot} approach will prompt the model with a basic instruction and a few fixed examples of the output format. We expect this method to fail due to a lack of knowledge of LangChain in the models' training data.
+   \item The vanilla retrieval-augmented approach (\textbf{RAG}) constructs a prompt by doing retrieval over a vector store containing the conceptual documentation and API reference material.
+         \begin{itemize}
+            \item We expect to further refine this retrieval process somewhat. This may involve enforcing retrieval diversity by penalizing similarity between retrieved docs, having the model split the query into subqueries to find the individual parts necessary to build the whole answer, or using contextual compression\footnote{\url{https://python.langchain.com/docs/modules/data\_connection/retrievers/contextual\_compression/}}.
+            \item This method would also benefit from HyDE \citep{hyde}, I\textsuperscript{3} \citep{i3}, or EAR \citep{ear}. At that point, it might be worth having this optimized version as a separate baseline here.
+         \end{itemize}
+\end{itemize}
+
+For our experiment, the \textbf{SRPO} approach constructs a prompt by retrieval over the same documents as RAG, plus all procedures generated so far. When retrieving from the past outputs, the model is separately presented with the selection prompt as described in Section~\ref{sec:method}.
 
 \subsection{Evaluation}
+
+Try to connect to metrics already in use in other papers, like ones for truthfulness and completeness (see page 39 of https://arxiv.org/pdf/2307.10928.pdf)
+
+https://github.com/X-PLUG/mPLUG-Owl/blob/main/OwlEval/OwlEval.md
+
+TODO ``model card'' for this paper: write down numbers: dataset size, approaches, models, evaluations, etc.
+- we need a fine-tuned baseline
+- another task: question-answering
+
+RAG has been very limited so far but now input tokens are getting longer, is there a way to involve
+
+how do we draw the line between using RAG and fine-tuning, based on the size and label types and publicness of your dataset. So we want lots of comparisons for this reason too. Set smaller token limits artificially for 100k models, and do the same for llama2 (the OSS standard).
+
+https://huggingface.co/docs/peft/index
+https://arxiv.org/pdf/2307.10928.pdf
 
 \bibliography{submission}
 \bibliographystyle{iclr2024}
