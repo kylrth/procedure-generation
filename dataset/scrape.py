@@ -39,8 +39,6 @@ _sub_skip = [
 _specific_skip = [
     # summary pages
     "https://python.langchain.com/docs/modules/",
-    "https://python.langchain.com/docs/modules/model_io/",
-    "https://python.langchain.com/docs/modules/model_io/prompts/",
     "https://python.langchain.com/docs/modules/data_connection/",
     "https://python.langchain.com/docs/modules/chains/how_to/",
     "https://python.langchain.com/docs/modules/chains/foundational/",
@@ -49,8 +47,28 @@ _specific_skip = [
     "https://python.langchain.com/docs/modules/chains/additional/",
     "https://python.langchain.com/docs/modules/agents/agent_types/",
     "https://python.langchain.com/docs/modules/agents/toolkits/",
+    "https://python.langchain.com/docs/modules/callbacks/custom_chain",
+    "https://python.langchain.com/docs/modules/data_connection/retrievers/self_query/",
+    "https://python.langchain.com/docs/modules/model_io/",
+    "https://python.langchain.com/docs/modules/model_io/prompts/",
+    "https://python.langchain.com/docs/modules/model_io/prompts/prompt_templates/format_output",
     "https://python.langchain.com/docs/use_cases",
+    "https://python.langchain.com/docs/use_cases/agent_simulations/",
+    "https://python.langchain.com/docs/use_cases/agents/",
+    "https://python.langchain.com/docs/use_cases/apis",
+    "https://python.langchain.com/docs/use_cases/autonomous_agents/",
+    "https://python.langchain.com/docs/use_cases/chatbots",
     "https://python.langchain.com/docs/use_cases/code/",
+    "https://python.langchain.com/docs/use_cases/more/code_writing/",
+    "https://python.langchain.com/docs/use_cases/more/extraction",
+    "https://python.langchain.com/docs/use_cases/more/graph",
+    "https://python.langchain.com/docs/use_cases/more/self_check/",
+    "https://python.langchain.com/docs/use_cases/summarization",
+    "https://python.langchain.com/docs/use_cases/tabular",
+    # duplicates
+    "https://python.langchain.com/docs/use_cases/agent_simulations/camel_role_playing",
+    "https://python.langchain.com/docs/use_cases/autonomous_agents/baby_agi",
+    "https://python.langchain.com/docs/use_cases/autonomous_agents/baby_agi_with_agent",
 ]
 
 
