@@ -42,7 +42,7 @@ jobs:
         black --check .
         ruff .
     - name: test
-      run: pytest
+      run: PYTHONPATH=$(pwd) pytest
 
     - name: save caches
       uses: actions/cache/save@v3
