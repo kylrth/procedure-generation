@@ -20,12 +20,12 @@ jobs:
         cache: 'pip'  # cache dependencies
         cache-dependency-path: |
           requirements.txt
-          requirements_dev.txt
           dataset/requirements.txt
+        # requirements_dev.txt is excluded, to not invalidate the cache if linters are updated
     - name: install dependencies
       run: |
         pip install --upgrade pip
-        pip install -r requirements.txt -r requirements_dev.txt -r dataset/requirements.txt
+        pip install -r requirements.txt -r dataset/requirements.txt -r requirements_dev.txt
 
     - name: restore caches
       uses: actions/cache/restore@v3
