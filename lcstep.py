@@ -72,9 +72,9 @@ def procedure_from_text(text: str) -> tuple[str, list[str], str]:
 
     # parse the side note
     side_note = chunks[2].strip() if len(chunks) == 3 else ""  # noqa: PLR2004
-    _prefix = "Side note: "
+    _prefix = "side note: "
     if side_note:
-        if not side_note.startswith(_prefix):
+        if not side_note.lower().startswith(_prefix):
             raise ValueError(f"procedure side note not marked with '{_prefix}'")
         side_note = side_note[len(_prefix) :].strip()  # remove final newline
 
