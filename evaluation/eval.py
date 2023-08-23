@@ -10,7 +10,6 @@ from typing import Any
 import evaluate
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import BaseMessage, HumanMessage, SystemMessage
-from language_tool_python import LanguageTool
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -83,18 +82,6 @@ def cosine_sim(recipe: str, gold: str) -> float:
     vectorizer = TfidfVectorizer()
     tfidf_matrix = vectorizer.fit_transform([recipe, gold])
     return round(cosine_similarity(tfidf_matrix[0], tfidf_matrix[1])[0][0], 3)
-
-
-def linguistic_correctness(lt: LanguageTool, recipe: str) -> int:
-    """Metric Based Evaluation
-    Counts grammar and spelling mistakes detected using LanguageCheck"""
-    matches = lt.check(recipe)
-    filtered_matches = [
-        match
-        for match in matches
-        if match.ruleId not in ["UPPERCASE_SENTENCE_START", "WHITESPACE_RULE"]
-    ]
-    return len(filtered_matches)
 
 
 async def hallucination() -> float:
