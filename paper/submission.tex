@@ -9,7 +9,7 @@
 \usepackage{verbatim}
 
 
-\title{Procedural Knowledge Generation with Selective Retrieval from Past Outputs}
+\title{From Retrieval Augmented Generation to Analogy Augmented Generation}
 
 \author{Kyle Roth \& Yacine Mkhinini \\
 D\'epartement d'Informatique et de Recherche Operationelle \\
@@ -39,10 +39,38 @@ Montr\'eal, QC, Canada \\
 \maketitle
 
 \begin{abstract}
-   Retrieval-augmented generation (RAG) \citep{atlas} has become a common approach to ground the output of large language models (LLMs). For topics unseen in training, RAG requires careful search tuning to ensure the model sees the information necessary to answer the question, especially if it is dispersed across many documents. If we instead answer requests one at a time and store the responses, some information for later outputs will likely be densely available in earlier responses. We propose a new augmentation technique called Selective Retrieval from Past Outputs (SRPO) which searches a library of previous responses using model-generated queries, and filters them by having the model decide if each document is relevant. To demonstrate that this approach more easily surfaces useful information, we publish a new dataset called LCStep containing 120 clean, step-by-step procedures extracted from the LangChain Python documentation (created after the OpenAI knowledge cutoff date), along with a model-based evaluation metric that judges the quality of generated procedures. We show that GPT-4 cannot reliably generate these procedures from a candidate goal, even when augmented with retrieved texts from LangChain's conceptual documentation and API reference. We demonstrate that collecting outputs into a library of retrievable procedures can improve later responses, as long as retrieved procedures are highly relevant to the current generation.
+   TODO
 \end{abstract}
 
+\section{Motivation}
+
+\begin{itemize}
+   \item~\cite{checkYourFacts} demonstrate that augmenting with external knowledge sources and self-feedback improves performance on factual knowledge tasks.
+   \item~\cite{llmsZeroShotPlanners} demonstrate that LLMs can produce procedural knowledge. But the VirtualHome environment is limited (and the choices of steps to include is subjective), and the paper does not leverage external knowledge (although it does leverage environment grounding).
+   \item Factual knowledge is most succinctly represented by knowledge graphs, but these graphs leave out contextual information (which is why current approaches to factual generation use retrieved documents instead of KGs).
+   \item Procedural knowledge can also be succinctly represented as a graph relating goals with steps, but this also leaves out contextual information.
+   \item Retrieving procedural knowledge can be difficult because information is often spread across many more documents.
+         \begin{itemize}
+            \item To reliably discover the information the model needs, it is already established practice to \href{https://python.langchain.com/docs/modules/data\_connection/retrievers/contextual\_compression/\#embeddingsfilter}{threshhold} retrieved documents based on embedding similarity with the query, or to prompt an LLM to \href{https://python.langchain.com/docs/modules/data\_connection/retrievers/contextual\_compression/\#llmchainfilter}{filter} or \href{https://python.langchain.com/docs/modules/data\_connection/retrievers/contextual\_compression/\#adding-contextual-compression-with-an-llmchainextractor}{compress} the passages.
+         \end{itemize}
+   \item What is procedural knowledge: does pseudocode count? does instructions to get to the university count? what makes it procedural?
+         \begin{itemize}
+            \item Procedural knowledge is action knowledge.
+            \item Procedural knowledge comes from \textit{motivated} reasoning over factual knowledge.
+         \end{itemize}
+   \item What we're doing is different from general summarization because the relevance of individual facts depends on the goal being achieved. It's also different from knowledge extraction because the resulting procedure has to cohesively combine many facts to produce steps, and the end result won't necessarily spell out the underlying facts.
+   \item For performance on procedural knowledge, the constraint is procedural reasoning, not fact retrieval. (This is demonstrated by the performance of GPT-4 when just doing retrieval.)
+\end{itemize}
+
 \section{LCStep}
+
+\begin{itemize}
+   \item talk about procedural knowledge design principles
+   \item explain what a good procedure looks like (main idea steps, no unnecessary details, etc.) so others can follow (regardless of the schema they choose for their data)
+   \item Our dataset is a procedural knowledge base for using langchain.
+   \item The primary task will be procedure generation, and the downstream tasks will be code generation and (as a bonus) code writing Q\&A.
+   \item Each procedure also comes with unit tests that check whether generated code accomplishes the procedure.
+\end{itemize}
 
 LCStep contains three sets of documents: API reference, conceptual documentation, and procedures. See Figure~\ref{fig:dataset-workflow} for a diagram of the process of generating the LCStep data.
 
@@ -54,63 +82,100 @@ LCStep contains three sets of documents: API reference, conceptual documentation
 
 \subsection{API reference}
 
-We generate the API reference material from the source files in the LangChain GitHub repository\footnote{https://github.com/langchain-ai/langchain/} using Sphinx. These files contain descriptions of all APIs in the Python package, including call signatures and argument descriptions. These files do not contain any usage examples or high-level explanation.
+We generate the API reference material from the source files in the LangChain \href{https://github.com/langchain-ai/langchain/}{GitHub repository} using Sphinx. These files contain descriptions of all APIs in the Python package, including call signatures and argument descriptions. These files do not contain any usage examples or high-level explanation.
 
 \subsection{Conceptual documentation and procedures}
 
-We collect these documents by scraping the LangChain Python docs\footnote{https://python.langchain.com/}. We manually filter out topic pages and stubs, leaving 228 documents. We then manually classified these into 137 documents of conceptual documentation, and 91 documents containing tutorials/guides.
+We collect these documents by scraping the \href{https://python.langchain.com/}{LangChain Python docs}. We manually filter out topic pages and stubs, leaving 228 documents. We then manually classified these into around 30 documents of conceptual documentation, and around 180 documents containing tutorials/guides.
 
-For the 91 tutorials/guides, we prompted GPT-4\footnote{See Appendix~\ref{sec:lcstep-formatting} for the full prompt.} to extract a list of high-level steps necessary to accomplish the goal. We then prompted GPT-4\footnote{See Appendix~\ref{sec:lcstep-validation} for the full prompt.} to rate those extracted procedures using a list of criteria. We found that this caught many mistakes where GPT-4 did not follow all the stated instructions. In those cases, we had the model revise the steps to meet the requirements, and then we manually checked the revised versions.
+For the 180 tutorials/guides, we prompted GPT-4\footnote{See Appendix~\ref{sec:lcstep-formatting} for the full prompt.} to extract a list of high-level steps necessary to accomplish the goal. We then prompted GPT-4\footnote{See Appendix~\ref{sec:lcstep-validation} for the full prompt.} to rate those extracted procedures using a list of criteria. We found that this caught many mistakes where GPT-4 did not follow all the stated instructions. In those cases, we had the model revise the steps to meet the requirements, and then we manually checked the revised versions.
 
-\section{Methods}\label{sec:method}
+\section{Analogy-augmented generation}
 
-Selective retrieval from past outputs (SRPO) involves two parts: selecting candidate documents from source material and past generations, and then the selection and refinement of those documents.
+The performance of retrieval-augmented generation (RAG) is highly dependent on the number and size of the documents, as well as the density of relevant information (citation needed). For many tasks, a lot of the knowledge to be retrieved is the same for many queries. In our case, many procedures involving the LangChain library require connecting to a language model, creating a prompt template, and constructing a chain. Instead of collecting this information anew for each similar query, we search over past outputs to find procedures similar to the current query, and then include them in the set of retrieved candidate documents to include in the final prompt.
 
-\subsection{Retrieval from past outputs}
-
-The performance of retrieval-augmented generation (RAG) is highly dependent on the number and size of the documents, as well as the density of relevant information (citation needed). To reliably discover the information the model needs, it is already established practice to threshhold retrieved documents based on embedding similarity with the query\footnote{\url{https://python.langchain.com/docs/modules/data\_connection/retrievers/contextual\_compression/\#embeddingsfilter}}, or to prompt an LLM to filter\footnote{\url{https://python.langchain.com/docs/modules/data\_connection/retrievers/contextual\_compression/\#llmchainfilter}} or compress\footnote{\url{https://python.langchain.com/docs/modules/data\_connection/retrievers/contextual\_compression/\#adding-contextual-compression-with-an-llmchainextractor}. \cite{compression} study GPT-4's ability to compress texts, but ask the model to remove extraneous information. Should we include a study of the value of contextual compression as described in that LangChain doc? I can't find any papers that look into this.} documents to include just the relevant information in the final prompt to answer the query.
-
-For many tasks, a lot of the knowledge to be retrieved is the same for many queries. In our case, many procedures involving the LangChain library require connecting to a language model, creating a prompt template, and constructing a chain. Instead of collecting this information anew for each similar query, selective retrieval from past outputs (SRPO) searches over past outputs to find procedures similar to the current query, and then includes them in the set of retrieved candidate documents to include in the final prompt.
-
-\subsection{Selection and refinement}
-
-Once we have a set of candidate documents, we apply similar filtering/compression techniques as is common, but we encourage the model to
+\begin{itemize}
+   \item A good procedural knowledge representation provides context in natural language. This makes the individual parts composable.
+   \item When we get a new task, we break it down into steps by comparing with similar tasks in the skill library.
+   \item When we don't see a similar task or subtask, we retrieve additional documents to support compiling a new skill.
+   \item This is like storing experience (i.e.~how to do something) instead of facts (i.e.~what something is) in memory.
+   \item This is like learning to use tools because we collect a library of ``skills'', but it's different because we don't treat the skills as black boxes: we use them to draw analogies with to solve novel problems.\footnote{See the Wikipedia articles for \href{https://en.wikipedia.org/wiki/Procedural\_knowledge}{procedural knowledge} and \href{https://en.wikipedia.org/wiki/Procedural\_memory}{procedural memory}.}
+   \item We can call this ``analogy-augmented generation'' (AAG).
+   \item grounding:
+         \begin{itemize}
+            \item This approach can still benefit from environment grounding much like Voyager or the two papers cited at the top.
+            \item In our case, we ground the output by transforming it into code and then evaluating the code. The first test is whether the code runs; the next is whether the LangChain model/chain/agent produces results that look right to a human or LLM, when compared with the examples from the tutorials.
+            \item This method works anywhere real or simulated feedback can be provided.
+         \end{itemize}
+\end{itemize}
 
 \section{Experiments}
 
-To demonstrate that SRPO can overcome shortcomings of standard retrieval, we pit the two methods against each other on the task of generating the procedures in LCStep. We also test against a few baselines and oracles which we explain below.  Both methods have access to the API reference and conceptual documentation from the dataset.
+\begin{itemize}
+   \item understand how well plain RAG can produce procedural knowledge
+         \begin{itemize}
+            \item model: GPT-4
+            \item compare model's output on a few examples with and without the procedural knowledge base, by hand
+            \item highlight examples where procedural reasoning falls short with just with plain retrieval
+            \item test whether compressing the documents helps RAG (It's likely that the standard model gets lost in long context and needs more compressed content.)
+         \end{itemize}
+   \item full procedural knowledge generation test
+         \begin{itemize}
+            \item models: GPT-3.5/4, Llama2 instruction-tuned (both prompted and fine-tuned [with \href{https://huggingface.co/docs/peft/index}{PEFT}?] versions of each) (plain, normal compression, and AAG versions)
+            \item evals:
+                  \begin{itemize}
+                     \item ROUGE
+                     \item self-check GPT
+                     \item GPT-4-rated relevancy, faithfulness, context recall, correctness
+                           \begin{itemize}
+                              \item TODO borrow existing metrics, like \href{https://github.com/X-PLUG/mPLUG-Owl/blob/main/OwlEval/OwlEval.md}{OwlEval}, or page 39 of \href{https://arxiv.org/pdf/2307.10928.pdf}{FLASK}
+                           \end{itemize}
+                  \end{itemize}
+            \item select a set of hardest procedures and report performance on that set
+            \item find examples where the model (un)successfully made analogy to produce the right procedure
+            \item Questions we want to answer with the RAG vs.~fine-tuning experiments:
+                  \begin{itemize}
+                     \item How do we draw the line between using RAG and fine-tuning, based on the size and label types and publicness of the dataset?
+                  \end{itemize}
+         \end{itemize}
+   \item TODO experiment with token limits?
+         \begin{itemize}
+            \item Set smaller token limits artificially for 100k models, and do the same for llama2 (the OSS standard).
+         \end{itemize}
+   \item code generation
+         \begin{itemize}
+            \item models: same as above, but we post-process the generated procedures to create code
+            \item evals:
+                  \begin{itemize}
+                     \item does the code run?
+                     \item ``unit tests'' collected from LCStep tutorials, as described in the methods section
+                  \end{itemize}
+         \end{itemize}
+   \item TODO code-writing question answering?
+\end{itemize}
+
+To demonstrate that AAG can overcome shortcomings of standard retrieval, we pit the two methods against each other on the task of generating the procedures in LCStep. We also test against a few baselines and oracles which we explain below.  Both methods have access to the API reference and conceptual documentation from the dataset.
 
 \subsection{Baselines}
 
-All prompting methods are performed with \texttt{GPT-4-0614} from OpenAI as well as a version of LLaMA2 instruction-tuned by Thales.
+All prompting methods are performed with \texttt{GPT-4-0614} from OpenAI as well as an instruction-tuned version of LLaMA2.
 
 \begin{itemize}
    \item The \textbf{few-shot} approach will prompt the model with a basic instruction and a few fixed examples of the output format. We expect this method to fail due to a lack of knowledge of LangChain in the models' training data.
    \item The vanilla retrieval-augmented approach (\textbf{RAG}) constructs a prompt by doing retrieval over a vector store containing the conceptual documentation and API reference material.
          \begin{itemize}
-            \item We expect to further refine this retrieval process somewhat. This may involve enforcing retrieval diversity by penalizing similarity between retrieved docs, having the model split the query into subqueries to find the individual parts necessary to build the whole answer, or using contextual compression\footnote{\url{https://python.langchain.com/docs/modules/data\_connection/retrievers/contextual\_compression/}}.
+            \item We expect to further refine this retrieval process somewhat. This may involve enforcing retrieval diversity by penalizing similarity between retrieved docs, having the model split the query into subqueries to find the individual parts necessary to build the whole answer, or using contextual compression.
             \item This method would also benefit from HyDE \citep{hyde}, I\textsuperscript{3} \citep{i3}, or EAR \citep{ear}. At that point, it might be worth having this optimized version as a separate baseline here.
          \end{itemize}
 \end{itemize}
 
-For our experiment, the \textbf{SRPO} approach constructs a prompt by retrieval over the same documents as RAG, plus all procedures generated so far. When retrieving from the past outputs, the model is separately presented with the selection prompt as described in Section~\ref{sec:method}.
+For our experiment, the \textbf{AAG} approach constructs a prompt by retrieval over the same documents as RAG, plus all procedures generated so far. When retrieving from the past outputs, the model is separately presented with the selection prompt as described in Section~\ref{sec:method}.
 
-\subsection{Evaluation}
+\subsection{Extra}
 
-Try to connect to metrics already in use in other papers, like ones for truthfulness and completeness (see page 39 of https://arxiv.org/pdf/2307.10928.pdf)
-
-https://github.com/X-PLUG/mPLUG-Owl/blob/main/OwlEval/OwlEval.md
-
-TODO ``model card'' for this paper: write down numbers: dataset size, approaches, models, evaluations, etc.
-- we need a fine-tuned baseline
-- another task: question-answering
-
-RAG has been very limited so far but now input tokens are getting longer, is there a way to involve
-
-how do we draw the line between using RAG and fine-tuning, based on the size and label types and publicness of your dataset. So we want lots of comparisons for this reason too. Set smaller token limits artificially for 100k models, and do the same for llama2 (the OSS standard).
-
-https://huggingface.co/docs/peft/index
-https://arxiv.org/pdf/2307.10928.pdf
+\begin{itemize}
+   \item demo UI to demonstrate procedural knowledge-enhanced code copilot (more efficient? stronger reasoning? experience accumulation? better task solving strategy? better explainability?)
+\end{itemize}
 
 \bibliography{submission}
 \bibliographystyle{iclr2024}
