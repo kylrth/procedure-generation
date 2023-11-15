@@ -10,12 +10,14 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import weaviate
 from datasets import Dataset
 from langchain.embeddings import HuggingFaceEmbeddings
 
 import lcstep
 from evaluation.eval import evaluation
-from systems import RAG, FewShot, Model, System
+from systems import RAG, FewShot, Model, System, aag
+from systems.aag import AAG, setup_api_ref, setup_skills
 from utils import spread_gather
 
 
@@ -89,6 +91,19 @@ async def evaluate(model: System, data: Dataset, n_workers: int = 10):
         print("\nno evaluation results for these IDs:", " ".join(str(i) for i in broken))
 
 
+def int_leq(v: int):
+    """Custom type conversion function which validates that the int is less than or equal to v."""
+
+    def validate(value):
+        i = int(value)
+        if i > v:
+            raise argparse.ArgumentTypeError(f"{value} is not less than {v}")
+
+        return i
+
+    return validate
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -118,7 +133,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-k",
-        type=int,
+        type=int_leq(5),
         default=3,
         help=(
             "maximum number of examples to provide for FewShot and RAG (fewer are provided if they "
@@ -126,14 +141,14 @@ if __name__ == "__main__":
         ),
     )
 
-    few_shot_options = parser.add_argument_group("FewShot")
-    few_shot_options.add_argument(
+    rag_options = parser.add_argument_group("RAG")
+    rag_options.add_argument(
         "--rag-embed-model",
         type=str,
         default="sentence-transformers/all-mpnet-base-v2",
         help="HuggingFace model to use for embeddings",
     )
-    few_shot_options.add_argument(
+    rag_options.add_argument(
         "--rag-embed-n",
         type=int,
         default=sys.maxsize,
@@ -142,19 +157,18 @@ if __name__ == "__main__":
             "directory exists"
         ),
     )
-    few_shot_options.add_argument(
+    rag_options.add_argument(
         "--rag-embed-gpu", action="store_true", help="compute embeddings on the GPU"
     )
 
     args = parser.parse_args()
 
+    cache_path = Path("cache")
+
     print("loading data...", file=sys.stderr)
     data = lcstep.load_formatted_docs(args.data_dir)
 
     # reserve a few examples for few-shot
-    max_k = 5
-    if args.k > max_k:
-        raise argparse.ArgumentError(f"-k must be <= {max_k}")
     examples = data.select(np.arange(0, args.k))
     data = data.select(np.arange(5, len(data)))
 
@@ -169,7 +183,7 @@ if __name__ == "__main__":
         # prepare examples
         shots = []
         for _, item in zip(range(args.k), examples.iter(1), strict=False):
-            proc = lcstep.text_from_procedure(item["goal"][0], item["steps"][0], "")
+            proc = lcstep.Procedure(item["goal"][0], item["steps"][0], "").to_text()
             goal, steps = proc.strip().split("\n\n")
             print(goal, steps)
             shots.append((goal, steps))
@@ -177,19 +191,33 @@ if __name__ == "__main__":
         system = FewShot(model, shots=shots)
     elif system == "rag":
         api_refs = lcstep.load_api_ref(args.data_dir)
-        concept_docs = lcstep.load_api_ref(args.data_dir)
+        concept_docs = lcstep.load_concept_docs(args.data_dir)
         embedder = HuggingFaceEmbeddings(
-            model_name=args.few_shot_embed_model,
-            encode_kwargs=None if args.few_shot_embed_gpu else {"device": "cpu"},
+            model_name=args.rag_embed_model,
+            encode_kwargs=None if args.rag_embed_gpu else {"device": "cpu"},
         )
         system = RAG(
             model,
-            args.few_shot_k,
+            args.rag_k,
             api_refs,  # TODO handle api_refs and concept_docs
             embedder,
-            args.few_shot_embed_n,
-            Path("embeddings") / args.few_shot_embed_model,
+            args.rag_embed_n,
+            cache_path / "embeddings" / args.rag_embed_model,
         )
+    elif system == "aag":
+        store = weaviate.connect_to_local()
+
+        # set up skill library from concept docs
+        concept_docs = lcstep.load_concept_docs(args.data_dir)
+        skills = asyncio.run(aag.build_concept_skills(model, concept_docs))
+        setup_skills(store, skills)
+
+        # set up API ref store
+        api_ref = lcstep.load_api_ref(args.data_dir)
+        setup_api_ref(store, api_ref.iter(1))
+
+        store.batch.wait_for_vector_indexing()
+        system = AAG(model, store)
     else:
         raise NotImplementedError(args.system)
 

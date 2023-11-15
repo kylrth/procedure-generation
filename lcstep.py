@@ -2,6 +2,7 @@
 
 import bisect
 import re
+from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
 
@@ -41,57 +42,75 @@ def load_concept_docs(data_dir: str | PathLike = "./dataset/docs") -> Dataset:
 _ordering_re = re.compile(r"\d+\. ")
 
 
-def procedure_from_text(text: str) -> tuple[str, list[str], str]:
-    """Parse text containing a formatted procedure."""
-    chunks = text.split("\n\n")
-    if len(chunks) < 2 or len(chunks) > 3:  # goal + steps + optional side note  # noqa: PLR2004
-        raise ValueError("procedure does not contain 2-3 chunks")
+@dataclass
+class Procedure:
+    goal: str
+    steps: list[str]
+    side_note: str
 
-    # parse the goal
-    goal = chunks[0]
-    _prefix = "Goal: "
-    if not goal.startswith(_prefix):
-        raise ValueError(f"procedure goal not marked with '{_prefix}'")
-    goal = goal[len(_prefix) :]
+    @classmethod
+    def from_text(cls, text: str) -> "Procedure":
+        """Parse text containing a formatted procedure."""
+        chunks = text.split("\n\n")
+        if len(chunks) < 2 or len(chunks) > 3:  # goal + steps + optional side note  # noqa: PLR2004
+            raise ValueError("procedure does not contain 2-3 chunks")
 
-    # parse the steps (which may be multi-line)
-    lines = chunks[1].strip().split("\n")
-    steps = []
-    for line in lines:
-        _prefix = f"{len(steps)+1}. "
-        if line.startswith(_prefix):
-            steps.append(line[len(_prefix) :])
-            continue
+        # parse the goal
+        goal = chunks[0]
+        _prefix = "Goal: "
+        if not goal.startswith(_prefix):
+            raise ValueError(f"procedure goal not marked with '{_prefix}'")
+        goal = goal[len(_prefix) :]
 
-        if _ordering_re.match(line):
-            raise ValueError("incorrect step order")
+        # parse the steps (which may be multi-line)
+        lines = chunks[1].strip().split("\n")
+        steps = []
+        for line in lines:
+            _prefix = f"{len(steps)+1}. "
+            if line.startswith(_prefix):
+                steps.append(line[len(_prefix) :])
+                continue
 
-        if len(steps) == 0:
-            raise ValueError("steps did not start with 1")
-        steps[-1] += "\n" + line
+            if _ordering_re.match(line):
+                raise ValueError("incorrect step order")
 
-    # parse the side note
-    side_note = chunks[2].strip() if len(chunks) == 3 else ""  # noqa: PLR2004
-    _prefix = "side note: "
-    if side_note:
-        if not side_note.lower().startswith(_prefix):
-            raise ValueError(f"procedure side note not marked with '{_prefix}'")
-        side_note = side_note[len(_prefix) :].strip()  # remove final newline
+            if len(steps) == 0:
+                raise ValueError("steps did not start with 1")
+            steps[-1] += "\n" + line
 
-    return goal, steps, side_note
+        # parse the side note
+        side_note = chunks[2].strip() if len(chunks) == 3 else ""  # noqa: PLR2004
+        _prefix = "side note: "
+        if side_note:
+            if not side_note.lower().startswith(_prefix):
+                raise ValueError(f"procedure side note not marked with '{_prefix}'")
+            side_note = side_note[len(_prefix) :].strip()  # remove final newline
 
+        return cls(goal, steps, side_note)
 
-def text_from_procedure(goal: str, steps: list[str], side_note: str) -> str:
-    """Format the text of a procedure. `goal` and `side_note` are optional and ignored if empty."""
-    out = "Goal: " + goal + "\n\n" if goal else ""  # allow blank goal if formatting just steps
+    def to_text(self) -> str:
+        """Format the text of a procedure.
 
-    for i, step in enumerate(steps):
-        out += f"{i+1}. {step}\n"
+        `goal` and `side_note` are optional and ignored if empty.
+        """
+        # allow blank goal if formatting just steps
+        out = "Goal: " + self.goal + "\n\n" if self.goal else ""
 
-    if side_note:
-        out += "\nSide note: " + side_note + "\n"
+        out += self.format_steps()
 
-    return out
+        if self.side_note:
+            out += "\nSide note: " + self.side_note + "\n"
+
+        return out
+
+    def format_steps(self) -> str:
+        """Format just the steps of the procedure."""
+        out = ""
+
+        for i, step in enumerate(self.steps):
+            out += f"{i+1}. {step}\n"
+
+        return out
 
 
 def load_formatted_docs(data_dir: str | PathLike = "./dataset/docs") -> Dataset:
@@ -106,14 +125,20 @@ def load_formatted_docs(data_dir: str | PathLike = "./dataset/docs") -> Dataset:
         for ref in full_text.split("\nNEW PROCEDURE\n"):
             text = ref.strip()
             try:
-                goal, steps, side_note = procedure_from_text(text)
+                p = Procedure.from_text(text)
             except ValueError as e:
                 raise ValueError(f"could not process '{file}'") from e
 
             # sort by length of text, as a proxy for difficulty
             bisect.insort(
                 dicts,
-                {"path": path, "ref": text, "goal": goal, "steps": steps, "side_note": side_note},
+                {
+                    "path": path,
+                    "ref": text,
+                    "goal": p.goal,
+                    "steps": p.steps,
+                    "side_note": p.side_note,
+                },
                 key=lambda v: len(v["ref"]),
             )
 

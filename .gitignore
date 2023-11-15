@@ -5,7 +5,7 @@ logs/
 slurm-*.out
 
 data/
-embeddings/
-vectors/
+cache/
+weaviate_data/
 
 openai.key
