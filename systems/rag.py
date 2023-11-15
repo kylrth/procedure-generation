@@ -56,14 +56,14 @@ class RAG(System):
         ds: Dataset,
         embedder: HuggingFaceEmbeddings,
         embedding_n: int | None = None,
-        emb_path: str | PathLike = "embeddings",
-        vs_path: str | PathLike = "vectors",
+        emb_path: str | PathLike = "cache/embeddings",
+        vs_path: str | PathLike = "cache/vectors",
     ):
         self.model = model
 
         vs_path = Path(vs_path)
         if vs_path.exists():
-            store = FAISS.load_local(vs_path, embedder)
+            store = FAISS.load_local(str(vs_path), embedder)
         else:
             embeds = load_embeddings(emb_path, max_rows=embedding_n)
 

@@ -10,8 +10,8 @@ class FewShot(System):
     instructions: str = (
         "Please generate high-level steps to accomplish the specified goal using the LangChain "
         "Python library. Don't include code, extraneous commentary, or examples, but do refer to "
-        "the specific LangChain APIs used in each step. Don't produce any text other than the list "
-        "of steps."
+        "the specific LangChain APIs (or other APIs) used in each step. Don't produce any text "
+        "other than the list of steps."
     )
 
     def __init__(self, model: Model, shots: list[tuple[str, str]] | None = None):
