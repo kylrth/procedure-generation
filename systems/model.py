@@ -3,6 +3,7 @@ import textwrap
 from collections.abc import Callable
 from dataclasses import dataclass
 
+import tiktoken
 from langchain.base_language import BaseLanguageModel
 from langchain.chat_models import ChatOpenAI
 from langchain.llms import OpenAI
@@ -201,6 +202,7 @@ def log(
     prefix: str,
     prompt: str | list[BaseMessage],
     completion: list[str],
+    openai_model="gpt-3.5-turbo-0613",
 ):
     """Log the prompt and completion in a human-friendly way."""
     if not logger:
@@ -225,3 +227,53 @@ def log(
         + "\nEND COMPLETION"
     )
     logger.debug(f"{prefix} completion:\n{logged_completion}")
+
+    def count(s: str | list[BaseMessage]) -> int:
+        return _num_tokens(s, openai_model)
+
+    logger.debug(
+        f"used {count(prompt) * len(completion)} input tokens and "
+        f"{sum(count(s) for s in completion)} output tokens"
+    )
+
+
+def _num_tokens(msg: str | list[BaseMessage], model="gpt-3.5-turbo-0613") -> int:
+    if isinstance(msg, list):
+        return _openai_tokens(msg, model)
+
+    enc = tiktoken.encoding_for_model(model)
+
+    return len(enc.encode(msg))
+
+
+def _openai_tokens(messages: list[BaseMessage], model="gpt-3.5-turbo-0613"):
+    """Return the number of tokens used by a list of messages.
+
+    Modified from https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb
+    """
+    enc = tiktoken.encoding_for_model(model)
+
+    if model in {
+        "gpt-3.5-turbo-0613",
+        "gpt-3.5-turbo-16k-0613",
+        "gpt-4-0314",
+        "gpt-4-32k-0314",
+        "gpt-4-0613",
+        "gpt-4-32k-0613",
+    }:
+        tokens_per_message = 3
+    elif model == "gpt-3.5-turbo-0301":
+        tokens_per_message = 4  # every message follows <|start|>{role/name}\n{content}<|end|>\n
+    elif "gpt-3.5-turbo" in model:
+        raise ValueError("gpt-3.5-turbo version not specified")
+    elif "gpt-4" in model:
+        raise ValueError("gpt-4 version not specified")
+    else:
+        raise NotImplementedError(f"_openai_tokens() is not implemented for model {model}.")
+
+    num_tokens = 3  # every reply is primed with <|start|>assistant<|message|>
+    for message in messages:
+        num_tokens += tokens_per_message
+        num_tokens += len(enc.encode(message.content))
+
+    return num_tokens

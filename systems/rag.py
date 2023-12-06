@@ -1,136 +1,130 @@
 import logging
-from os import PathLike
-from pathlib import Path
 
-import numpy as np
-from datasets import Dataset
-from langchain.embeddings.huggingface import HuggingFaceEmbeddings
-from langchain.prompts.example_selector import SemanticSimilarityExampleSelector
-from langchain.vectorstores import FAISS
+import weaviate
+import weaviate.classes as wvc
+from langchain.schema import BaseMessage, HumanMessage, SystemMessage
 
-from .few_shot import FewShot
 from .interface import System
 from .model import Model, log
 
 
-def load_embeddings(path: str | PathLike, max_rows: int | None = None) -> np.ndarray:
-    """Use np.loadtxt to read each embedding file in path until the concatenated result has max_rows
-    rows."""
-    tot = 0
-    arrays = []
+_docs_collection = "Docs"
 
-    i = 1
-    while True:
-        try:
-            array = np.loadtxt(
-                Path(path) / f"{i}.txt.gz",
-                max_rows=max_rows - tot if max_rows is not None else None,
-            )
-        except FileNotFoundError:
-            if len(arrays) == 0:
-                # the embeddings are missing
-                raise
-            break
 
-        arrays.append(array)
-        tot += len(array)
+def setup_store(
+    logger: logging.Logger, store: weaviate.WeaviateClient, docs: list[dict[str, str | int]]
+) -> weaviate.Collection:
+    """Create a vector store with the provided docs."""
+    if store.collections.exists(_docs_collection):
+        logger.info("reusing existing Weaviate collection")
+        out = store.collections.get(_docs_collection)
+    else:
+        logger.info("creating new Weaviate collection")
+        out = store.collections.create(
+            name=_docs_collection,
+            description="Documentation for the LangChain Python library.",
+            vectorizer_config=wvc.Configure.Vectorizer.text2vec_transformers(),
+            properties=[
+                wvc.Property(
+                    name="title",
+                    data_type=wvc.DataType.TEXT,
+                    description="The title of the document",
+                ),
+                wvc.Property(
+                    name="chunk",
+                    data_type=wvc.DataType.INT,
+                    description="Zero-indexed chunk number in the document",
+                    skip_vectorization=True,
+                    vectorize_property_name=False,
+                ),
+                wvc.Property(
+                    name="contents",
+                    data_type=wvc.DataType.TEXT,
+                    description="The contents of (this chunk of) the document",
+                ),
+            ],
+        )
 
-        if max_rows and tot >= max_rows:
-            break
+    if len(out) == 0:
+        logger.info(f"uploading {len(docs)} chunks to Weaviate collection")
+        res = out.data.insert_many(docs)
+        if res.has_errors:
+            if len(res.errors) > 0:
+                logger.error("first Weaviate error: " + next(iter(res.errors.values())).message)
 
-        i += 1
+            raise ValueError(f"there were {len(res.errors)} upload errors")
+    else:
+        logger.info(f"using old data, {len(out)} chunks")
 
-    return np.concatenate(arrays)
+    return out
 
 
 class RAG(System):
     """This model prompts an LM to generate text few-shot, with the examples provided by searching a
     vector store for texts with similar embeddings to the title."""
 
-    instructions: str = FewShot.instructions
+    model: Model
+    docs: weaviate.Collection
+    k: int
+    instructions: str = (
+        "Please generate high-level steps to accomplish the specified goal using the LangChain "
+        "Python library. Don't include code, extraneous commentary, or examples, but do refer to "
+        "the specific LangChain APIs (or other APIs) used in each step. Don't produce any text "
+        "other than the list of steps. Use the provided reference documentation to answer the "
+        "question."
+    )
 
     def __init__(
         self,
         model: Model,
+        docs: weaviate.Collection,
         k: int,
-        ds: Dataset,
-        embedder: HuggingFaceEmbeddings,
-        embedding_n: int | None = None,
-        emb_path: str | PathLike = "cache/embeddings",
-        vs_path: str | PathLike = "cache/vectors",
     ):
         self.model = model
+        self.docs = docs
+        self.k = k
 
-        vs_path = Path(vs_path)
-        if vs_path.exists():
-            store = FAISS.load_local(str(vs_path), embedder)
-        else:
-            embeds = load_embeddings(emb_path, max_rows=embedding_n)
-
-            ds = ds.select(np.arange(0, len(embeds)))
-
-            # We would use FAISS.from_embeddings, but it has a stupid list[tuple[str, list[float]]]
-            # argument.
-            store = FAISS._FAISS__from(
-                texts=ds["formatted"],
-                embeddings=embeds,
-                embedding=embedder,
-                metadatas=ds,
-                ids=list(map(str, ds["id"])),
-            )
-            store.save_local(vs_path)
-
-        self.selector = SemanticSimilarityExampleSelector(vectorstore=store, k=k)
-
-    def generate(self, title: str, logger: logging.Logger | None = None) -> list[str]:
-        examples = self.get_examples(title, logger)
-        prompt = self.model.build_prompt(title, self.instructions, examples)
+    def generate(self, title: str, logger: logging.Logger) -> list[str]:
+        docs = self.get_docs(title, logger)
+        prompt = self.build_prompt(title, docs)
         completion = self.model.generate(prompt)
 
-        log(logger, "FewShot", prompt, completion)
+        log(logger, "RAG", prompt, completion)
 
         return completion
 
-    async def agenerate(self, title: str, logger: logging.Logger | None = None) -> list[str]:
-        examples = self.get_examples(title, logger)
-        prompt = self.model.build_prompt(title, self.instructions, examples)
+    async def agenerate(self, title: str, logger: logging.Logger) -> list[str]:
+        docs = self.get_docs(title, logger)
+        prompt = self.build_prompt(title, docs)
         completion = await self.model.agenerate(prompt)
 
-        log(logger, "FewShot", prompt, completion)
+        log(logger, "RAG", prompt, completion)
 
         return completion
 
-    def get_examples(
-        self, title: str, logger: logging.Logger | None = None
-    ) -> list[tuple[str, str]]:
-        """Returns the examples that will be inserted into the prompt."""
-        examples = self.selector.select_examples({"title": title})
-        for i in range(len(examples)):
-            # split the title from the recipe
-            recipe = examples[i]["formatted"].split("\n\n", 1)[1]
-            examples[i] = (examples[i]["title"], recipe)
+    def get_docs(self, title: str, logger: logging.Logger) -> list[tuple[str, str]]:
+        """Returns the docs that will be inserted into the prompt."""
+        res = self.docs.query.near_text(
+            query=title, limit=self.k, return_properties=["title", "contents"]
+        )
 
-        if logger:
-            logger.debug(f"got {len(examples)} examples: {', '.join(ex[0] for ex in examples)}")
+        out: list[tuple[str, str]] = []
+        for obj in res.objects:
+            out.append((obj.properties["title"], obj.properties["contents"]))
 
-        token_budget = self.model.max_tokens
-        if token_budget is not None:
-            token_counts = [self.model.get_num_tokens(example) for example in examples]
+        logger.debug(f"retrieved {len(out)} docs for query '{title}'")
 
-            # As a heuristic, we'll assume the remaining token window for inference only needs to be
-            # about as large as the largest example we provide. I'd imagine that similar recipes
-            # require similar lengths.
-            token_budget -= max(token_counts) + 20
+        return out
 
-            for i, token_count in enumerate(token_counts):
-                token_budget -= token_count
-                if token_budget < 0:
-                    if logger:
-                        logger.warning(
-                            f"keeping only {i}/{len(examples)} examples for few-shot prompt due to "
-                            "token length"
-                        )
-                    examples = examples[:i]
-                    break
+    def build_prompt(self, title: str, docs: list[tuple[str, str]]) -> list[BaseMessage]:
+        msg = (
+            f"Please generate a list of instructions to accomplish '{title}' using the "
+            "documentation below:"
+        )
+        for t, doc in docs:
+            msg += f"\n\nDOCUMENTATION FOR '{t}':\n\n{doc}"
 
-        return examples
+        return [
+            SystemMessage(content=self.instructions),
+            HumanMessage(content=msg),
+        ]

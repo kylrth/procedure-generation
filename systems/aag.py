@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from pathlib import Path
+from typing import Iterable
 
 import weaviate
 import weaviate.classes as wvc
@@ -13,7 +14,7 @@ from .interface import System
 from .model import Model
 
 
-with Path("prompts/concept_skills.txt").open() as f:
+with (Path(__file__).parent / "prompts/concept_skills.txt").open() as f:
     _concept_skill_instructions = f.read().strip()
 
 
@@ -37,7 +38,9 @@ async def build_concept_skills(model: Model, concept_docs: Dataset) -> list[Proc
 _skills_collection = "Skills"
 
 
-def setup_skills(store: weaviate.WeaviateClient, skills: list[Procedure]) -> weaviate.Collection:
+def setup_skills(
+    store: weaviate.WeaviateClient, skills: Iterable[Procedure]
+) -> weaviate.Collection:
     """Create the skill library with the provided skills as a start."""
     if store.collections.exists(_skills_collection):
         out = store.collections.get(_skills_collection)
@@ -48,7 +51,9 @@ def setup_skills(store: weaviate.WeaviateClient, skills: list[Procedure]) -> wea
             vectorizer_config=wvc.Configure.Vectorizer.text2vec_transformers(),
             properties=[
                 wvc.Property(
-                    name="goal", data_type="text", description="The goal achieved by this skill"
+                    name="goal",
+                    data_type="text",
+                    description="The goal achieved by this skill",
                 ),
                 wvc.Property(
                     name="steps",
@@ -67,7 +72,9 @@ def setup_skills(store: weaviate.WeaviateClient, skills: list[Procedure]) -> wea
 _api_ref_collection = "APIRef"
 
 
-def setup_api_ref(store: weaviate.WeaviateClient, docs: dict[str, str]) -> weaviate.Collection:
+def setup_api_ref(
+    store: weaviate.WeaviateClient, docs: Iterable[dict[str, str]]
+) -> weaviate.Collection:
     """Create the vector store for the API reference docs."""
     if store.collections.exists(_api_ref_collection):
         out = store.collections.get(_api_ref_collection)
@@ -91,7 +98,7 @@ def setup_api_ref(store: weaviate.WeaviateClient, docs: dict[str, str]) -> weavi
             ],
         )
 
-    out.data.insert_many([{"api": api, "documentation": docs[api]} for api in docs])
+    out.data.insert_many(docs)
 
 
 class AAG(System):

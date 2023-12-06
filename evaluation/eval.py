@@ -212,7 +212,7 @@ async def evaluation(
 ) -> dict[str, Any]:
     """Evaluate a generated procedure using GPT-4 to compare with the gold procedure."""
     goal = gold["goal"][0]
-    gold_steps = lcstep.text_from_procedure("", gold["steps"][0], "")
+    gold_steps = lcstep.Procedure("", gold["steps"][0], "")
 
     results = {}
 

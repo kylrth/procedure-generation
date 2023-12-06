@@ -11,13 +11,12 @@ from typing import Any
 
 import numpy as np
 import weaviate
-from datasets import Dataset
-from langchain.embeddings import HuggingFaceEmbeddings
+from datasets import Dataset, concatenate_datasets
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 import lcstep
 from evaluation.eval import evaluation
-from systems import RAG, FewShot, Model, System, aag
-from systems.aag import AAG, setup_api_ref, setup_skills
+from systems import Model, System, aag, rag
 from utils import spread_gather
 
 
@@ -117,7 +116,7 @@ if __name__ == "__main__":
         "-s",
         "--system",
         type=str,
-        default="FewShot",
+        default="RAG",
         help="system to perform generation",
     )
     parser.add_argument(
@@ -141,83 +140,65 @@ if __name__ == "__main__":
         ),
     )
 
-    rag_options = parser.add_argument_group("RAG")
-    rag_options.add_argument(
-        "--rag-embed-model",
-        type=str,
-        default="sentence-transformers/all-mpnet-base-v2",
-        help="HuggingFace model to use for embeddings",
-    )
-    rag_options.add_argument(
-        "--rag-embed-n",
-        type=int,
-        default=sys.maxsize,
-        help=(
-            "number of samples to use in the vector store. This is ignored when the vectors/ "
-            "directory exists"
-        ),
-    )
-    rag_options.add_argument(
-        "--rag-embed-gpu", action="store_true", help="compute embeddings on the GPU"
-    )
-
     args = parser.parse_args()
+
+    logger = logging.getLogger("main")
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
 
     cache_path = Path("cache")
 
-    print("loading data...", file=sys.stderr)
+    logger.info("loading data...")
     data = lcstep.load_formatted_docs(args.data_dir)
-
-    # reserve a few examples for few-shot
-    examples = data.select(np.arange(0, args.k))
-    data = data.select(np.arange(5, len(data)))
 
     # shorten dataset according to -n
     n = min(args.n, len(data))
     data = data.select(np.arange(0, n))
 
-    print("creating system...", file=sys.stderr)
+    logger.info("creating system...")
     model = Model.from_full_name(args.model)
     system = args.system.lower()
-    if system == "fewshot":
-        # prepare examples
-        shots = []
-        for _, item in zip(range(args.k), examples.iter(1), strict=False):
-            proc = lcstep.Procedure(item["goal"][0], item["steps"][0], "").to_text()
-            goal, steps = proc.strip().split("\n\n")
-            print(goal, steps)
-            shots.append((goal, steps))
+    if system == "rag":
+        store = weaviate.connect_to_local()
 
-        system = FewShot(model, shots=shots)
-    elif system == "rag":
-        api_refs = lcstep.load_api_ref(args.data_dir)
+        # set up vector store with API refs and concept docs
+        api_ref = lcstep.load_api_ref(args.data_dir)
+        api_ref = api_ref.rename_columns({"api": "title", "ref": "contents"})
         concept_docs = lcstep.load_concept_docs(args.data_dir)
-        embedder = HuggingFaceEmbeddings(
-            model_name=args.rag_embed_model,
-            encode_kwargs=None if args.rag_embed_gpu else {"device": "cpu"},
+        concept_docs = concept_docs.rename_columns({"path": "title", "ref": "contents"})
+        docs = concatenate_datasets([api_ref, concept_docs])
+        docs = docs.select(np.arange(0, 50))  ## TODO remove this
+        logger.debug(f"collected {len(docs)} docs for vector store")
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=4000, chunk_overlap=200)
+        docs_store = rag.setup_store(
+            logger,
+            store,
+            [
+                {"title": d["title"][0], "chunk": i, "contents": t}
+                for d in docs.iter(1)
+                for i, t in enumerate(text_splitter.split_text(d["contents"][0]))
+            ],
         )
-        system = RAG(
-            model,
-            args.rag_k,
-            api_refs,  # TODO handle api_refs and concept_docs
-            embedder,
-            args.rag_embed_n,
-            cache_path / "embeddings" / args.rag_embed_model,
-        )
+
+        store.batch.wait_for_vector_indexing()
+        system = rag.RAG(model, docs_store, args.k)
     elif system == "aag":
         store = weaviate.connect_to_local()
 
         # set up skill library from concept docs
         concept_docs = lcstep.load_concept_docs(args.data_dir)
         skills = asyncio.run(aag.build_concept_skills(model, concept_docs))
-        setup_skills(store, skills)
+        aag.setup_skills(store, skills)
 
         # set up API ref store
         api_ref = lcstep.load_api_ref(args.data_dir)
-        setup_api_ref(store, api_ref.iter(1))
+        api_ref = api_ref.rename_column("ref", "documentation")
+        aag.setup_api_ref(store, list(api_ref.iter(1)))
 
         store.batch.wait_for_vector_indexing()
-        system = AAG(model, store)
+        system = aag.AAG(model, store)
     else:
         raise NotImplementedError(args.system)
 
