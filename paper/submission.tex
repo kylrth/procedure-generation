@@ -42,11 +42,23 @@ Montr\'eal, QC, Canada \\
    TODO
 \end{abstract}
 
-\section{Motivation}
+\section{Prior Work}
+
+There are several recent works that augment large language models with external knowledge sources to achieve better performance on knowledge production tasks. \cite{checkYourFacts} demonstrate that augmenting with external knowledge and self-feedback improves performance on factual knowledge tasks. \cite{llmsZeroShotPlanners} demonstrate that LLMs can produce procedural knowledge, but the VirtualHome environment is limited and the work does not leverage external knowledge except by environment grounding.
+
+\cite{thoughtPropagation} design an analogical prompting process they call Thought Propagation, which asks the model to propose analogous problems, which are each individually solved, and all analogous problems and solutions are included in the prompt to determine the solution to the original problem. \cite{reAct} prompts LLMs to generate a mix of thoughts \textit{and} actions in order to combine the benefits of CoT with the benefits of tool use/retrieval.
+
+\cite{opro} iteratively optimize the prompt by asking LLMs to refine it.
+
+\subsection{multi-agent simulation}
+
+\cite{qian2023communicative} perform software engineering by prompting LLMs to fill various waterfall development roles and allowing them to interact with each other.
+
+\subsection{model-based evaluation}
+
+\cite{prometheus} trains an evaluator model that evaluates generated text as well as GPT-4 (given a rubric) but is open source.
 
 \begin{itemize}
-   \item~\cite{checkYourFacts} demonstrate that augmenting with external knowledge sources and self-feedback improves performance on factual knowledge tasks.
-   \item~\cite{llmsZeroShotPlanners} demonstrate that LLMs can produce procedural knowledge. But the VirtualHome environment is limited (and the choices of steps to include is subjective), and the paper does not leverage external knowledge (although it does leverage environment grounding).
    \item Factual knowledge is most succinctly represented by knowledge graphs, but these graphs leave out contextual information (which is why current approaches to factual generation use retrieved documents instead of KGs).
    \item Procedural knowledge can also be succinctly represented as a graph relating goals with steps, but this also leaves out contextual information.
    \item Retrieving procedural knowledge can be difficult because information is often spread across many more documents.
