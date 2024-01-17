@@ -18,3 +18,13 @@ pip install -r requirements.txt
 ```
 
 If you want CPU versions of PyTorch (a dependency of `sentence-transformers`), be sure to install them beforehand. If you're doing development, also run `pip install -r requirements_dev.txt`.
+
+## running experiments
+
+To run an experiment, you need to set up a Weaviate instance to function as the vector store. You can run `docker compose up -d` to start this service in the background. Then to generate results for the RAG method on 10 samples, run the following:
+
+```sh
+OPENAI_API_KEY=$(cat openai.key) python run.py --system RAG -n 10
+```
+
+Of course, you'll need to have your API key in `openai.key` for this to work. The generated results will be in `output.csv`, but they're available in a more human-readable format under `logs/`.
