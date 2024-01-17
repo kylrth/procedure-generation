@@ -2,16 +2,19 @@
 specific LMs."""
 
 
+from .aag import AAG
 from .few_shot import FewShot
-from .interface import System
+from .interface import Result, System
 from .model import Model
 from .rag import RAG
 
 
 __all__ = [
+    "Result",
     "System",
     "Model",
     # systems
     "FewShot",
     "RAG",
+    "AAG",
 ]

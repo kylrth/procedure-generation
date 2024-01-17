@@ -1,5 +1,10 @@
 # ruff: noqa: T201
 # This script needs to print.
+# ruff: noqa: I001, E402  # need to shut up before importing langchain
+
+import shutup
+
+shutup.please()
 
 import argparse
 import asyncio
@@ -15,66 +20,71 @@ from datasets import Dataset, concatenate_datasets
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 import lcstep
-from evaluation.eval import evaluation
-from systems import Model, System, aag, rag
-from utils import spread_gather
+from evaluation.eval import evaluate_all
+from systems import Model, Result, System, aag, rag
+from utils import log, spread_gather
 
 
-def make_logger(for_file: str) -> logging.Logger:
-    """Create a new logger that writes to logs/{name}.log, where `name` is converted from `for_file`
-    with directory separators replaced with dashes."""
-    name = for_file.replace("/", "-")
-    log_file = Path("logs") / f"{name}.log"
-    log_file.parent.mkdir(parents=True, exist_ok=True)
+def create_log_result(_id: int, source: str, res: Result, label: str) -> log.Result:
+    return log.Result(
+        ID=_id,
+        source=source,
+        query=res.query,
+        label=label,
+        prompt=res.prompt,
+        completions=res.answers,
+        retrieved_docs=res.retrieved_docs if res.retrieved_docs is not None else [],
+        context=res.context if res.context is not None else "",
+        model=res.model,
+    )
 
-    logger = logging.getLogger(name)
-    logger.propagate = False
-    logger.addHandler(logging.FileHandler(log_file, "w"))
-    logger.setLevel(logging.DEBUG)
-    return logger
 
+async def generate_and_evaluate(
+    model: System, item: dict[str, Any], logger: log.ResultsLogger
+) -> tuple[int, dict[str, list[Any]]]:
+    """Generate a procedure for this item with the model, and then evaluate it.
 
-async def generate_and_evaluate(model: System, item: dict[str, Any]):
-    """Generate a procedure for this item with the model, and then evaluate it."""
-    goal = item["goal"][0]
+    Returns the item ID and the scores for each metric on each generated answer.
+    """
+    goal: str = item["goal"][0]
+    _id: int = item["id"][0]
+    source: str = item["path"][0]
+    ref: str = item["ref"][0]
 
-    logger = make_logger(str(item["path"][0]))
-
-    res = await model.agenerate(goal, logger)
-    logger.debug(f"got {len(res)} generations")
+    res = await model.agenerate(goal)
+    logger.result(create_log_result(_id, source, res, ref))
 
     scores = defaultdict(list)
-    for completion in res:
+    for answer in res.answers:
         try:
-            evals = await evaluation(completion, item, logger)
+            evals = await evaluate_all(answer, item, logger)
+            logger.evaluation(_id, evals)
         except Exception:
-            logger.exception("exception during evaluation")
-            break
+            logger.exception(_id, "exception during evaluation")
+            continue
         for metric in evals:
             scores[metric].append(evals[metric])
 
-    score_print = "\n".join(f"  {metric}: {scores[metric]}" for metric in scores)
-    logger.debug("final scores:\n" + score_print)
-
-    return scores, item["path"][0]
+    return _id, scores
 
 
 async def evaluate(model: System, data: Dataset, n_workers: int = 10):
     """Evaluate the system with the given text generation dataset."""
-    results = await spread_gather(
-        lambda prompt: generate_and_evaluate(model, prompt),
-        data.iter(1),
-        n_workers,
-        len(data),
-    )
+    with log.ResultsLogger("output.csv", "logs") as logger:
+        results = await spread_gather(
+            lambda prompt: generate_and_evaluate(model, prompt, logger),
+            data.iter(1),
+            n_workers,
+            len(data),
+        )
 
     # collect results
     scores = defaultdict(list)
     broken = []
-    for evals, path in results:
+    for _id, evals in results:
         # if prompt had no correct completions
         if len(evals) == 0:
-            broken.append(path)
+            broken.append(_id)
             continue
         # collect all scores of a metric
         for metric, values in evals.items():
@@ -169,9 +179,8 @@ if __name__ == "__main__":
         concept_docs = lcstep.load_concept_docs(args.data_dir)
         concept_docs = concept_docs.rename_columns({"path": "title", "ref": "contents"})
         docs = concatenate_datasets([api_ref, concept_docs])
-        docs = docs.select(np.arange(0, 50))  ## TODO remove this
         logger.debug(f"collected {len(docs)} docs for vector store")
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=4000, chunk_overlap=200)
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=200)
         docs_store = rag.setup_store(
             logger,
             store,
