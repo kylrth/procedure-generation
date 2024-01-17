@@ -142,7 +142,16 @@ def load_formatted_docs(data_dir: str | PathLike = "./dataset/docs") -> Dataset:
                 key=lambda v: len(v["ref"]),
             )
 
-    return Dataset.from_list(dicts)
+    ds = Dataset.from_list(dicts)
+
+    # add question IDs
+    def add_id(example, idx):
+        example["id"] = idx
+        return example
+
+    ds = ds.map(add_id, with_indices=True)
+
+    return ds
 
 
 if __name__ == "__main__":

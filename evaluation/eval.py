@@ -1,4 +1,3 @@
-""" RECIPE EVALUATION"""
 import asyncio
 import json
 import logging
@@ -14,6 +13,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 import lcstep
+from utils import log
 
 
 with Path("./evaluation/evaluation-prompts.json").open() as file:
@@ -194,7 +194,9 @@ async def relevance(recipe: str, logger: logging.Logger) -> int:
     return out
 
 
-async def step_comparison(goal: str, gold: str, generated: str, logger: logging.Logger) -> int:
+async def step_comparison(
+    goal: str, gold: lcstep.Procedure, generated: str, logger: log.ResultsLogger
+) -> int:
     """Judge the generated steps by letting GPT-4 compare with the gold steps.
 
     Score is out of 10.
@@ -207,17 +209,23 @@ async def step_comparison(goal: str, gold: str, generated: str, logger: logging.
     return 10
 
 
-async def evaluation(
-    generated: str, gold: dict[str, Any], logger: logging.Logger
+async def evaluate_all(
+    generated: str,
+    gold: dict[str, Any],
+    logger: log.ResultsLogger,
 ) -> dict[str, Any]:
-    """Evaluate a generated procedure using GPT-4 to compare with the gold procedure."""
+    """Evaluate a generated procedure by comparing with the gold procedure using various methods.
+
+    The returned dictionary contains the evaluation result for each metric.
+    """
     goal = gold["goal"][0]
     gold_steps = lcstep.Procedure("", gold["steps"][0], "")
 
-    results = {}
+    results = {}  # TODO add synchronous evals here
 
     async_tasks = {
         "compared": step_comparison(goal, gold_steps, generated, logger),
+        # TODO add more asyncronous evals here
     }
     resp = await asyncio.gather(*async_tasks.values())
 

@@ -4,8 +4,8 @@ import weaviate
 import weaviate.classes as wvc
 from langchain.schema import BaseMessage, HumanMessage, SystemMessage
 
-from .interface import System
-from .model import Model, log
+from .interface import Result, System
+from .model import Model
 
 
 _docs_collection = "Docs"
@@ -70,8 +70,8 @@ class RAG(System):
         "Please generate high-level steps to accomplish the specified goal using the LangChain "
         "Python library. Don't include code, extraneous commentary, or examples, but do refer to "
         "the specific LangChain APIs (or other APIs) used in each step. Don't produce any text "
-        "other than the list of steps. Use the provided reference documentation to answer the "
-        "question."
+        "other than the list of steps. Use any of the provided reference documentation to answer "
+        "the question."
     )
 
     def __init__(
@@ -84,25 +84,34 @@ class RAG(System):
         self.docs = docs
         self.k = k
 
-    def generate(self, title: str, logger: logging.Logger) -> list[str]:
-        docs = self.get_docs(title, logger)
-        prompt = self.build_prompt(title, docs)
-        completion = self.model.generate(prompt)
+    def generate(self, query: str) -> Result:
+        out = self._prepare_result(query)
+        out.answers = self.model.generate(out.prompt)
 
-        log(logger, "RAG", prompt, completion)
+        return out
 
-        return completion
+    async def agenerate(self, query: str) -> Result:
+        out = self._prepare_result(query)
+        out.answers = await self.model.agenerate(out.prompt)
 
-    async def agenerate(self, title: str, logger: logging.Logger) -> list[str]:
-        docs = self.get_docs(title, logger)
-        prompt = self.build_prompt(title, docs)
-        completion = await self.model.agenerate(prompt)
+        return out
 
-        log(logger, "RAG", prompt, completion)
+    def _prepare_result(self, query: str) -> Result:
+        """Do everything except get the completions (which can be async)"""
+        docs = self.get_docs(query)
+        context = self.build_context(docs)
+        prompt = self.build_prompt(query, context)
 
-        return completion
+        return Result(
+            query=query,
+            prompt=prompt,
+            answers=[],
+            model=self.model.model,
+            retrieved_docs=[{"path": doc[0], "contents": doc[1]} for doc in docs],
+            context=context,
+        )
 
-    def get_docs(self, title: str, logger: logging.Logger) -> list[tuple[str, str]]:
+    def get_docs(self, title: str) -> list[tuple[str, str]]:
         """Returns the docs that will be inserted into the prompt."""
         res = self.docs.query.near_text(
             query=title, limit=self.k, return_properties=["title", "contents"]
@@ -112,17 +121,21 @@ class RAG(System):
         for obj in res.objects:
             out.append((obj.properties["title"], obj.properties["contents"]))
 
-        logger.debug(f"retrieved {len(out)} docs for query '{title}'")
+        return out
+
+    def build_context(self, docs: list[tuple[str, str]]) -> str:
+        out = ""
+        for t, doc in docs:
+            out += f"\n\nDOCUMENTATION FOR '{t}':\n\n{doc}"
 
         return out
 
-    def build_prompt(self, title: str, docs: list[tuple[str, str]]) -> list[BaseMessage]:
+    def build_prompt(self, title: str, context: str) -> list[BaseMessage]:
         msg = (
             f"Please generate a list of instructions to accomplish '{title}' using the "
             "documentation below:"
         )
-        for t, doc in docs:
-            msg += f"\n\nDOCUMENTATION FOR '{t}':\n\n{doc}"
+        msg += context
 
         return [
             SystemMessage(content=self.instructions),

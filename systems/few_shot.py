@@ -1,7 +1,7 @@
-import logging
+from langchain.schema import BaseMessage
 
-from .interface import System
-from .model import Model, log
+from .interface import Result, System
+from .model import Model
 
 
 class FewShot(System):
@@ -18,18 +18,24 @@ class FewShot(System):
         self.model = model
         self.shots = shots if shots is not None else []
 
-    def generate(self, goal: str, logger: logging.Logger | None = None) -> list[str]:
-        prompt = self.model.build_prompt(goal, self.instructions, self.shots)
+    def generate(self, query: str) -> Result:
+        prompt = self.model.build_prompt(query, self.instructions, self.shots)
         completion = self.model.generate(prompt)
 
-        log(logger, f"{len(self.shots)}Shot", prompt, completion)
+        return self._make_result(query, prompt, completion)
 
-        return completion
-
-    async def agenerate(self, goal: str, logger: logging.Logger | None = None) -> list[str]:
-        prompt = self.model.build_prompt(goal, self.instructions, self.shots)
+    async def agenerate(self, query: str) -> Result:
+        prompt = self.model.build_prompt(query, self.instructions, self.shots)
         completion = await self.model.agenerate(prompt)
 
-        log(logger, f"{len(self.shots)}Shot", prompt, completion)
+        return self._make_result(query, prompt, completion)
 
-        return completion
+    def _make_result(self, query: str, prompt: str | list[BaseMessage], completion: list[str]):
+        return Result(
+            query,
+            prompt,
+            completion,
+            self.model.model,
+            [],
+            prompt if isinstance(prompt, str) else "\n\n".join(str(msg.content) for msg in prompt),
+        )
