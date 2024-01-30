@@ -4,6 +4,7 @@ import weaviate
 import weaviate.classes as wvc
 from langchain.schema import BaseMessage, HumanMessage, SystemMessage
 
+from . import utils
 from .interface import Result, System
 from .model import Model
 
@@ -47,12 +48,7 @@ def setup_store(
 
     if len(out) == 0:
         logger.info(f"uploading {len(docs)} chunks to Weaviate collection")
-        res = out.data.insert_many(docs)
-        if res.has_errors:
-            if len(res.errors) > 0:
-                logger.error("first Weaviate error: " + next(iter(res.errors.values())).message)
-
-            raise ValueError(f"there were {len(res.errors)} upload errors")
+        utils.weaviate_insert(logger, out, docs)
     else:
         logger.info(f"using old data, {len(out)} chunks")
 
