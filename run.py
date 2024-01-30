@@ -196,15 +196,15 @@ if __name__ == "__main__":
     elif system == "aag":
         store = weaviate.connect_to_local()
 
-        # set up skill library from concept docs
-        concept_docs = lcstep.load_concept_docs(args.data_dir)
-        skills = asyncio.run(aag.build_concept_skills(model, concept_docs))
-        aag.setup_skills(store, skills)
-
         # set up API ref store
         api_ref = lcstep.load_api_ref(args.data_dir)
         api_ref = api_ref.rename_column("ref", "documentation")
-        aag.setup_api_ref(store, list(api_ref.iter(1)))
+        aag.setup_api_ref(logger, store, list(api_ref.iter(1)))
+
+        # set up skill library from concept docs
+        concept_docs = lcstep.load_concept_docs(args.data_dir)
+        skills = asyncio.run(aag.build_concept_skills(model, concept_docs))
+        aag.setup_skills(logger, store, skills)
 
         store.batch.wait_for_vector_indexing()
         system = aag.AAG(model, store)

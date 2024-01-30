@@ -1,7 +1,6 @@
 import asyncio
 import logging
 from pathlib import Path
-from typing import Iterable
 
 import weaviate
 import weaviate.classes as wvc
@@ -10,7 +9,8 @@ from datasets import Dataset
 from lcstep import Procedure
 from utils import spread_gather
 
-from .interface import System
+from . import utils
+from .interface import Result, System
 from .model import Model
 
 
@@ -39,32 +39,46 @@ _skills_collection = "Skills"
 
 
 def setup_skills(
-    store: weaviate.WeaviateClient, skills: Iterable[Procedure]
+    logger: logging.Logger, store: weaviate.WeaviateClient, skills: list[Procedure]
 ) -> weaviate.Collection:
-    """Create the skill library with the provided skills as a start."""
-    if store.collections.exists(_skills_collection):
-        out = store.collections.get(_skills_collection)
-    else:
-        out = store.collections.create(
-            name=_skills_collection,
-            description="Skills extracted from high-level documentation about LangChain.",
-            vectorizer_config=wvc.Configure.Vectorizer.text2vec_transformers(),
-            properties=[
-                wvc.Property(
-                    name="goal",
-                    data_type="text",
-                    description="The goal achieved by this skill",
-                ),
-                wvc.Property(
-                    name="steps",
-                    data_type="text[]",
-                    description="The procedure to accomplish the goal, expressed as "
-                    "step-by-step instructions",
-                ),
-            ],
-        )
+    """Create the skill library with the provided skills as a start.
 
-    out.data.insert_many([{"goal": p.goal, "skill": p.steps} for p in skills])
+    Since this collection will be updated over time, a pre-existing collection by the same name will
+    be deleted.
+    """
+    if store.collections.exists(_skills_collection):
+        logger.info("destroying existing Weaviate collection for skills")
+        store.collections.delete(_skills_collection)
+
+    logger.info("creating new Weaviate collection for skills")
+    out = store.collections.create(
+        name=_skills_collection,
+        description="Skills extracted from high-level documentation about LangChain.",
+        vectorizer_config=wvc.Configure.Vectorizer.text2vec_transformers(),
+        properties=[
+            wvc.Property(
+                name="goal",
+                data_type=wvc.DataType.TEXT,
+                description="The goal achieved by this skill",
+            ),
+            wvc.Property(
+                name="steps",
+                data_type=wvc.DataType.TEXT_ARRAY,
+                description="The procedure to accomplish the goal, expressed as "
+                "step-by-step instructions",
+            ),
+            wvc.Property(
+                name="sidenote",
+                data_type=wvc.DataType.TEXT,
+                description="Optional extra information related to this procedure",
+            ),
+        ],
+    )
+
+    logger.info(f"uploading {len(skills)} skills to Weaviate collection")
+    utils.weaviate_insert(
+        logger, out, [{"goal": p.goal, "skill": p.steps, "sidenote": p.side_note} for p in skills]
+    )
 
     return out
 
@@ -73,12 +87,17 @@ _api_ref_collection = "APIRef"
 
 
 def setup_api_ref(
-    store: weaviate.WeaviateClient, docs: Iterable[dict[str, str]]
+    logger: logging.Logger, store: weaviate.WeaviateClient, docs: list[dict[str, str]]
 ) -> weaviate.Collection:
-    """Create the vector store for the API reference docs."""
+    """Create the vector store for the API reference docs.
+
+    Expects an iterable of dicts with keys "api" and "documentation".
+    """
     if store.collections.exists(_api_ref_collection):
+        logger.info("reusing existing Weaviate collection for API ref")
         out = store.collections.get(_api_ref_collection)
     else:
+        logger.info("creating new Weaviate collection for API ref")
         out = store.collections.create(
             name=_api_ref_collection,
             description="API reference documentation for public methods of the LangChain Python "
@@ -87,18 +106,31 @@ def setup_api_ref(
             properties=[
                 wvc.Property(
                     name="api",
-                    data_type="text",
+                    data_type=wvc.DataType.TEXT,
                     description="The full import path of a LangChain method or class",
                 ),
                 wvc.Property(
+                    name="chunk",
+                    data_type=wvc.DataType.INT,
+                    description="Zero-indexed chunk number in the documentation text",
+                    skip_vectorization=True,
+                    vectorize_property_name=False,
+                ),
+                wvc.Property(
                     name="documentation",
-                    data_type="text",
+                    data_type=wvc.DataType.TEXT,
                     description="Full Markdown documentation for the method or class",
                 ),
             ],
         )
 
-    out.data.insert_many(docs)
+    if len(out) == 0:
+        logger.info(f"uploading {len(docs)} API ref chunks to Weaviate collection")
+        utils.weaviate_insert(logger, out, docs)
+    else:
+        logger.info(f"using old data, {len(out)} chunks")
+
+    return out
 
 
 class AAG(System):
@@ -124,31 +156,31 @@ class AAG(System):
         self.skills = store.collections.get(_skills_collection)
         self.api_ref = store.collections.get(_api_ref_collection)
 
-    def generate(self, goal: str, logger: logging.Logger | None = None) -> list[str]:
-        return asyncio.run(self.agenerate(goal, logger))
+    def generate(self, query: str, logger: logging.Logger | None = None) -> Result:
+        return asyncio.run(self.agenerate(query, logger))
 
-    async def agenerate(self, goal: str, logger: logging.Logger | None = None) -> list[str]:
+    async def agenerate(self, query: str, logger: logging.Logger | None = None) -> Result:
         # search skill library
-        skills = self.find_relevant_skills(goal, 5)
+        skills = self.find_relevant_skills(query, 5)
 
         # use model to filter out irrelevant skills
-        skills = [skills[i] for i in await self.ask_relevance(goal, skills)]
+        skills = [skills[i] for i in await self.ask_relevance(query, skills)]
 
         if len(skills) == 0:
             # if nothing was similar enough, search docs
-            procedure = await self.skill_from_docs(goal)
+            procedure = await self.skill_from_docs(query)
         elif len(skills) == 1:
             procedure = skills[0]
         else:
             # ask the model to synthesize the skills into a single procedure
-            procedure = await self.merge_skills(goal, skills)
+            procedure = await self.merge_skills(query, skills)
 
         # iteratively improve
         while "TODO" in procedure:
-            procedure = await self.refine(goal, procedure)
+            procedure = await self.refine(query, procedure)
 
         # review and compare with requirements
-        procedure = await self.review(goal, procedure)
+        procedure = await self.review(query, procedure)
 
         # store in skill library
 
