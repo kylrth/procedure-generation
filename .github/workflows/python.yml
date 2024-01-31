@@ -25,7 +25,7 @@ jobs:
     - name: install dependencies
       run: |
         pip install --upgrade pip
-        pip install -r requirements.txt -r dataset/requirements.txt -r requirements_dev.txt
+        pip install -r requirements.txt -r requirements_dev.txt
 
     - name: restore caches
       uses: actions/cache/restore@v3
