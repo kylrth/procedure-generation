@@ -159,7 +159,7 @@ class AAG(System):
     def generate(self, query: str, logger: logging.Logger | None = None) -> Result:
         return asyncio.run(self.agenerate(query, logger))
 
-    async def agenerate(self, query: str, logger: logging.Logger | None = None) -> Result:
+    async def agenerate(self, query: str, _: logging.Logger | None = None) -> Result:
         # search skill library
         skills = self.find_relevant_skills(query, 5)
 
@@ -219,4 +219,4 @@ class AAG(System):
         """
 
     async def review(self, goal: str, procedure: str) -> str:
-        """Give the model one more chance to review the procedure to ensure it meets requirements."""
+        """Give the model another chance to review the procedure to ensure it meets requirements."""
