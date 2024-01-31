@@ -1,15 +1,6 @@
-# procedure generation
+# analogy-augmented generation (AAG)
 
-Our task is generating steps for accomplishing various tasks with the LangChain library. We have created a dataset of LangChain tutorials condensed into concise steps, with each step referencing the LangChain API. See [dataset/README.md](dataset/README.md) for details on the dataset. We will leverage LLMs to do perform retrieval-augmented generation (RAG), following several approaches:
-
-- **zero**: GPT-4 prompted zero-shot to generate steps (should fail due to 2021 knowledge cutoff)
-- **RAG**: GPT-4 augmented with retrieval over the API reference documentation plus some LangChain conceptual documentation. This will probably need some retrieval optimizations like [HyDE](https://arxiv.org/abs/2212.10496), [I^3](https://arxiv.org/abs/2306.02371), or [EAR](https://arxiv.org/abs/2305.17080).
-- **skill library + environment feedback**: Retrieval now gets access to all procedures generated so far. There will also be environment feedback in the form of a similarity score threshold to recognize when we don't actually have a relevant skill in the library.
-- **teacher forcing (oracle)**: Instead of retrieving over its own generated procedures, the system now retrieves over the gold procedures from the dataset for the items it has already seen.
-
-## evaluation
-
-Model-based evaluation, probably voting among several LLMs that compare the generation with the gold standard.
+This project implements and evaluates the AAG method described in our paper.
 
 ## dependencies
 
@@ -28,3 +19,54 @@ OPENAI_API_KEY=$(cat openai.key) python run.py --system RAG -n 10
 ```
 
 Of course, you'll need to have your API key in `openai.key` for this to work. The generated results will be in `output.csv`, but they're available in a more human-readable format under `logs/`.
+
+## tasks
+
+### RecipeNLG
+
+(evaluation on a "normal" LM (T5, BERT, small Llama 2, etc.) because this task is too easy for LLMs)
+
+### LCStep
+
+We have created a dataset called LCStep containing LangChain tutorials condensed into concise steps. See [dataset/README.md](dataset/README.md) for details on creating LCStep. We will leverage LLMs to do perform retrieval-augmented generation (RAG), following several approaches:
+
+(evaluation on a coding LLM)
+
+### math
+
+[JEEBench](https://github.com/dair-iitd/jeebench)
+
+(evaluation on a (math?) LLM)
+
+## baselines
+
+- **zero**: model prompted zero-shot to generate steps
+- **RAG**: model augmented with retrieval over the supporting documents. This may benefit from retrieval optimizations like [HyDE](https://arxiv.org/abs/2212.10496), [I^3](https://arxiv.org/abs/2306.02371), or [EAR](https://arxiv.org/abs/2305.17080).
+- **AAG**: (our method)
+- **teacher forcing (oracle)**: Instead of retrieving over its own generated procedures, the system now retrieves over the gold procedures from the dataset for the items it has already seen.
+
+## evaluation
+
+Model-based evaluation, probably voting among several LLMs that compare the generation with the gold standard.
+
+## development status
+
+- [ ] update definition of a procedure
+- [ ] get away from Docker (use embedded)
+- datasets
+  - [ ] RecipeNLG
+  - [ ] LCStep
+  - [ ] some other code dataset?
+  - [ ] JEEBench(?)
+- method
+  - [x] implement RAG
+  - [ ] implement another baseline (Active RAG)?
+  - [ ] implement another baseline specific to the dataset
+  - [ ] implement the memory system
+  - [ ] implement AAG
+  - [ ] add flags for ablations to AAG
+- evaluation
+  - [x] implement experiment framework (Do we want a train/test split for LCStep or are we good with gradual learn/eval?)
+  - [ ] add metrics (including dataset-specific ones)
+  - [ ] think about tables/figures we want to include
+    - [ ] a figure demonstrating that once the procedural memory is robust the system refers to external documents less
