@@ -93,15 +93,33 @@ Of course, you'll need to have your API key in `openai.key` for this to work. Th
 
 ## development status
 
-- [ ] update definition of a procedure
+- [x] update definition of a procedure
 - [ ] get away from Docker (use embedded)
 - datasets
   - [ ] RecipeNLG
+    - [ ] describe in natural language the appropriate level of abstraction for this dataset
+    - [ ] ensure quality is good on a set of 20 representative ingested examples
+    - [ ] identify suitable dataset-specific baseline
+    - [ ] ingest entire dataset
   - [ ] LCStep
-  - [ ] some other code dataset?
+    - [ ] describe in natural language the appropriate level of abstraction for this dataset
+    - [ ] ensure quality is good on a set of 20 representative ingested examples
+    - [ ] identify suitable dataset-specific baseline
+    - [ ] ingest entire dataset
+    - [ ] do we want a train/test split?
+  - [ ] some other code dataset
+    - [ ] describe in natural language the appropriate level of abstraction for this dataset
+    - [ ] ensure quality is good on a set of 20 representative ingested examples
+    - [ ] identify suitable dataset-specific baseline
+    - [ ] ingest entire dataset
   - [ ] JEEBench(?)
+    - [ ] describe in natural language the appropriate level of abstraction for this dataset
+    - [ ] ensure quality is good on a set of 20 representative ingested examples
+    - [ ] identify suitable dataset-specific baseline
+    - [ ] ingest entire dataset
 - method
   - [x] implement RAG
+  - [ ] slides to propose AAG system
   - [ ] implement another baseline (Active RAG)?
   - [ ] implement another baseline specific to the dataset
   - [ ] implement the memory system
