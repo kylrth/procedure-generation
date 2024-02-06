@@ -1,0 +1,1840 @@
+[
+  {
+    "input": [
+      "brown sugar",
+      "milk",
+      "vanilla",
+      "nuts",
+      "butter",
+      "bite size shredded rice biscuits"
+    ],
+    "output": "No-Bake Nut Cookies",
+    "steps": [
+      "In a heavy 2-quart saucepan, mix brown sugar, nuts, evaporated milk and butter or margarine.",
+      "Stir over medium heat until mixture bubbles all over top.",
+      "Boil and stir 5 minutes more. Take off heat.",
+      "Stir in vanilla and cereal; mix well.",
+      "Using 2 teaspoons, drop and shape into 30 clusters on wax paper.",
+      "Let stand until firm, about 30 minutes."
+    ]
+  },
+  {
+    "input": [
+      "beef",
+      "chicken breasts",
+      "cream of mushroom soup",
+      "sour cream"
+    ],
+    "output": "Jewell Ball'S Chicken",
+    "steps": [
+      "Place chipped beef on bottom of baking dish.",
+      "Place chicken on top of beef.",
+      "Mix soup and cream together; pour over chicken. Bake, uncovered, at 275\u00b0 for 3 hours."
+    ]
+  },
+  {
+    "input": [
+      "frozen corn",
+      "cream cheese",
+      "butter",
+      "garlic powder",
+      "salt",
+      "pepper"
+    ],
+    "output": "Creamy Corn",
+    "steps": [
+      "In a slow cooker, combine all ingredients. Cover and cook on low for 4 hours or until heated through and cheese is melted. Stir well before serving. Yields 6 servings."
+    ]
+  },
+  {
+    "input": [
+      "chicken",
+      "chicken gravy",
+      "cream of mushroom soup",
+      "shredded cheese"
+    ],
+    "output": "Chicken Funny",
+    "steps": [
+      "Boil and debone chicken.",
+      "Put bite size pieces in average size square casserole dish.",
+      "Pour gravy and cream of mushroom soup over chicken; level.",
+      "Make stuffing according to instructions on box (do not make too moist).",
+      "Put stuffing on top of chicken and gravy; level.",
+      "Sprinkle shredded cheese on top and bake at 350\u00b0 for approximately 20 minutes or until golden and bubbly."
+    ]
+  },
+  {
+    "input": [
+      "peanut butter",
+      "graham cracker crumbs",
+      "butter",
+      "powdered sugar",
+      "chocolate chips"
+    ],
+    "output": "Reeses Cups(Candy)  ",
+    "steps": [
+      "Combine first four ingredients and press in 13 x 9-inch ungreased pan.",
+      "Melt chocolate chips and spread over mixture. Refrigerate for about 20 minutes and cut into pieces before chocolate gets hard.",
+      "Keep in refrigerator."
+    ]
+  },
+  {
+    "input": [
+      "baking potatoes",
+      "extra lean ground beef",
+      "butter",
+      "milk",
+      "salt",
+      "pepper",
+      "Cheddar cheese",
+      "bacon",
+      "green onion",
+      "sour cream"
+    ],
+    "output": "Cheeseburger Potato Soup",
+    "steps": [
+      "Wash potatoes; prick several times with a fork.",
+      "Microwave them with a wet paper towel covering the potatoes on high for 6-8 minutes.",
+      "The potatoes should be soft, ready to eat.",
+      "Let them cool enough to handle.",
+      "Cut in half lengthwise; scoop out pulp and reserve.",
+      "Discard shells.",
+      "Brown ground beef until done.",
+      "Drain any grease from the meat.",
+      "Set aside when done.",
+      "Meat will be added later.",
+      "Melt butter in a large kettle over low heat; add flour, stirring until smooth.",
+      "Cook 1 minute, stirring constantly. Gradually add milk; cook over medium heat, stirring constantly, until thickened and bubbly.",
+      "Stir in potato, ground beef, salt, pepper, 1 cup of cheese, 2 tablespoons of green onion and 1/2 cup of bacon.",
+      "Cook until heated (do not boil).",
+      "Stir in sour cream if desired; cook until heated (do not boil).",
+      "Sprinkle with remaining cheese, bacon and green onions."
+    ]
+  },
+  {
+    "input": [
+      "sugar",
+      "butter",
+      "egg",
+      "buttermilk",
+      "flour",
+      "salt",
+      "soda",
+      "buttermilk",
+      "rhubarb",
+      "vanilla"
+    ],
+    "output": "Rhubarb Coffee Cake",
+    "steps": [
+      "Cream sugar and butter.",
+      "Add egg and beat well.",
+      "To creamed butter, sugar and egg, add alternately buttermilk with mixture of flour, salt and soda.",
+      "Mix well.",
+      "Add rhubarb and vanilla.",
+      "Pour into greased 9 x 13-inch pan and add Topping."
+    ]
+  },
+  {
+    "input": [
+      "cream-style corn",
+      "whole kernel corn",
+      "crackers",
+      "egg",
+      "butter",
+      "pepper"
+    ],
+    "output": "Scalloped Corn",
+    "steps": [
+      "Mix together both cans of corn, crackers, egg, 2 teaspoons of melted butter and pepper and place in a buttered baking dish.",
+      "Dot with remaining 4 teaspoons of butter.",
+      "Bake at 350\u00b0 for 1 hour."
+    ]
+  },
+  {
+    "input": [
+      "tomatoes",
+      "water",
+      "onions",
+      "Worcestershire sauce",
+      "green peppers",
+      "oil"
+    ],
+    "output": "Nolan'S Pepper Steak",
+    "steps": [
+      "Roll steak strips in flour.",
+      "Brown in skillet.",
+      "Salt and pepper.",
+      "Combine tomato liquid, water, onions and browned steak. Cover and simmer for one and a quarter hours.",
+      "Uncover and stir in Worcestershire sauce.",
+      "Add tomatoes, green peppers and simmer for 5 minutes.",
+      "Serve over hot cooked rice."
+    ]
+  },
+  {
+    "input": [
+      "pineapple",
+      "condensed milk",
+      "lemons",
+      "pecans",
+      "graham cracker crusts"
+    ],
+    "output": "Millionaire Pie",
+    "steps": [
+      "Empty Cool Whip into a bowl.",
+      "Drain juice from pineapple.",
+      "Mix Cool Whip and pineapple.",
+      "Add condensed milk.",
+      "Squeeze lemons, remove seeds and add to Cool Whip and pineapple.",
+      "Chop nuts into small pieces and add to mixture.",
+      "Stir all ingredients together and mix well.",
+      "Pour into a graham cracker crust.",
+      "Use top from crust to cover top of pie.",
+      "Chill overnight.",
+      "Makes 2 pies."
+    ]
+  },
+  {
+    "input": [
+      "dark sweet pitted cherries",
+      "ginger ale",
+      "flavor gelatin",
+      "boiling water",
+      "almond extract",
+      "marshmallows"
+    ],
+    "output": "Double Cherry Delight",
+    "steps": [
+      "Drain cherries, measuring syrup.",
+      "Cut cherries in half.",
+      "Add ginger ale and enough water to syrup to make 1 1/2 cups.",
+      "Dissolve gelatin in boiling water.",
+      "Add measured liquid and almond extract. Chill until very thick.",
+      "Fold in marshmallows and the cherries. Spoon into 6-cup mold.",
+      "Chill until firm, at least 4 hours or overnight.",
+      "Unmold.",
+      "Makes about 5 1/3 cups."
+    ]
+  },
+  {
+    "input": [
+      "powdered sugar",
+      "butter",
+      "peanut butter",
+      "paraffin",
+      "chocolate chips"
+    ],
+    "output": "Buckeye Candy",
+    "steps": [
+      "Mix sugar, butter and peanut butter.",
+      "Roll into balls and place on cookie sheet.",
+      "Set in freezer for at least 30 minutes. Melt chocolate chips and paraffin in double boiler.",
+      "Using a toothpick, dip balls 3/4 of way into chocolate chip and paraffin mixture to make them look like buckeyes."
+    ]
+  },
+  {
+    "input": [
+      "chicken",
+      "flour",
+      "barbecue sauce"
+    ],
+    "output": "Quick Barbecue Wings",
+    "steps": [
+      "Clean wings.",
+      "Flour and fry until done.",
+      "Place fried chicken wings in microwave bowl.",
+      "Stir in barbecue sauce.",
+      "Microwave on High (stir once) for 4 minutes."
+    ]
+  },
+  {
+    "input": [
+      "taco sauce",
+      "sour cream",
+      "cream cheese",
+      "ground beef",
+      "taco seasoning",
+      "shredded lettuce",
+      "tomato",
+      "onion",
+      "green pepper",
+      "Cheddar cheese"
+    ],
+    "output": "Taco Salad Chip Dip",
+    "steps": [
+      "Mix taco sauce, sour cream and cream cheese.",
+      "Spread on pizza pan.",
+      "Brown meat.",
+      "Drain off fat and add taco seasoning.",
+      "Spread over cream mixture.",
+      "Layer with raw vegetables.",
+      "Top with cheese. Serve with chips."
+    ]
+  },
+  {
+    "input": [
+      "pie filling",
+      "pineapple",
+      "condensed milk",
+      "lemon juice"
+    ],
+    "output": "Pink Stuff(Frozen Dessert)  ",
+    "steps": [
+      "Mix all ingredients together.",
+      "Pour into a 9 x 13-inch pan. Freeze until firm.",
+      "Allow to set out approximately 15 minutes before serving."
+    ]
+  },
+  {
+    "input": [
+      "shell",
+      "cleaned strawberries",
+      "water",
+      "cornstarch",
+      "sugar",
+      "salt",
+      "strawberry jello"
+    ],
+    "output": "Fresh Strawberry Pie",
+    "steps": [
+      "Mix water, cornstarch, sugar and salt in saucepan.",
+      "Stir constantly and boil until thick and clear.",
+      "Remove from heat and stir in jello.",
+      "Set aside to cool.",
+      "But don't allow it to set. Layer strawberries in baked crust.",
+      "Pour cooled glaze over. Continue layering berries and glaze.",
+      "Refrigerate.",
+      "Serve with whipped cream."
+    ]
+  },
+  {
+    "input": [
+      "chocolate fudge cake",
+      "white cake",
+      "Wesson oil"
+    ],
+    "output": "Easy German Chocolate Cake",
+    "steps": [
+      "Mix according to directions and add oil.",
+      "Bake in 9 x 13-inch pan."
+    ]
+  },
+  {
+    "input": [
+      "broccoli",
+      "bacon",
+      "green onions",
+      "raisins",
+      "mayonnaise",
+      "vinegar",
+      "sugar"
+    ],
+    "output": "Broccoli Salad",
+    "steps": [
+      "Trim off large leaves of broccoli and remove the tough ends of lower stalks. Wash the broccoli thoroughly. Cut the florets and stems into bite-size pieces. Place in a large bowl. Add bacon, onions and raisins. Combine remaining ingredients, stirring well. Add dressing to broccoli mixture and toss gently. Cover and refrigerate 2 to 3 hours. Makes about 6 servings."
+    ]
+  },
+  {
+    "input": [
+      "frozen strawberries",
+      "pineapple",
+      "bananas",
+      "pecans",
+      "strawberry",
+      "boiling water",
+      "sour cream"
+    ],
+    "output": "Strawberry Whatever",
+    "steps": [
+      "Mix Jell-O in boiling water.",
+      "Add strawberries, pineapple, crushed bananas and nuts.",
+      "Spread 1/2 mixture in 13 x 6 1/2-inch pan.",
+      "Allow to gel in freezer 30 minutes.",
+      "Add layer of sour cream, then remaining mixture on top.",
+      "Gel and serve."
+    ]
+  },
+  {
+    "input": [
+      "sugar",
+      "shortening",
+      "applesauce",
+      "soda",
+      "cinnamon",
+      "flour",
+      "raisins",
+      "nuts"
+    ],
+    "output": "Eggless Milkless Applesauce Cake",
+    "steps": [
+      "Mix Crisco with applesauce, nuts and raisins.",
+      "Sift dry ingredients and add.",
+      "Mix well.",
+      "Put in a greased and floured loaf pan or tube pan.",
+      "Bake in loaf pan at 350\u00b0 to 375\u00b0 for 45 to 60 minutes, layer pan at 375\u00b0 for 20 minutes or tube pan at 325\u00b0 for 1 hour."
+    ]
+  },
+  {
+    "input": [
+      "sugar",
+      "shortening",
+      "eggs",
+      "salt",
+      "soda",
+      "flour",
+      "nuts",
+      "bananas"
+    ],
+    "output": "Grandma Hanrath'S Banana Breadfort Collins, Colorado  ",
+    "steps": [
+      "Cream sugar and shortening.",
+      "Add eggs, salt and soda, then bananas and flour.",
+      "Add nuts.",
+      "Mix well.",
+      "Bake in loaf pan at 350\u00b0 for 1 hour."
+    ]
+  },
+  {
+    "input": [
+      "cake mix",
+      "chocolate fudge pudding",
+      "sour cream",
+      "water",
+      "Wesson oil",
+      "eggs",
+      "Frango"
+    ],
+    "output": "Chocolate Frango Mints",
+    "steps": [
+      "Mix ingredients together for 5 minutes.",
+      "Scrape bowl often. Last fold in chocolate chip mints.",
+      "Bake at 350\u00b0 for 35 to 40 minutes or until done (cake mix directions)."
+    ]
+  },
+  {
+    "input": [
+      "vegetable oil",
+      "soy sauce",
+      "garlic"
+    ],
+    "output": "Cuddy Farms Marinated Turkey",
+    "steps": [
+      "Buy whole turkey breast; remove all skin and bones. Cut into pieces about the size of your hand. Pour marinade over turkey and refrigerate for at least 8 hours (up to 48 hours). The longer it marinates, the less cooking time it takes."
+    ]
+  },
+  {
+    "input": [
+      "tomatoes",
+      "oil",
+      "garlic",
+      "tomato paste",
+      "peppers",
+      "sugar",
+      "salt",
+      "sweet basil",
+      "oregano",
+      "Italian seasoning"
+    ],
+    "output": "Spaghetti Sauce To Can",
+    "steps": [
+      "Cook ground or chopped peppers and onions in oil for 1/2 hour. Cook tomatoes and garlic as for juice.",
+      "Put through the mill.",
+      "(I use a food processor and do my tomatoes uncooked.",
+      "I then add the garlic right to the juice.)",
+      "Add peppers and onions to juice and remainder of ingredients.",
+      "Cook approximately 1 hour.",
+      "Put in jars and seal.",
+      "Yields 7 quarts."
+    ]
+  },
+  {
+    "input": [
+      "ground beef",
+      "tomato juice",
+      "oats",
+      "egg",
+      "onion",
+      "pepper",
+      "salt"
+    ],
+    "output": "Prize-Winning Meat Loaf",
+    "steps": [
+      "Mix well.",
+      "Press firmly into an 8 1/2 x 4 1/2 x 2 1/2-inch loaf pan.",
+      "Bake in preheated moderate oven.",
+      "Bake at 350\u00b0 for 1 hour.",
+      "Let stand 5 minutes before slicing.",
+      "Makes 8 servings."
+    ]
+  },
+  {
+    "input": [
+      "steak",
+      "ground black pepper",
+      "ground white pepper",
+      "vegetable oil",
+      "bell peppers",
+      "beef stock",
+      "salt",
+      "ground red pepper",
+      "flour",
+      "onions",
+      "celery"
+    ],
+    "output": "Smothered Round Steak(Servings: 4)  ",
+    "steps": [
+      "Alex Patout says, \"Smothering is a multipurpose Cajun technique that works wonders with everything from game to snap beans.",
+      "It's similar to what the rest of the world knows as braising.",
+      "The ingredients are briefly browned or sauteed, then cooked with a little liquid over a low heat for a long time.\""
+    ]
+  },
+  {
+    "input": [
+      "long",
+      "cooking oil",
+      "tomato sauce",
+      "water",
+      "brown sugar",
+      "mustard",
+      "Worcestershire sauce",
+      "onion"
+    ],
+    "output": "Corral Barbecued Beef Steak Strips",
+    "steps": [
+      "Brown strips in cooking oil.",
+      "Pour off drippings.",
+      "Combine tomato sauce, water, brown sugar, mustard and Worcestershire sauce.",
+      "Add sauce and onion to meat slices.",
+      "Cover and cook slowly, stirring occasionally 30 minutes or until meat is tender. Serve over rice or buttered noodles.",
+      "Yields 6 to 8 servings."
+    ]
+  },
+  {
+    "input": [
+      "condensed milk",
+      "semi-sweet chocolate chips",
+      "unsweetened chocolate",
+      "nuts",
+      "vanilla"
+    ],
+    "output": "Easy Fudge",
+    "steps": [
+      "Butter a square pan, 8 x 8 x 2-inches.",
+      "Heat milk, chocolate chips and unsweetened chocolate over low heat, stirring constantly, until chocolate is melted and mixture is smooth. Remove from heat.",
+      "Stir in nuts and vanilla.",
+      "Spread in pan."
+    ]
+  },
+  {
+    "input": [
+      "Ground Beef",
+      "taco seasoning",
+      "beans",
+      "onion",
+      "salsa",
+      "green peppers",
+      "Tomato",
+      "cheddar cheese",
+      "sour cream"
+    ],
+    "output": "Taco-Filled Green Pepper",
+    "steps": [
+      "In a large skillet, brown the ground beef. Drain, stir in taco mix, kidney beans, and salsa. Bring to a boil. Reduce heat, and let simmer for about 5 minutes. Cut peppers in half and clean it. Put peppers in boiling water for 3 minutes- drain- spoon the meat mixture into the green pepper. Put pepper in an ungreased pan. Cover, and bake at 350 degrees for 15 to 20 minutes or until peppers are crispy and filling is heated through. Top with tomatoes, cheese, and sour cream."
+    ]
+  },
+  {
+    "input": [
+      "milk",
+      "sugar",
+      "yeast",
+      "salt",
+      "Crisco oil",
+      "flour"
+    ],
+    "output": "One Hour Rolls",
+    "steps": [
+      "Put flour into a large mixing bowl.",
+      "Combine sugar, milk, salt and oil in a saucepan and heat to boiling; remove from heat and let cool to lukewarm.",
+      "Add yeast and mix well.",
+      "Pour into flour and stir.",
+      "Batter will be sticky.",
+      "Roll out batter on a floured board and cut with biscuit cutter.",
+      "Lightly brush tops with melted oleo and fold over.",
+      "Place rolls on a cookie sheet, put in a warm place and let rise for 1 hour.",
+      "Bake at 350\u00b0 for about 20 minutes. Yield: 2 1/2 dozen."
+    ]
+  },
+  {
+    "input": [
+      "peaches",
+      "fruit cocktail",
+      "pineapple",
+      "fresh strawberries",
+      "red apples",
+      "yellow apples",
+      "bananas",
+      "white grapes",
+      "purple grapes"
+    ],
+    "output": "Punch Bowl Fruit Salad",
+    "steps": [
+      "In a 6-quart punch bowl mix all of the cans of fruit, juice and all.",
+      "Clean and slice berries.",
+      "Wash and slice apples; leave peeling on apples.",
+      "Dice apples.",
+      "Slice bananas.",
+      "Wash and cut grapes in half.",
+      "Mix all together.",
+      "Nuts or other fruit may be added."
+    ]
+  },
+  {
+    "input": [
+      "chicken cutlets",
+      "oil",
+      "red vinegar",
+      "oregano",
+      "garlic salt"
+    ],
+    "output": "Summer Chicken",
+    "steps": [
+      "Double recipe for more chicken."
+    ]
+  },
+  {
+    "input": [
+      "cherry pie mix",
+      "deluxe white cake mix",
+      "butter",
+      "ground nuts"
+    ],
+    "output": "Cherry Pizza",
+    "steps": [
+      "Grease a 9 x 12-inch cake pan.",
+      "Spread cherry pie mix.",
+      "Sift cake mix and spread it dry over the cherries.",
+      "Top with ground nuts.",
+      "Melt butter and pour over top.",
+      "Bake 45 minutes in a 350\u00b0 oven."
+    ]
+  },
+  {
+    "input": [
+      "eggs",
+      "salt",
+      "pepper",
+      "potatoes",
+      "Cheddar cheese",
+      "green onions"
+    ],
+    "output": "Potato And Cheese Pie",
+    "steps": [
+      "Beat eggs, salt and pepper until well blended.",
+      "Stir in half and half, potatoes and onions.",
+      "Pour into well-greased 8-inch baking dish.",
+      "Bake in a 400\u00b0 oven for 35 to 40 minutes, or until knife inserted in center comes out clean and potatoes are tender. Cool on rack 5 minutes; cut into squares.",
+      "Makes 4 large servings."
+    ]
+  },
+  {
+    "input": [
+      "macaroni",
+      "tuna",
+      "pimentos",
+      "onion"
+    ],
+    "output": "Tuna Macaroni Casserole",
+    "steps": [
+      "Prepare macaroni and cheese as directed.",
+      "Add drained tuna, pimento and onion.",
+      "Mix.",
+      "Serve hot or cold."
+    ]
+  },
+  {
+    "input": [
+      "hearts",
+      "mayonnaise",
+      "Parmesan cheese"
+    ],
+    "output": "Artichoke Dip",
+    "steps": [
+      "Drain artichokes and chop.",
+      "Mix with mayonnaise and Parmesan cheese.",
+      "After well mixed, bake, uncovered, for 20 to 30 minutes at 350\u00b0.",
+      "Serve with crackers."
+    ]
+  },
+  {
+    "input": [
+      "sour cream",
+      "vegetable soup mix",
+      "broccoli",
+      "Cheddar cheese"
+    ],
+    "output": "Broccoli Dip For Crackers",
+    "steps": [
+      "Mix together sour cream, soup mix, broccoli and half of cheese.",
+      "Sprinkle remaining cheese on top.",
+      "Bake at 350\u00b0 for 30 minutes, uncovered.",
+      "Serve hot with vegetable crackers."
+    ]
+  },
+  {
+    "input": [
+      "Salad Supreme",
+      "Italian dressing"
+    ],
+    "output": "Summer Spaghetti",
+    "steps": [
+      "Prepare spaghetti per package.",
+      "Drain.",
+      "Melt a little butter through it.",
+      "Marinate overnight in Salad Supreme and Zesty Italian dressing.",
+      "Just before serving, add cucumbers, tomatoes, green peppers, mushrooms, olives or whatever your taste may want."
+    ]
+  },
+  {
+    "input": [
+      "pear halves",
+      "lime gelatin",
+      "cream cheese",
+      "lemon yogurt"
+    ],
+    "output": "Pear-Lime Salad",
+    "steps": [
+      "Drain pears, reserving juice.",
+      "Bring juice to a boil, stirring constantly.",
+      "Remove from heat.",
+      "Add gelatin, stirring until dissolved.",
+      "Let cool slightly.",
+      "Coarsely chop pear halves. Combine cream cheese and yogurt; beat at medium speed of electric mixer until smooth.",
+      "Add gelatin and beat well.",
+      "Stir in pears.",
+      "Pour into an oiled 4-cup mold or Pyrex dish.",
+      "Chill."
+    ]
+  },
+  {
+    "input": [
+      "watermelon rind",
+      "sugar",
+      "apple vinegar",
+      "oil",
+      "oil of cinnamon"
+    ],
+    "output": "Watermelon Rind Pickles",
+    "steps": [
+      "Trim off green and pink parts of watermelon rind; cut to 1-inch cubes.",
+      "Parboil until tender, but not soft.",
+      "Drain. Combine sugar, vinegar, oil of cloves and oil of cinnamon; bring to boiling and pour over rind.",
+      "Let stand overnight.",
+      "In the morning, drain off syrup.",
+      "Heat and put over rind.",
+      "The third morning, heat rind and syrup; seal in hot, sterilized jars.",
+      "Makes 8 pints.",
+      "(Oil of cinnamon and clove keeps rind clear and transparent.)"
+    ]
+  },
+  {
+    "input": [
+      "chicken",
+      "potatoes",
+      "onions",
+      "corn",
+      "English peas",
+      "peas",
+      "butter beans",
+      "tomatoes",
+      "tomato juice",
+      "macaroni",
+      "black pepper",
+      "salt",
+      "sugar"
+    ],
+    "output": "Chicken Stew",
+    "steps": [
+      "Remove chicken from bone.",
+      "Use the broth.",
+      "Mix the vegetables and macaroni.",
+      "Add sugar, salt and black pepper.",
+      "Cook until all vegetables are tender over medium heat."
+    ]
+  },
+  {
+    "input": [
+      "butter",
+      "sugar",
+      "egg",
+      "flour",
+      "baking powder",
+      "salt",
+      "milk",
+      "vanilla",
+      "brown sugar",
+      "cinnamon",
+      "butter"
+    ],
+    "output": "Quick Coffee Cake(6 Servings)  ",
+    "steps": [
+      "Mix 3 tablespoons fat with granulated sugar.",
+      "Add egg and beat until creamy.",
+      "Mix flour, baking powder and salt thoroughly.",
+      "Add to sugar mixture alternately with milk.",
+      "Add vanilla. Spread batter evenly in a greased 8-inch square baking pan.",
+      "Mix brown sugar and cinnamon and sprinkle over batter.",
+      "Dot with 2 tablespoons fat.",
+      "Bake at 350\u00b0 (moderate oven) for 25 to 30 minutes."
+    ]
+  },
+  {
+    "input": [
+      "flour",
+      "sugar",
+      "baking powder",
+      "yeast",
+      "buttermilk",
+      "soda",
+      "margarine",
+      "warm water"
+    ],
+    "output": "Angel Biscuits",
+    "steps": [
+      "Mix flour, sugar, baking powder, soda and salt together.",
+      "Cut in margarine, dissolve yeast in warm water.",
+      "Stir into buttermilk and add to dry mixture.",
+      "Cover and chill."
+    ]
+  },
+  {
+    "input": [
+      "marshmallows",
+      "margarine",
+      "peppermint candy",
+      "crescent rolls"
+    ],
+    "output": "Quick Peppermint Puffs",
+    "steps": [
+      "Dip marshmallows in melted margarine; roll in candy. Wrap a crescent triangle around each marshmallow, completely covering the marshmallow and square edges of dough tightly to seal.",
+      "Dip in margarine and place in a greased muffin tin.",
+      "Bake at 375\u00b0 for 10 to 15 minutes; remove from pan."
+    ]
+  },
+  {
+    "input": [
+      "yellow cake mix",
+      "water",
+      "brown sugar",
+      "butter",
+      "eggs",
+      "nuts"
+    ],
+    "output": "Fruit Pizza",
+    "steps": [
+      "Mix ingredients and spread into 2 greased pizza pans.",
+      "Bake at 350\u00b0 for 15-20 minutes."
+    ]
+  },
+  {
+    "input": [
+      "flour",
+      "sugar",
+      "oleo",
+      "eggs",
+      "chocolate syrup"
+    ],
+    "output": "Chocolate Mint Bars",
+    "steps": [
+      "Mix together and bake in 9 x 13-inch pan at 350\u00b0 for 25 to 30 minutes.",
+      "Top should spring back when touched lightly; do not overbake.",
+      "Cool completely, then spread with mint layer."
+    ]
+  },
+  {
+    "input": [
+      "flour",
+      "beer",
+      "sugar"
+    ],
+    "output": "Beer Bread",
+    "steps": [
+      "Stir the ingredients together and put in a greased and floured loaf pan.",
+      "Bake at 425 degrees for 50 minutes.",
+      "Drizzle melted butter on top."
+    ]
+  },
+  {
+    "input": [
+      "margarine",
+      "onion",
+      "celery",
+      "flour",
+      "curry powder",
+      "mushrooms",
+      "cream of celery soup",
+      "broccoli",
+      "chicken",
+      "cheese"
+    ],
+    "output": "Chicken Divan",
+    "steps": [
+      "Melt margarine in skillet; saute onions and celery.",
+      "Remove from heat.",
+      "Stir in flour and curry powder.",
+      "Drain mushrooms and keep juice.",
+      "Add water to juice to make 1/2 cup liquid.",
+      "Stir liquid and soup into flour mixture; add mushrooms.",
+      "Cook until thick.",
+      "Arrange broccoli and cubed chicken in a large baking dish. Spoon sauce over chicken.",
+      "Top with grated cheese.",
+      "Bake in a 350\u00b0 oven for about 20 minutes or in microwave until cheese is melted."
+    ]
+  },
+  {
+    "input": [
+      "flour",
+      "baking powder",
+      "salt",
+      "butter",
+      "sugar",
+      "egg yolks",
+      "vanilla",
+      "multi-colored candies"
+    ],
+    "output": "Mexican Cookie Rings",
+    "steps": [
+      "Sift flour, baking powder and salt together.",
+      "Cream together butter and sugar.",
+      "Add egg yolks and vanilla.",
+      "Beat until light and fluffy.",
+      "Mix in sifted dry ingredients.",
+      "Shape into 1-inch balls.",
+      "Push wooden spoon handle through center (twist).",
+      "Shape into rings.",
+      "Dip each cookie into candies.",
+      "Place on lightly greased baking sheets.",
+      "Bake in 375\u00b0 oven for 10 to 12 minutes or until golden brown.",
+      "Cool on racks.",
+      "Serves 2 dozen."
+    ]
+  },
+  {
+    "input": [
+      "ground beef",
+      "water",
+      "sugar",
+      "onion soup",
+      "tomatoes",
+      "tomato sauce",
+      "frozen mixed vegetables"
+    ],
+    "output": "Vegetable-Burger Soup",
+    "steps": [
+      "Lightly brown beef in soup pot.",
+      "Drain off excess fat.",
+      "Stir in tomatoes, tomato sauce, water, frozen vegetables, soup mix and sugar.",
+      "Bring to a boil.",
+      "Reduce heat and simmer for 20 minutes. Serve."
+    ]
+  },
+  {
+    "input": [
+      "chicken breasts",
+      "cream of chicken soup",
+      "cream of mushroom soup",
+      "green chili salsa sauce",
+      "green chilies",
+      "milk",
+      "onion",
+      "corn tortilla"
+    ],
+    "output": "Chicken Ole",
+    "steps": [
+      "Dice chicken.",
+      "Mix all ingredients together.",
+      "Let sit overnight.",
+      "Bake 1 1/2 hours at 375\u00b0."
+    ]
+  },
+  {
+    "input": [
+      "cabbage",
+      "carrots",
+      "green pepper",
+      "onion",
+      "mayonnaise",
+      "vinegar",
+      "sugar",
+      "celery",
+      "salt"
+    ],
+    "output": "Creamy Coleslaw(Better Homes And Gardens)  ",
+    "steps": [
+      "In a large bowl, combine cabbage, carrot, green pepper and onion or can use package of slaw mix purchased from store."
+    ]
+  },
+  {
+    "input": [
+      "flounder",
+      "tomatoes",
+      "green pepper",
+      "lemon juice",
+      "salad oil",
+      "salt",
+      "onion",
+      "basil",
+      "ground black pepper",
+      "drops red pepper sauce",
+      "green pepper"
+    ],
+    "output": "Creole Flounder",
+    "steps": [
+      "Heat oven to 500\u00b0.",
+      "Place fillets in single layer in baking dish, 13 1/2 x 9 x 2-inch.",
+      "Stir together remaining ingredients except pepper rings. Spoon over fillets.",
+      "Bake 5 to 8 minutes or until fish flakes easily with fork.",
+      "Remove fillets to warm platter. Garnish with green pepper rings. Makes 4 to 6 servings."
+    ]
+  },
+  {
+    "input": [
+      "green beans",
+      "yellow beans",
+      "kidney beans",
+      "sugar",
+      "salad oil",
+      "vinegar",
+      "water"
+    ],
+    "output": "Three Bean Salad",
+    "steps": [
+      "Mix together all of sugar, salad oil, vinegar and water until sugar is dissolved.",
+      "Pour over beans and let stand overnight."
+    ]
+  },
+  {
+    "input": [
+      "whole kernel corn",
+      "cream-style",
+      "sour cream",
+      "corn bread",
+      "margarine"
+    ],
+    "output": "Dave'S Corn Casserole",
+    "steps": [
+      "In a bowl, mix corns, sour cream, corn bread mix and melted margarine.",
+      "Pour into a greased 8 x 8 x 2-inch pan.",
+      "Bake at 350\u00b0 for 50 minutes."
+    ]
+  },
+  {
+    "input": [
+      "ground beef",
+      "onion",
+      "tomato soup",
+      "noodles",
+      "oregano",
+      "salt",
+      "water",
+      "cheese"
+    ],
+    "output": "Casserole Italiano",
+    "steps": [
+      "Brown beef with onion and seasonings and combine in a 1 1/2-quart casserole with soup, water and noodles.",
+      "Place cheese around edges.",
+      "Bake at 350\u00b0 for 30 minutes."
+    ]
+  },
+  {
+    "input": [
+      "cabbage",
+      "dry mustard",
+      "corned beef",
+      "cream of celery soup",
+      "onion"
+    ],
+    "output": "Corned Beef And Cabbage Casserole",
+    "steps": [
+      "Combine all ingredients and cook uncovered over low heat until cabbage is crisp-tender, about 20 minutes."
+    ]
+  },
+  {
+    "input": [
+      "Worcestershire sauce",
+      "dry mustard",
+      "mayonnaise",
+      "egg"
+    ],
+    "output": "Crab Cakes",
+    "steps": [
+      "Mix together and carefully add 1 pound lump crab meat.",
+      "Mix ahead of time and refrigerate so they will hold together better."
+    ]
+  },
+  {
+    "input": [
+      "cream cheese",
+      "mayonnaise",
+      "taco sauce",
+      "green onions",
+      "green pepper",
+      "tomato",
+      "Mozzarella cheese",
+      "Cheddar cheese",
+      "black olives",
+      "tortilla chips"
+    ],
+    "output": "Taco Dip",
+    "steps": [
+      "Mix together cream cheese and mayonnaise.",
+      "Spread on to a large platter or two dinner plates.",
+      "Freeze for 15 minutes. Spread taco sauce evenly on top.",
+      "Layer remaining ingredients in the written order.",
+      "Serve with tortilla chips."
+    ]
+  },
+  {
+    "input": [
+      "butter",
+      "peanut butter",
+      "graham cracker crumbs",
+      "coconut",
+      "nut meats",
+      "vanilla"
+    ],
+    "output": "Bonbon Cookies",
+    "steps": [
+      "Cream together the butter and peanut butter.",
+      "Add the remaining ingredients.",
+      "Mix and form into balls (best to mix with your hands) and chill several hours, even a day."
+    ]
+  },
+  {
+    "input": [
+      "orange sliced candy",
+      "Angel",
+      "pecans",
+      "condensed milk",
+      "vanilla",
+      "orange flavoring"
+    ],
+    "output": "Forever Amber",
+    "steps": [
+      "Mix together.",
+      "Spread in a buttered pan.",
+      "Bake for 30 minutes at 275\u00b0.",
+      "While still hot, sift 1 box of powdered sugar into it. Drop by teaspoons on waxed paper.",
+      "Let dry.",
+      "If it seems set on bottom, turn over and let it continue to dry."
+    ]
+  },
+  {
+    "input": [
+      "yellow cake",
+      "eggs",
+      "oleo",
+      "nuts",
+      "eggs",
+      "cream cheese",
+      "powdered sugar"
+    ],
+    "output": "Gooey Coffee Cake",
+    "steps": [
+      "Mix together cake mix, 2 eggs and melted oleo.",
+      "Put in greased 9 x 13-inch pan.",
+      "Put chopped nuts on top of mixture.",
+      "Mix together 2 eggs, cream cheese and powdered sugar.",
+      "Add on top of first mixture.",
+      "Bake 15 minutes at 325\u00b0, then bake 20 minutes at 350\u00b0."
+    ]
+  },
+  {
+    "input": [
+      "pineapple",
+      "bananas"
+    ],
+    "output": "Phylis' Pineapple-Banana Salad",
+    "steps": [
+      "Drain pineapple and reserve juice.",
+      "Cut bananas in chunks like pineapple."
+    ]
+  },
+  {
+    "input": [
+      "cream of mushroom soup",
+      "cream of chicken soup",
+      "cream of celery soup",
+      "chicken",
+      "butter",
+      "rice"
+    ],
+    "output": "Chicken Casserole",
+    "steps": [
+      "Mix all ingredients together in baking dish.",
+      "Cover and bake at 350\u00b0 for 2 1/2 hours.",
+      "Bake the last 45 minutes, uncovered, to brown top of chicken."
+    ]
+  },
+  {
+    "input": [
+      "cream cheese",
+      "condensed milk",
+      "pineapple",
+      "nuts",
+      "lemon juice"
+    ],
+    "output": "Pineapple Nut Pie",
+    "steps": [
+      "Cream the cream cheese; add the milk and beat smooth.",
+      "Add lemon juice, pineapple and nuts.",
+      "Beat well.",
+      "Pour into graham cracker crust and chill.",
+      "Slice in small servings (very rich) and top with dollop of Cool Whip."
+    ]
+  },
+  {
+    "input": [
+      "vanilla",
+      "cream cheese",
+      "butter",
+      "peanut butter"
+    ],
+    "output": "Annie'S Diabetic Candy",
+    "steps": [
+      "Mix all ingredients, form in small balls and roll in chopped peanuts.",
+      "Keep refrigerated."
+    ]
+  },
+  {
+    "input": [
+      "peaches",
+      "sugar",
+      "sour cream",
+      "lemon juice",
+      "vanilla"
+    ],
+    "output": "Frozen Peach Mousse",
+    "steps": [
+      "Puree peaches in a blender.",
+      "Add remaining ingredients.",
+      "Blend and pour in container and freeze."
+    ]
+  },
+  {
+    "input": [
+      "frozen strawberries",
+      "sugar",
+      "cream cheese"
+    ],
+    "output": "Strawberry Pie",
+    "steps": [
+      "*Can also use blueberries or cherries."
+    ]
+  },
+  {
+    "input": [
+      "margarine",
+      "graham cracker crumbs",
+      "granulated sugar"
+    ],
+    "output": "Blueberry Surprise",
+    "steps": [
+      "Mix ingredients and press 2/3 mixture in bottom of square baking dish.",
+      "(A bowl that has the same diameter top and bottom may be used, 1 1/2 to 2-quart size.)"
+    ]
+  },
+  {
+    "input": [
+      "flour",
+      "baking soda",
+      "salt",
+      "shortening",
+      "sugar",
+      "eggs",
+      "cocoa",
+      "water",
+      "vanilla",
+      "milk"
+    ],
+    "output": "Moist Devil'S Food Cake",
+    "steps": [
+      "Sift together the flour, soda and salt; set aside.",
+      "Combine shortening and sugar in a bowl.",
+      "Beat until creamy.",
+      "Add egg yolks; beat well.",
+      "Combine cocoa, water and vanilla to make 1 cup; mix well.",
+      "Add to batter.",
+      "Add flour mixture alternately with milk.",
+      "Beat well after each addition; set aside.",
+      "Beat egg whites until stiff peaks form when beater is lifted.",
+      "Fold into batter. Bake in two 9-inch greased cake pans at 375\u00b0 for 30 minutes."
+    ]
+  },
+  {
+    "input": [
+      "apples",
+      "raisins",
+      "brown sugar",
+      "sugar",
+      "shortening",
+      "cold water",
+      "flour",
+      "soda",
+      "cinnamon",
+      "nutmeg",
+      "cloves",
+      "salt",
+      "nuts"
+    ],
+    "output": "Dot'S Civil War Cake",
+    "steps": [
+      "Combine and cook first 6 ingredients.",
+      "Bring to boil and boil 5 minutes; cool.",
+      "Add sifted, dry ingredients to apple mixture. Stir and blend only.",
+      "Add nuts.",
+      "Pour into greased and floured tube pan.",
+      "Bake 1 hour at 350\u00b0.",
+      "Serves 16."
+    ]
+  },
+  {
+    "input": [
+      "potatoes",
+      "onion",
+      "butter",
+      "cream of chicken soup",
+      "sour cream",
+      "Cheddar cheese",
+      "cornflakes"
+    ],
+    "output": "Potato Casserole",
+    "steps": [
+      "Peel and dice potatoes; place in bowl of cold, salted water. Drain potatoes and dry on paper towels.",
+      "Mix 1/2 cup butter, onions, soup, sour cream and cheese; stir well.",
+      "Add potatoes to mixture and pour into a 2 1/2-quart casserole dish.",
+      "Crush cornflakes, mix with remaining butter.",
+      "Sprinkle cornflakes and butter on top of potato mixture.",
+      "Bake at 350\u00b0 for 50 minutes."
+    ]
+  },
+  {
+    "input": [
+      "vanilla wafers",
+      "butter"
+    ],
+    "output": "Dream Pie",
+    "steps": [
+      "Mix vanilla wafer crumbs with butter."
+    ]
+  },
+  {
+    "input": [
+      "sugar",
+      "white corn syrup",
+      "cold water",
+      "egg whites",
+      "vanilla",
+      "nuts"
+    ],
+    "output": "Divinity Fudge",
+    "steps": [
+      "Stir well together the sugar, syrup and water.",
+      "Allow to boil without stirring until it forms a hard ball in cold water.",
+      "Pour this over stiffly beaten egg whites, beating constantly.",
+      "Cool; add vanilla and nuts.",
+      "Beat until cool and thick enough to set. Pour into a buttered platter or drop by teaspoons on waxed paper."
+    ]
+  },
+  {
+    "input": [
+      "apples",
+      "sugar",
+      "cinnamon",
+      "sugar",
+      "flour",
+      "salt",
+      "corn flake crumbs",
+      "oleo"
+    ],
+    "output": "Apple Crisp",
+    "steps": [
+      "Mix 1/2 cup of sugar and cinnamon.",
+      "Spread on apples.",
+      "Mix 1/4 cup sugar, flour, salt, cornflake crumbs and oleo.",
+      "Spread mixture on apples."
+    ]
+  },
+  {
+    "input": [
+      "Bisquick",
+      "sausage",
+      "Cheddar cheese"
+    ],
+    "output": "Sausage Balls",
+    "steps": [
+      "Mix sausage and cheese together.",
+      "Add Bisquick and mix thoroughly.",
+      "Roll into medium size balls.",
+      "Bake at 350\u00b0 for 15 minutes or until golden brown."
+    ]
+  },
+  {
+    "input": [
+      "chicken",
+      "cream of chicken soup",
+      "consomme",
+      "rice",
+      "salt",
+      "pepper"
+    ],
+    "output": "Consomme Chicken",
+    "steps": [
+      "Add enough liquid to chicken soup and consomme to make 4 cups of water.",
+      "Season with salt and pepper.",
+      "Cook at 350\u00b0 for 1 hour."
+    ]
+  },
+  {
+    "input": [
+      "celery",
+      "onions",
+      "butter",
+      "ground beef",
+      "vinegar",
+      "lemon juice",
+      "brown sugar",
+      "mustard",
+      "salt",
+      "pepper",
+      "catsup",
+      "water"
+    ],
+    "output": "Spanish Hamburgers",
+    "steps": [
+      "Brown celery, onions and ground beef in butter.",
+      "Add vinegar, lemon juice, brown sugar, mustard, salt, pepper catsup and water. Simmer for 30 minutes."
+    ]
+  },
+  {
+    "input": [
+      "chicken broth",
+      "cornstarch",
+      "egg",
+      "green onion"
+    ],
+    "output": "Egg Drop Soup",
+    "steps": [
+      "In saucepan slowly stir the chicken broth into cornstarch. Cook, stirring constantly, until slightly thickened.",
+      "Slowly pour in the well beaten egg; stir once gently.",
+      "Remove from heat. Garnish with sliced green onion.",
+      "Makes 4 servings."
+    ]
+  },
+  {
+    "input": [
+      "apple juice",
+      "allspice",
+      "whole cloves",
+      "cinnamon",
+      "brown sugar"
+    ],
+    "output": "Mulled Cider",
+    "steps": [
+      "Simmer all of the ingredients.",
+      "Strain into warmed mugs and top",
+      "with",
+      "a",
+      "dash of nutmeg.",
+      "This recipe can be doubled many times, according to the number of guests present."
+    ]
+  },
+  {
+    "input": [
+      "sesame seed",
+      "grated ginger",
+      "honey",
+      "soy sauce",
+      "chicken",
+      "vegetable cooking spray",
+      "thin green onion strips"
+    ],
+    "output": "Sesame Ginger Chicken",
+    "steps": [
+      "Combine first 4 ingredients in a small bowl, stir well and set aside.",
+      "Place chicken between 2 sheets of waxed paper or heavy duty plastic wrap, and flatten to 1/4-inch thickness, using meat mallet or rolling pin.",
+      "Coat grill rack with cooking spray; place on grill over coals.",
+      "Place chicken on rack and cook 4 minutes on each side, basting frequently with soy sauce mixture.",
+      "Transfer chicken to a serving platter and garnish with green onion, if desired.",
+      "Yields 4 servings, about 200 calories."
+    ]
+  },
+  {
+    "input": [
+      "Vidalia onion",
+      "fresh mushrooms",
+      "green peppers",
+      "clove garlic",
+      "olive oil",
+      "bread",
+      "eggs",
+      "milk"
+    ],
+    "output": "Egg Casserole",
+    "steps": [
+      "Saute together first 5\tingredients.",
+      "In a separate 9 x 12-inch pan, mix bread, eggs",
+      "and",
+      "milk.",
+      "Put",
+      "pieces of bread into",
+      "pan; add your",
+      "vegetables,",
+      "then",
+      "your",
+      "eggs.",
+      "Place\tin refrigerator overnight (at least 8 hours).\tAdd Cheddar cheese before cooking.",
+      "Bake at 350\u00b0 for 1 hour."
+    ]
+  },
+  {
+    "input": [
+      "cranberries",
+      "sugar",
+      "apple",
+      "orange",
+      "orange gelatin",
+      "nuts"
+    ],
+    "output": "Cranberry-Apple-Orange Salad",
+    "steps": [
+      "In food processor or blender, grind cranberries, apple and orange.",
+      "Mix with sugar and set aside.",
+      "Prepare gelatin according to package directions, using 1/4 cup less of cold water.",
+      "Chill until it begins to thicken.",
+      "Add cranberry mixture and nuts.",
+      "Mix well.",
+      "Pour into a mold, if desired, or leave in a bowl and stir before serving.",
+      "Chill until set.",
+      "Can even be made a day ahead. Keeps well in refrigerator for a few days."
+    ]
+  },
+  {
+    "input": [
+      "rice",
+      "beef consomme",
+      "onion soup",
+      "mushrooms",
+      "margarine"
+    ],
+    "output": "Brown Rice",
+    "steps": [
+      "Put in a covered 1 1/2-quart dish.",
+      "Bake 1 hour at 350\u00b0."
+    ]
+  },
+  {
+    "input": [
+      "cream cheese",
+      "margarine",
+      "sugar",
+      "cranberry sauce",
+      "pineapple",
+      "walnuts",
+      "whipping cream"
+    ],
+    "output": "Cranberry Salad",
+    "steps": [
+      "Mix cream cheese, margarine and sugar.",
+      "Add fruit and walnuts. Whip cream and fold into fruit and cream cheese mixture.",
+      "Pour into round mold.",
+      "Freeze 6 hours.",
+      "Remove from mold shortly before serving.",
+      "Makes 12 servings."
+    ]
+  },
+  {
+    "input": [
+      "Velveeta cheese",
+      "Italian tomatoes",
+      "green chili peppers",
+      "onion",
+      "garlic",
+      "salt"
+    ],
+    "output": "Cheese Dip",
+    "steps": [
+      "Dice tomatoes and peppers.",
+      "Combine all ingredients in top of double boiler for 30 minutes.",
+      "Serve hot over corn chips."
+    ]
+  },
+  {
+    "input": [
+      "flour",
+      "salt",
+      "soda",
+      "sugar",
+      "baking powder",
+      "egg",
+      "milk",
+      "oil",
+      "powdered sugar"
+    ],
+    "output": "Funnel Cake",
+    "steps": [
+      "Sift first 5 ingredients together in a bowl.",
+      "Mix egg and milk together; add to dry ingredients.",
+      "Beat until smooth.",
+      "Hold finger over bottom of a funnel; pour in some batter.",
+      "Remove finger to let batter drop.",
+      "Drop batter in a spiral motion into pan filled with 1 inch of hot oil (375\u00b0).",
+      "Fry until golden brown, turning once.",
+      "Remove from pan; drain on a paper towel.",
+      "Sprinkle with powdered sugar and serve hot."
+    ]
+  },
+  {
+    "input": [
+      "confectioners sugar",
+      "cocoa",
+      "nuts",
+      "margarine",
+      "Velveeta",
+      "vanilla"
+    ],
+    "output": "Fast Real Good Fudge",
+    "steps": [
+      "In large bowl, put confectioners sugar, cocoa and chopped nuts.",
+      "In saucepan, put margarine and Velveeta.",
+      "Melt and add vanilla.",
+      "Pour hot mixture over sugar mixture.",
+      "Mix quickly and pour into buttered cookie sheet.",
+      "Cool and cut into squares."
+    ]
+  },
+  {
+    "input": [
+      "squash",
+      "onions",
+      "sour cream",
+      "carrots",
+      "chicken",
+      "stuffing mix",
+      "butter",
+      "salt"
+    ],
+    "output": "Squash Casserole",
+    "steps": [
+      "Cook squash, onions and carrots until tender.",
+      "Mash.",
+      "Melt butter in pan; stir in stuffing until all is coated.",
+      "Drain all water from squash.",
+      "Stir in sour cream and soup.",
+      "Place in a greased baking dish a layer of squash and a layer of stuffing. Bake at 350\u00b0 for 35 minutes."
+    ]
+  },
+  {
+    "input": [
+      "cream cheese",
+      "Cheddar cheese",
+      "pimento",
+      "green pepper",
+      "onion",
+      "lemon juice",
+      "Worcestershire sauce",
+      "Tabasco sauce",
+      "salt"
+    ],
+    "output": "Cheese Ball",
+    "steps": [
+      "Combine softened cream and Cheddar cheeses.",
+      "Add chopped up items.",
+      "Mix and add liquids last.",
+      "Mix well.",
+      "Roll into ball and cover with chopped nuts."
+    ]
+  },
+  {
+    "input": [
+      "apricot jello",
+      "sugar",
+      "cream cheese",
+      "jars Junior baby food",
+      "pineapple",
+      "milk",
+      "water"
+    ],
+    "output": "*Apricot Salad",
+    "steps": [
+      "Dissolve jello in boiling water; add sugar.",
+      "Blend in the cream cheese with a fork.",
+      "Add can of crushed pineapple and apricot baby food.",
+      "Refrigerate.",
+      "Chill can of milk.",
+      "When jello starts to set, take milk out of the refrigerator and beat until stiff.",
+      "Fold partially set jello into cream.",
+      "Chopped nuts can be used for garnish.",
+      "This is a large salad; could fill a 2-quart mold or 2 (1-quart) molds.",
+      "Serves about 12."
+    ]
+  },
+  {
+    "input": [
+      "flour",
+      "sugar",
+      "baking powder",
+      "salt",
+      "eggs",
+      "margarine",
+      "butter",
+      "sweet milk",
+      "vanilla"
+    ],
+    "output": "Pound Cake",
+    "steps": [
+      "Have all ingredients at room temperature. Hand stir all dry ingredients together. Add eggs and stir. Add butter and Crisco and stir. Add milk and stir. Put batter in",
+      "mixer and beat at high speed until well blended. Add 1 to 2 teaspoons of your favorite flavoring and mix well. Pour batter into greased and floured tube pan. Place in cold oven. Bake at 325\u00b0 for 1 hour and 20 to 30 minutes."
+    ]
+  },
+  {
+    "input": [
+      "bread",
+      "margarine",
+      "brown sugar",
+      "vanilla pudding",
+      "milk",
+      "cinnamon"
+    ],
+    "output": "Monkey Bread",
+    "steps": [
+      "Use greased 9 x 13-inch pan or Bundt pan.",
+      "Melt butter; add brown sugar, pudding, milk and cinnamon.",
+      "Break up 1 loaf into round balls; place in pan.",
+      "Pour mixture over and break second loaf over this.",
+      "Rise 2 1/2 to 3 hours.",
+      "Bake 30 minutes at 350\u00b0; turn out immediately to cool."
+    ]
+  },
+  {
+    "input": [
+      "crescent rolls",
+      "cheese",
+      "hen",
+      "cream of chicken soup",
+      "milk"
+    ],
+    "output": "Chicken Roll-Ups",
+    "steps": [
+      "Unroll crescent rolls; add cooked chicken and grated cheese. Wrap roll over chicken and cheese; pinch sides together."
+    ]
+  },
+  {
+    "input": [
+      "Spanish rice",
+      "corned beef",
+      "onion",
+      "Cheddar cheese"
+    ],
+    "output": "Beef And Spanish Rice Casserole",
+    "steps": [
+      "Spray a 1-quart casserole dish with Pam.",
+      "Layer rice and meat, diced onion and grated cheese.",
+      "Bake at 350\u00b0 for 25 to 30 minutes."
+    ]
+  },
+  {
+    "input": [
+      "pork",
+      "bell pepper",
+      "onions",
+      "catsup",
+      "brown sugar",
+      "salt",
+      "black pepper",
+      "ground beef",
+      "oil"
+    ],
+    "output": "Baked Beans",
+    "steps": [
+      "Cook onions and bell pepper in oil until onions are transparent.",
+      "Add beef and cook until brown.",
+      "Mix all ingredients together.",
+      "Bake in 350\u00b0 oven for 45 minutes, or after mixing together, pour in crock-pot and cook 6 to 10 hours on low."
+    ]
+  },
+  {
+    "input": [
+      "chicken",
+      "shortening",
+      "onion",
+      "carrot chunks",
+      "water",
+      "chicken",
+      "brown sugar",
+      "cornstarch",
+      "ginger",
+      "catsup",
+      "vinegar",
+      "soy sauce",
+      "green pepper",
+      "pineapple"
+    ],
+    "output": "Sweet-N-Sour Chicken",
+    "steps": [
+      "Saute onion in 2 tablespoons shortening.",
+      "Add carrots, water and bouillon cubes.",
+      "Simmer 5 minutes.",
+      "Combine next 6 ingredients.",
+      "Add to vegetable mixture and cook until clear.",
+      "Add pepper, pineapple and chicken.",
+      "Cover and simmer 5 minutes or until heated through.",
+      "Serve with rice or angel hair noodles. Serves 6 people."
+    ]
+  },
+  {
+    "input": [
+      "oranges",
+      "moist coconut",
+      "pecans",
+      "cherries",
+      "sugar",
+      "orange juice"
+    ],
+    "output": "Ambrosia",
+    "steps": [
+      "Combine all ingredients. Chill overnight.",
+      "Yields 4 to 6 servings."
+    ]
+  },
+  {
+    "input": [
+      "peanut butter",
+      "sugar",
+      "egg"
+    ],
+    "output": "Crazy Peanut Butter Cookies",
+    "steps": [
+      "Mix together and roll into balls; flatten with fork.",
+      "Bake on ungreased cookie sheet.",
+      "Makes 2 dozen.",
+      "Quick, easy and good."
+    ]
+  },
+  {
+    "input": [
+      "yellow cake mix",
+      "eggs",
+      "margarine",
+      "milk",
+      "pecans"
+    ],
+    "output": "Brickle Bars",
+    "steps": [
+      "Mix together with a fork:",
+      "cake mix, 1 egg and margarine. Press into a 13 x 9-inch pan.",
+      "Next mix Eagle Brand milk, 1 egg, pecans and Bits 'O Brickle.",
+      "Pour over cake mixture.",
+      "Bake 30 minutes at 350\u00b0.",
+      "Let cool and cut into bars."
+    ]
+  }
+]
