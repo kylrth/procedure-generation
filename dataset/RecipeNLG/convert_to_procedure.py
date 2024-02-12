@@ -1,6 +1,6 @@
-import numpy as np 
+import numpy as np
 import pandas as pd
-from dataset.procedure import *
+from dataset.base import Procedure
 import json
 import pickle
 
@@ -21,19 +21,19 @@ def process_ingredients(detail_ingredients, item_names):
         ing_str_list = ing.split(" ")
         start_idx = 0
         for ing_str in ing_str_list:
-            if ing_str.isnumeric() or ing_str[-1] == '.' or 
+            if ing_str.isnumeric() or ing_str[-1] == '.' or
     # item_list = json.loads(item_names)
 
     # if len(detail_ing) != len(item_list):
     #     counter_to_rem += 1
-    
+
     # return item_list
 
 def process_steps(directions):
     return json.loads(directions)
 
 def create_procedure(_input, _output, _steps):
-    procedure_obj = Procedure()
+    procedure_obj = Procedure(_input, _output, _steps)
     procedure_obj._set_input(_input)
     procedure_obj._set_output(_output)
     procedure_obj._set_steps(_steps)
@@ -49,7 +49,7 @@ def prepare_recipe_memory():
     global csv_path, counter_to_rem
     #Read Recipes CSV
     recipes = read_csv(csv_path) #Returns a pandas dataframe
-    
+
     recipe_procedures = []
     processed = 0
 
@@ -68,6 +68,3 @@ def prepare_recipe_memory():
 
 
 prepare_recipe_memory()
-
-
-

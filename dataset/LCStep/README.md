@@ -1,4 +1,4 @@
-# langchain docs dataset
+# LCStep dataset
 
 The dataset can be downloaded from <https://dl.kylrth.com/langchain_procedures.tar.gz>.
 

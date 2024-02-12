@@ -34,7 +34,7 @@ def get_prompt_messages(few_shot_as_ex: bool) -> list[BaseMessage]:
             sys_msg += f"\n\nBEGIN EXAMPLE {ex}\n" + f.read().strip() + f"\nEND EXAMPLE {ex}"
     sys_msg = sys_msg.strip()
 
-    out = [SystemMessage(content=sys_msg)]
+    out: list[BaseMessage] = [SystemMessage(content=sys_msg)]
 
     # load few-shot examples
     for ex in range(1, _num_few_shot + 1):
@@ -245,7 +245,7 @@ input_modifications = {
 }
 
 
-def prepare_input_text(filepath: PathLike, logger: logging.Logger) -> str:
+def prepare_input_text(filepath: Path, logger: logging.Logger) -> str:
     """Read the file and possibly modify the text to fit in the context window."""
     with filepath.open(encoding="utf-8") as f:
         text = f.read().strip()
@@ -367,7 +367,7 @@ async def format_docs(
 
     prompt = get_prompt_messages(few_shot_as_ex)
 
-    chatgpt = ChatOpenAI(temperature=0.5, model_name="gpt-4-0613")
+    chatgpt = ChatOpenAI(temperature=0.5, model="gpt-4-0613")
 
     path = Path(path)
     files = list(path.glob("**/*.md"))
