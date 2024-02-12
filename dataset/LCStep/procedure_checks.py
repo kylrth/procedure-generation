@@ -69,7 +69,7 @@ async def check_docs(root: str | PathLike, n: int, n_workers: int = 5):
 
     prompt = get_prompt_messages()
 
-    chatgpt = ChatOpenAI(temperature=0.5, model_name="gpt-4-0613")
+    chatgpt = ChatOpenAI(temperature=0.5, model="gpt-4-0613")
 
     root = Path(root)
 
