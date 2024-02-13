@@ -10,7 +10,11 @@ class Procedure:
     steps: list[str]
 
     def to_json(self):
-        return self.__dict__
+        return {
+            "input": self._input,
+            "output": self.output,
+            "steps": self.steps,
+        }
 
     def _set_input(self, input_str):
         self.input = input_str
