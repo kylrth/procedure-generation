@@ -19,7 +19,7 @@ import weaviate
 from datasets import Dataset, concatenate_datasets
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-import lcstep
+from dataset import lcstep
 from evaluation.eval import evaluate_all
 from systems import Model, Result, System, aag, rag
 from utils import log, spread_gather

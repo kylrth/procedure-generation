@@ -1,207 +1,15 @@
 import asyncio
-import json
-import logging
-import re
-import textwrap
-from pathlib import Path
 from typing import Any
 
-import evaluate
-from langchain.chat_models import ChatOpenAI
-from langchain.schema import BaseMessage, HumanMessage, SystemMessage
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-
-import lcstep
+from dataset import lcstep
 from utils import log
 
 
-with Path("./evaluation/evaluation-prompts.json").open() as file:
-    evaluation_messages = json.load(file)
-
-
-def format_message_history(key: str, **kwargs):
-    messages = evaluation_messages[key]
-
-    return [
-        SystemMessage(content=messages["system"].format(**kwargs)),
-        HumanMessage(content=messages["human"].format(**kwargs)),
-    ]
-
-
-def log_output(caller: str, messages: list[BaseMessage], resp):
-    def _format(msg: BaseMessage) -> str:
-        if "\n" not in msg.content:
-            return msg.__class__.__name__ + "(" + msg.content + ")"
-        return msg.__class__.__name__ + "(\n  " + msg.content.replace("\n", "\n  ") + "\n)"
-
-    return (
-        f"{caller} prompt:\n"
-        + textwrap.indent("\n".join(_format(msg) for msg in messages), "  ")
-        + f"\n{caller} response: {resp.generations[0][0].text}"
-    )
-
-
-rouge_metric = evaluate.load("rouge")
-bleu_metric = evaluate.load("bleu")
-chatgpt = ChatOpenAI(temperature=0.3)
-
-
-def rouge(recipe: str, gold: str) -> float:
-    """Metric Based Evaluation
-    Calculates the ROUGE score"""
-    _, r_steps, _ = lcstep.procedure_from_text(recipe)
-    _, g_steps, _ = lcstep.procedure_from_text(gold)
-
-    results = rouge_metric.compute(
-        predictions=["\n".join(r_steps)],
-        references=["\n".join(g_steps)],
-    )
-    return round(results["rougeL"], 3)
-
-
-def bleu(recipe: str, gold: str) -> float:
-    """Metric Based Evaluation
-    Calculates the BLEU score"""
-    _, r_steps, _ = lcstep.procedure_from_text(recipe)
-    _, g_steps, _ = lcstep.procedure_from_text(gold)
-
-    results = bleu_metric.compute(
-        predictions=["\n".join(r_steps)],
-        references=["\n".join(g_steps)],
-    )
-    return round(results["bleu"], 3)
-
-
-def cosine_sim(recipe: str, gold: str) -> float:
-    """Metric Based Evaluation
-    Calculates cosine similarity on TF-IDF representation to measure similarity between generated
-    and gold recipe
-    """
-
-    vectorizer = TfidfVectorizer()
-    tfidf_matrix = vectorizer.fit_transform([recipe, gold])
-    return round(cosine_similarity(tfidf_matrix[0], tfidf_matrix[1])[0][0], 3)
-
-
-async def hallucination() -> float:
-    """LLM Based Evaluation
-    Receives several samples of completions of a recipe.
-    Hallucination refers to a phenomenon where a language model generates text that is factually
-    incorrect or nonsensical, but appears coherent and plausible on the surface.
-    Hallucination will be measured by comparing the different samples and evaluating their
-    similarity on key points of the recipe.
-    """
-    # Implement this function
-    return 0
-
-
-async def consistency(recipe: str, logger: logging.Logger) -> int:
-    """Model Based Evaluation Recipe
-    Receives ingredients and instructions
-    Consistency refers to the alignment between the ingredients listed,
-    their respective measurements, and their usage in the recipe steps, ensuring coherence and
-     logical progression.
-    It also encompasses the assurance that the recipe yields the intended dish, without
-    contradictory instructions or logical inconsistencies throughout."""
-    messages = format_message_history("consistency", recipe=recipe)
-
-    resp = await chatgpt.agenerate(messages=[messages])
-    log_text = log_output("consistency", messages, resp)
-    response = resp.generations[0][0].text
-    pattern = r"\d+"
-    match = re.search(pattern, response)
-
-    if match is not None:
-        out = int(match.group())
-        logger.debug(f"{log_text}\n consistency result: {out}\n\n\n")
-    else:
-        out = 0
-        logger.warning(f"FAIL- {log_text}\n\n\n")
-    return out
-
-
-async def structure(recipe: str, logger: logging.Logger) -> int:
-    """Model Based Evaluation Receives ingredients and instructions Recipe structure correctness
-    refers to the adherence to a standardized format, including an organized ingredients list and
-    step-by-step instructions, facilitating clear understanding and easy execution. It ensures
-    that all listed ingredients are actual ingredients, and the steps provided are actionable and
-    sequentially structured, enhancing clarity and usability."""
-    messages = format_message_history("structure", recipe=recipe)
-
-    resp = await chatgpt.agenerate(messages=[messages])
-    log_text = log_output("structure", messages, resp)
-
-    response = resp.generations[0][0].text
-    pattern = r"\d+"
-    match = re.search(pattern, response)
-
-    if match is not None:
-        out = int(match.group())
-        logger.debug(f"{log_text}\n structure result: {out}\n\n\n")
-    else:
-        out = 0
-        logger.warning(f"FAIL- {log_text}\n\n\n")
-    return out
-
-
-async def coherence(recipe: str, logger: logging.Logger) -> int:
-    """Model Based Evaluation Receives title and ingredients and instructions Recipe coherence
-    refers to the logical consistency and clarity of a recipe, including the sequential order of
-    steps and absence of gibberish or nonsensical information. It also encompasses the
-    grammatical correctness and simplicity of the recipe, ensuring that it is easily
-    understandable and makes sense to the reader."""
-    messages = format_message_history("coherence", recipe=recipe)
-
-    resp = await chatgpt.agenerate(messages=[messages])
-    log_text = log_output("coherence", messages, resp)
-
-    response = resp.generations[0][0].text
-    pattern = r"\d+"
-    match = re.search(pattern, response)
-
-    if match is not None:
-        out = int(match.group())
-        logger.debug(f"{log_text}\n coherence result: {out}\n\n\n")
-    else:
-        out = 0
-        logger.warning(f"FAIL- {log_text}\n\n\n")
-    return out
-
-
-async def relevance(recipe: str, logger: logging.Logger) -> int:
-    """Model Based Evaluation Receives title + ingredients + steps Recipe relevance refers to the
-    appropriateness and alignment of the ingredients used in a recipe with its title, ensuring
-    that all ingredients are relevant to the intended dish. It also involves ensuring that each
-    step in the recipe contributes towards achieving the desired outcome mentioned in the recipe
-    title, avoiding any unnecessary or unrelated instructions.
-    """
-    messages = format_message_history("relevance", recipe=recipe)
-
-    resp = await chatgpt.agenerate(messages=[messages])
-    log_text = log_output("relevance", messages, resp)
-
-    response = resp.generations[0][0].text
-    pattern = r"\d+"
-    match = re.search(pattern, response)
-
-    if match is not None:
-        out = int(match.group())
-        logger.debug(f"{log_text}\n relevance result: {out}\n\n\n")
-    else:
-        out = 0
-        logger.warning(f"FAIL- {log_text}\n\n\n")
-    return out
-
-
-async def step_comparison(
-    goal: str, gold: lcstep.Procedure, generated: str, logger: log.ResultsLogger
-) -> int:
+async def step_comparison(gold: lcstep.Procedure, generated: str, logger: log.ResultsLogger) -> int:
     """Judge the generated steps by letting GPT-4 compare with the gold steps.
 
     Score is out of 10.
     """
-    _ = goal
     _ = gold
     _ = generated
     _ = logger
@@ -218,13 +26,12 @@ async def evaluate_all(
 
     The returned dictionary contains the evaluation result for each metric.
     """
-    goal = gold["goal"][0]
-    gold_steps = lcstep.Procedure("", gold["steps"][0], "")
+    p = lcstep.Procedure(gold["input"][0], gold["output"][0], gold["steps"][0])
 
     results = {}  # TODO add synchronous evals here
 
     async_tasks = {
-        "compared": step_comparison(goal, gold_steps, generated, logger),
+        "compared": step_comparison(p, generated, logger),
         # TODO add more asyncronous evals here
     }
     resp = await asyncio.gather(*async_tasks.values())
