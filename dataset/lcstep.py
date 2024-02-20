@@ -51,12 +51,7 @@ def procedure_from_text(text: str) -> tuple[Procedure, str]:
     if len(chunks) < 2 or len(chunks) > 3:  # goal + steps + optional side note  # noqa: PLR2004
         raise ValueError("procedure does not contain 2-3 chunks")
 
-    # parse the goal
-    goal = chunks[0]
-    _prefix = "Goal: "
-    if not goal.startswith(_prefix):
-        raise ValueError(f"procedure goal not marked with '{_prefix}'")
-    goal = goal[len(_prefix) :]
+    goal, resources = _goal_and_resources_from_text(chunks[0])
 
     # parse the steps (which may be multi-line)
     lines = chunks[1].strip().split("\n")
@@ -75,14 +70,38 @@ def procedure_from_text(text: str) -> tuple[Procedure, str]:
         steps[-1] += "\n" + line
 
     # parse the side note
-    side_note = chunks[2].strip() if len(chunks) == 3 else ""  # noqa: PLR2004
-    _prefix = "side note: "
-    if side_note:
-        if not side_note.lower().startswith(_prefix):
-            raise ValueError(f"procedure side note not marked with '{_prefix}'")
-        side_note = side_note[len(_prefix) :].strip()  # remove final newline
+    side_note = ""
+    if len(chunks) == 3:  # noqa: PLR2004  # side note appears as 3rd chunk, if any
+        side_note = chunks[2].strip()
+        _prefixes = ["Side note: ", "Note: "]
+        for p in _prefixes:
+            if side_note.startswith(p):
+                side_note = side_note[len(p) :].strip()  # remove final newline
+                break
+        else:
+            raise ValueError(f"procedure side note not marked with '{_prefixes[0]}'")
 
-    return Procedure("", goal, steps), side_note
+    return Procedure(resources, goal, steps), side_note
+
+
+def _goal_and_resources_from_text(text: str) -> tuple[str, str]:
+    chunks = text.split("\n")
+    if len(chunks) != 2:  # noqa: PLR2004  # one line each for goal and resources
+        raise ValueError("top of procedure does not contain goal and resources lines")
+
+    goal, resources = chunks
+
+    _prefix = "Goal: "
+    if not goal.startswith(_prefix):
+        raise ValueError(f"procedure goal not marked with '{_prefix}'")
+    goal = goal[len(_prefix) :]
+
+    _prefix = "Resources: "
+    if not resources.startswith(_prefix):
+        raise ValueError(f"procedure resources not marked with '{_prefix}'")
+    resources = resources[len(_prefix) :]
+
+    return goal, resources
 
 
 def format_procedure(p: Procedure, side_note: str = "") -> str:
@@ -120,8 +139,11 @@ def load_formatted_docs(data_dir: str | PathLike = "./dataset/LCStep/docs") -> D
         path = str(file)[:-3]  # remove .md
         full_text = file.read_text()
 
-        for ref in full_text.split("\nNEW PROCEDURE\n"):
+        for ref in full_text.split("NEW PROCEDURE\n"):
             text = ref.strip()
+            if not text:
+                continue
+
             try:
                 p, side_note = procedure_from_text(text)
             except ValueError as e:
