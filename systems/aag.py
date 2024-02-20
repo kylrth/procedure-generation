@@ -6,7 +6,7 @@ import weaviate
 import weaviate.classes as wvc
 from datasets import Dataset
 
-from lcstep import Procedure
+from dataset.base import Procedure
 from utils import spread_gather
 
 from . import utils
