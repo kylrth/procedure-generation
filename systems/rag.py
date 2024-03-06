@@ -13,8 +13,7 @@ _docs_collection = "Docs"
 
 
 def setup_store(
-    logger: logging.Logger, store: weaviate.WeaviateClient, docs: list[dict[str, str | int]]
-) -> weaviate.Collection:
+    logger: logging.Logger, store: weaviate.WeaviateClient, store_name: str, store_desc: str) -> weaviate.Collection:
     """Create a vector store with the provided docs."""
     if store.collections.exists(_docs_collection):
         logger.info("reusing existing Weaviate collection")
@@ -22,36 +21,13 @@ def setup_store(
     else:
         logger.info("creating new Weaviate collection")
         out = store.collections.create(
-            name=_docs_collection,
-            description="Documentation for the LangChain Python library.",
-            vectorizer_config=wvc.Configure.Vectorizer.text2vec_transformers(),
-            properties=[
-                wvc.Property(
-                    name="title",
-                    data_type=wvc.DataType.TEXT,
-                    description="The title of the document",
-                ),
-                wvc.Property(
-                    name="chunk",
-                    data_type=wvc.DataType.INT,
-                    description="Zero-indexed chunk number in the document",
-                    skip_vectorization=True,
-                    vectorize_property_name=False,
-                ),
-                wvc.Property(
-                    name="contents",
-                    data_type=wvc.DataType.TEXT,
-                    description="The contents of (this chunk of) the document",
-                ),
-            ],
+            name=store_name,
+            description=store_desc,
+            vectorizer_config=wvc.config.Configure.Vectorizer.none(),
+            vector_index_config=wvc.config.Configure.VectorIndex.hnsw(
+                distance_metric=wvc.config.VectorDistances.COSINE # select prefered distance metric
+            ),
         )
-
-    if len(out) == 0:
-        logger.info(f"uploading {len(docs)} chunks to Weaviate collection")
-        utils.weaviate_insert(logger, out, docs)
-    else:
-        logger.info(f"using old data, {len(out)} chunks")
-
     return out
 
 
@@ -109,8 +85,9 @@ class RAG(System):
 
     def get_docs(self, title: str) -> list[tuple[str, str]]:
         """Returns the docs that will be inserted into the prompt."""
-        res = self.docs.query.near_text(
-            query=title, limit=self.k, return_properties=["title", "contents"]
+        embedded_query = utils.get_vector_representation(None, [title])[0]
+        res = self.docs.query.near_vector(
+            query=embedded_query, limit=self.k, return_properties=["title", "contents"]
         )
 
         out: list[tuple[str, str]] = []
