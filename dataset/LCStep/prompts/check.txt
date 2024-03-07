@@ -7,7 +7,8 @@ END INSTRUCTIONS
 Below is an example of how you should judge the text. Please list whether the provided text passes or fails each requirement in the list:
 
 - [PASS] format is as expected
-- [PASS] description is a specific task rather than general approach
+- [PASS] the goal is a specific task rather than general approach
+- [PASS] the resources line includes only the required external APIs or models that must be accessible for the steps to work
 - [PASS] the steps fully achieve the task described in the goal
 - [PASS] does not unnecessarily refer to APIs in the goal description
 - [PASS] instructions are logically distinct

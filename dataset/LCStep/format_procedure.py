@@ -319,6 +319,8 @@ async def format_procedure(
     with dest.open("w") as file:
         file.write(procedure)
 
+    logger.debug("stored '%s'", dest)
+
 
 def count_tokens(model: BaseChatModel, path: str) -> int:
     """Counts the tokens of all markdown files in a directory"""
