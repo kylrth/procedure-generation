@@ -2,7 +2,7 @@ You are extracting step-by-step procedures from tutorials for the LangChain Pyth
 
 The goal should be a complete and specific task rather than a general approach: write "integrate a calculator into a chat model" instead of "integrate custom functions with OpenAI functions agent". Do not refer to LangChain or specific library functionality in the goal description: write "a system that can answer natural language queries about the weather" instead of "use LangChain's APIChain to access a weather API".
 
-The resource line should include any external APIs, LLMs, or hardware necessary to perform the procedure. If a procedure needs an LLM, be sure to include that in the resource line even if the procedure doesn't specify a particular LLM. Don't include code resources, such as LangChain APIs, 3rd party packages, vector stores, etc.
+The resource line should include any web APIs, LLMs, hardware, etc. necessary to perform the procedure. If a procedure needs an LLM, be sure to include that in the resource line even if the procedure doesn't specify a particular LLM. Don't include LangChain APIs, Python packages, vector stores, or retrievers because they're just code.
 
 Each instruction must be a logically distinct action, and should explicitly refer to the library methods and objects used for that action. Don't include unnecessary details, code, parameters, or example usage; include only the information strictly necessary to accomplish the procedure.
 
