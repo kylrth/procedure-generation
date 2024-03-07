@@ -131,14 +131,14 @@ if __name__ == "__main__":
         "-d",
         "--data-dir",
         type=str,
-        default="./dataset/docs",
+        default="./dataset/LCStep/docs",
         help="directory containing the LCStep dataset",
     )
 
     parser.add_argument(
         "--dataset", 
         type=str, 
-        default="", 
+        default="LCSTEP", 
         choices=["LCSTEP", "RECIPE_NLG"], help="Dataset to run the system on")
 
     parser.add_argument(
@@ -198,7 +198,9 @@ if __name__ == "__main__":
                         additional_env_vars={
                             "ENABLE_MODULES": "backup-filesystem,text2vec-openai,text2vec-cohere,text2vec-huggingface,ref2vec-centroid,generative-openai,qna-openai",
                             "BACKUP_FILESYSTEM_PATH": "/tmp/backups"
-                        }
+                        },
+                    hostname="127.0.0.1",
+                    port=3009,
                     )
                 )
 
