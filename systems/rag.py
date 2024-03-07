@@ -4,7 +4,8 @@ import weaviate
 import weaviate.classes as wvc
 from langchain.schema import BaseMessage, HumanMessage, SystemMessage
 
-from . import utils
+import vectorstore
+
 from .interface import Result, System
 from .model import Model
 
@@ -13,7 +14,8 @@ _docs_collection = "Docs"
 
 
 def setup_store(
-    logger: logging.Logger, store: weaviate.WeaviateClient, store_name: str, store_desc: str) -> weaviate.Collection:
+    logger: logging.Logger, store: weaviate.WeaviateClient, store_name: str, store_desc: str
+) -> weaviate.Collection:
     """Create a vector store with the provided docs."""
     if store.collections.exists(_docs_collection):
         logger.info("reusing existing Weaviate collection")
@@ -25,7 +27,7 @@ def setup_store(
             description=store_desc,
             vectorizer_config=wvc.config.Configure.Vectorizer.none(),
             vector_index_config=wvc.config.Configure.VectorIndex.hnsw(
-                distance_metric=wvc.config.VectorDistances.COSINE # select prefered distance metric
+                distance_metric=wvc.config.VectorDistances.COSINE
             ),
         )
     return out
@@ -85,7 +87,7 @@ class RAG(System):
 
     def get_docs(self, title: str) -> list[tuple[str, str]]:
         """Returns the docs that will be inserted into the prompt."""
-        embedded_query = utils.get_vector_representation(None, [title])[0]
+        embedded_query = vectorstore.get_vector_representation(None, [title])[0]
         res = self.docs.query.near_vector(
             query=embedded_query, limit=self.k, return_properties=["title", "contents"]
         )

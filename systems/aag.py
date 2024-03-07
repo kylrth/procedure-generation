@@ -6,10 +6,10 @@ import weaviate
 import weaviate.classes as wvc
 from datasets import Dataset
 
+import vectorstore
 from dataset.base import Procedure
 from utils import spread_gather
 
-from . import utils
 from .interface import Result, System
 from .model import Model
 
@@ -76,7 +76,7 @@ def setup_skills(
     )
 
     logger.info(f"uploading {len(skills)} skills to Weaviate collection")
-    utils.weaviate_insert(
+    vectorstore.weaviate_insert(
         logger, out, [{"goal": p.goal, "skill": p.steps, "sidenote": p.side_note} for p in skills]
     )
 
@@ -126,7 +126,7 @@ def setup_api_ref(
 
     if len(out) == 0:
         logger.info(f"uploading {len(docs)} API ref chunks to Weaviate collection")
-        utils.weaviate_insert(logger, out, docs)
+        vectorstore.weaviate_insert(logger, out, docs)
     else:
         logger.info(f"using old data, {len(out)} chunks")
 

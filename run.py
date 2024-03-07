@@ -18,12 +18,12 @@ import numpy as np
 import weaviate
 from weaviate.embedded import EmbeddedOptions
 from datasets import Dataset, concatenate_datasets
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 from dataset import lcstep
 from evaluation.eval import evaluate_all
 from systems import Model, Result, System, aag, rag
 from utils import log, spread_gather
+import vectorstore
 
 
 def create_log_result(_id: int, source: str, res: Result, label: str) -> log.Result:
@@ -113,17 +113,19 @@ def int_leq(v: int):
 
     return validate
 
+
 def modify_procedure_object_structure_for_RAG(data):
     def combine_input_and_steps(example):
-        example["contents"] = example["input"] + "\n \n" + ' '.join(example["steps"])
+        example["contents"] = example["input"] + "\n \n" + " ".join(example["steps"])
         return example
-    
+
     new_column = ["TEMP"] * len(data)
     data = data.add_column("contents", new_column)
     updated_data = data.map(combine_input_and_steps)
     updated_data = updated_data.rename_column("output", "title")
     updated_data = updated_data.select_columns(["title", "contents"])
     return updated_data
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -194,15 +196,8 @@ if __name__ == "__main__":
     system = args.system.lower()
     if system == "rag":
         client = weaviate.WeaviateClient(
-                    embedded_options=EmbeddedOptions(
-                        additional_env_vars={
-                            "ENABLE_MODULES": "backup-filesystem,text2vec-openai,text2vec-cohere,text2vec-huggingface,ref2vec-centroid,generative-openai,qna-openai",
-                            "BACKUP_FILESYSTEM_PATH": "/tmp/backups"
-                        },
-                    hostname="127.0.0.1",
-                    port=3009,
-                    )
-                )
+            embedded_options=EmbeddedOptions(persistence_data_path="./cache/weaviate")
+        )
 
         client.connect()
         # set up vector store with API refs and concept docs
@@ -213,17 +208,17 @@ if __name__ == "__main__":
         procedure_objects_transformed = modify_procedure_object_structure_for_RAG(train_data)
         docs = concatenate_datasets([procedure_objects_transformed, api_ref, concept_docs])
         logger.debug(f"collected {len(docs)} docs for vector store")
-        
+
         docs_store = rag.setup_store(
             logger,
             client,
             store_name="Docs",
-            store_desc="Documentation for the LangChain Python library."
-            )
+            store_desc="Documentation for the LangChain Python library.",
+        )
 
         if len(docs_store) == 0:
             logger.info(f"uploading {len(docs)} chunks to Weaviate collection")
-            utils.populate_vector_store(logger, client, docs, collection_name="Docs")
+            vectorstore.populate(logger, client, docs, collection_name="Docs")
 
         client.batch.wait_for_vector_indexing()
         system = rag.RAG(model, docs_store, args.k)
