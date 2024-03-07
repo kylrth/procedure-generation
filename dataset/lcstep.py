@@ -86,10 +86,13 @@ def procedure_from_text(text: str) -> tuple[Procedure, str]:
 
 def _goal_and_resources_from_text(text: str) -> tuple[str, str]:
     chunks = text.split("\n")
-    if len(chunks) != 2:  # noqa: PLR2004  # one line each for goal and resources
+    if len(chunks) < 1:  # noqa: PLR2004  # one line each for goal and resources
         raise ValueError("top of procedure does not contain goal and resources lines")
-
-    goal, resources = chunks
+    if len(chunks) == 1:
+        goal = chunks[0]
+        resources = "Resources: None"
+    else:
+        goal, resources = chunks
 
     _prefix = "Goal: "
     if not goal.startswith(_prefix):
