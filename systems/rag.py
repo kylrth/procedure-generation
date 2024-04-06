@@ -4,27 +4,43 @@ import weaviate
 import weaviate.classes as wvc
 from langchain.schema import BaseMessage, HumanMessage, SystemMessage
 
-import vectorstore
+import retrieval
 
 from .interface import Result, System
 from .model import Model
 
 
-_docs_collection = "Docs"
-
-
 def setup_store(
-    logger: logging.Logger, store: weaviate.WeaviateClient, store_name: str, store_desc: str
-) -> weaviate.Collection:
-    """Create a vector store with the provided docs."""
-    if store.collections.exists(_docs_collection):
+    logger: logging.Logger, store: weaviate.WeaviateClient, name: str, desc: str
+) -> weaviate.collections.Collection:
+    """Create a generic vector store for RAG."""
+    if store.collections.exists(name):
         logger.info("reusing existing Weaviate collection")
-        out = store.collections.get(_docs_collection)
+        out = store.collections.get(name)
     else:
         logger.info("creating new Weaviate collection")
         out = store.collections.create(
-            name=store_name,
-            description=store_desc,
+            name=name,
+            description=desc,
+            properties=[
+                wvc.config.Property(
+                    name="title",
+                    data_type=wvc.config.DataType.TEXT,
+                    description="The title of the document",
+                ),
+                wvc.config.Property(
+                    name="chunk",
+                    data_type=wvc.config.DataType.INT,
+                    description="Zero-indexed chunk number in the document",
+                    skip_vectorization=True,
+                    vectorize_property_name=False,
+                ),
+                wvc.config.Property(
+                    name="contents",
+                    data_type=wvc.config.DataType.TEXT,
+                    description="The contents of (this chunk of) the document",
+                ),
+            ],
             vectorizer_config=wvc.config.Configure.Vectorizer.none(),
             vector_index_config=wvc.config.Configure.VectorIndex.hnsw(
                 distance_metric=wvc.config.VectorDistances.COSINE
@@ -38,7 +54,7 @@ class RAG(System):
     vector store for texts with similar embeddings to the title."""
 
     model: Model
-    docs: weaviate.Collection
+    docs: weaviate.collections.Collection
     k: int
     instructions: str = (
         "Please generate high-level steps to accomplish the specified goal using the LangChain "
@@ -51,7 +67,7 @@ class RAG(System):
     def __init__(
         self,
         model: Model,
-        docs: weaviate.Collection,
+        docs: weaviate.collections.Collection,
         k: int,
     ):
         self.model = model
@@ -87,9 +103,11 @@ class RAG(System):
 
     def get_docs(self, title: str) -> list[tuple[str, str]]:
         """Returns the docs that will be inserted into the prompt."""
-        embedded_query = vectorstore.get_vector_representation(None, [title])[0]
+        embedded_query = retrieval.get_embeds([title])[0]
         res = self.docs.query.near_vector(
-            query=embedded_query, limit=self.k, return_properties=["title", "contents"]
+            near_vector=list(embedded_query),
+            limit=self.k,
+            return_properties=["title", "contents"],
         )
 
         out: list[tuple[str, str]] = []
@@ -100,8 +118,8 @@ class RAG(System):
 
     def build_context(self, docs: list[tuple[str, str]]) -> str:
         out = ""
-        for t, doc in docs:
-            out += f"\n\nDOCUMENTATION FOR '{t}':\n\n{doc}"
+        for title, contents in docs:
+            out += f"\n\nDOCUMENTATION FOR '{title}':\n\n{contents}"
 
         return out
 

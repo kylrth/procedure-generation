@@ -26,12 +26,10 @@ async def evaluate_all(
 
     The returned dictionary contains the evaluation result for each metric.
     """
-    p = lcstep.Procedure(gold["input"][0], gold["output"][0], gold["steps"][0])
-
     results = {}  # TODO add synchronous evals here
 
     async_tasks = {
-        "compared": step_comparison(p, generated, logger),
+        "compared": step_comparison(gold["procedure"], generated, logger),
         # TODO add more asyncronous evals here
     }
     resp = await asyncio.gather(*async_tasks.values())
