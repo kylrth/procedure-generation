@@ -1,12 +1,12 @@
 import asyncio
 import logging
 from pathlib import Path
+from typing import Any
 
 import weaviate
 import weaviate.classes as wvc
-from datasets import Dataset
 
-import vectorstore
+import retrieval
 from dataset.base import Procedure
 from utils import spread_gather
 
@@ -26,9 +26,9 @@ async def _get_concept_skills(model: Model, doc: str) -> list[Procedure]:
     return [Procedure.from_text(skill.strip()) for skill in res[0].split("NEW PROCEDURE")]
 
 
-async def build_concept_skills(model: Model, concept_docs: Dataset) -> list[Procedure]:
+async def build_concept_skills(model: Model, concept_docs: list[dict[str, Any]]) -> list[Procedure]:
     res = await spread_gather(
-        lambda doc: _get_concept_skills(model, doc), concept_docs.iter(1), 10, len(concept_docs)
+        lambda doc: _get_concept_skills(model, doc), concept_docs, 10, len(concept_docs)
     )
 
     # flatten
@@ -40,7 +40,7 @@ _skills_collection = "Skills"
 
 def setup_skills(
     logger: logging.Logger, store: weaviate.WeaviateClient, skills: list[Procedure]
-) -> weaviate.Collection:
+) -> weaviate.collections.Collection:
     """Create the skill library with the provided skills as a start.
 
     Since this collection will be updated over time, a pre-existing collection by the same name will
@@ -56,27 +56,27 @@ def setup_skills(
         description="Skills extracted from high-level documentation about LangChain.",
         vectorizer_config=wvc.Configure.Vectorizer.text2vec_transformers(),
         properties=[
-            wvc.Property(
+            wvc.config.Property(
                 name="goal",
-                data_type=wvc.DataType.TEXT,
+                data_type=wvc.config.DataType.TEXT,
                 description="The goal achieved by this skill",
             ),
-            wvc.Property(
+            wvc.config.Property(
                 name="steps",
-                data_type=wvc.DataType.TEXT_ARRAY,
+                data_type=wvc.config.DataType.TEXT_ARRAY,
                 description="The procedure to accomplish the goal, expressed as "
                 "step-by-step instructions",
             ),
-            wvc.Property(
+            wvc.config.Property(
                 name="sidenote",
-                data_type=wvc.DataType.TEXT,
+                data_type=wvc.config.DataType.TEXT,
                 description="Optional extra information related to this procedure",
             ),
         ],
     )
 
     logger.info(f"uploading {len(skills)} skills to Weaviate collection")
-    vectorstore.weaviate_insert(
+    retrieval.weaviate_insert(
         logger, out, [{"goal": p.goal, "skill": p.steps, "sidenote": p.side_note} for p in skills]
     )
 
@@ -88,7 +88,7 @@ _api_ref_collection = "APIRef"
 
 def setup_api_ref(
     logger: logging.Logger, store: weaviate.WeaviateClient, docs: list[dict[str, str]]
-) -> weaviate.Collection:
+) -> weaviate.collections.Collection:
     """Create the vector store for the API reference docs.
 
     Expects an iterable of dicts with keys "api" and "documentation".
@@ -126,7 +126,7 @@ def setup_api_ref(
 
     if len(out) == 0:
         logger.info(f"uploading {len(docs)} API ref chunks to Weaviate collection")
-        vectorstore.weaviate_insert(logger, out, docs)
+        retrieval.weaviate_insert(logger, out, docs)
     else:
         logger.info(f"using old data, {len(out)} chunks")
 
@@ -135,8 +135,8 @@ def setup_api_ref(
 
 class AAG(System):
     store: weaviate.WeaviateClient
-    skills: weaviate.Collection
-    api_ref: weaviate.Collection
+    skills: weaviate.collections.Collection
+    api_ref: weaviate.collections.Collection
     model: Model
 
     def __init__(

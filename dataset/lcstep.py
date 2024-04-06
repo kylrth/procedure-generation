@@ -4,13 +4,12 @@ import bisect
 import re
 from os import PathLike
 from pathlib import Path
-
-from datasets import Dataset
+from typing import Any
 
 from dataset.base import Procedure
 
 
-def load_api_ref(data_dir: str | PathLike = "./dataset/LCStep/docs") -> Dataset:
+def load_api_ref(data_dir: str | PathLike = "./dataset/LCStep/docs") -> list[dict[str, str]]:
     root = Path(data_dir) / "api"
 
     # walk the docs to collect all markdown files
@@ -20,12 +19,12 @@ def load_api_ref(data_dir: str | PathLike = "./dataset/LCStep/docs") -> Dataset:
         ref = file.read_text()
 
         # sort by API name
-        bisect.insort(dicts, {"api": api_fqn, "ref": ref}, key=lambda v: v["api"])
+        bisect.insort(dicts, {"title": api_fqn, "contents": ref}, key=lambda v: v["title"])
 
-    return Dataset.from_list(dicts)
+    return dicts
 
 
-def load_concept_docs(data_dir: str | PathLike = "./dataset/LCStep/docs") -> Dataset:
+def load_concept_docs(data_dir: str | PathLike = "./dataset/LCStep/docs") -> list[dict[str, str]]:
     root = Path(data_dir) / "concepts"
 
     # walk the docs to collect all markdown files
@@ -35,9 +34,9 @@ def load_concept_docs(data_dir: str | PathLike = "./dataset/LCStep/docs") -> Dat
         ref = file.read_text()
 
         # sort by path
-        bisect.insort(dicts, {"path": path, "ref": ref}, key=lambda v: v["path"])
+        bisect.insort(dicts, {"title": path, "contents": ref}, key=lambda v: v["title"])
 
-    return Dataset.from_list(dicts)
+    return dicts
 
 
 _ordering_re = re.compile(r"\d+\. ")
@@ -133,7 +132,7 @@ def format_steps(steps: list[str]) -> str:
     return out
 
 
-def load_formatted_docs(data_dir: str | PathLike = "./dataset/LCStep/docs") -> Dataset:
+def load_formatted_docs(data_dir: str | PathLike = "./dataset/LCStep/docs") -> list[dict[str, Any]]:
     root = Path(data_dir) / "procedures" / "formatted"
 
     # walk the docs to collect all markdown files
@@ -152,46 +151,34 @@ def load_formatted_docs(data_dir: str | PathLike = "./dataset/LCStep/docs") -> D
             except ValueError as e:
                 raise ValueError(f"could not process '{file}'") from e
 
-            # sort by length of text, as a proxy for difficulty
+            # sort by length of step text, as a proxy for difficulty
             bisect.insort(
                 dicts,
                 {
                     "path": path,
-                    "ref": text,
-                    "input": p._input,
-                    "output": p.output,
-                    "steps": p.steps,
+                    "procedure": p,
                     "side_note": side_note,
                 },
-                key=lambda v: len(v["ref"]),
+                key=lambda v: len("\n".join(v["procedure"].steps)),
             )
 
-    ds = Dataset.from_list(dicts)
+    for i, d in enumerate(dicts):
+        d["id"] = i
 
-    # add question IDs
-    def add_id(example, idx):
-        example["id"] = idx
-        return example
-
-    ds = ds.map(add_id, with_indices=True)
-
-    return ds
+    return dicts
 
 
 if __name__ == "__main__":
     # ruff: noqa: T201
 
     ds = load_api_ref()
-    print("API ref dataset:")
-    print(ds)
+    print("API ref dataset:", len(ds))
     print("example:", repr(ds[0])[:120] + "...")
 
     ds = load_concept_docs()
-    print("concept docs dataset:")
-    print(ds)
+    print("concept docs dataset:", len(ds))
     print("example:", repr(ds[0])[:120] + "...")
 
     ds = load_formatted_docs()
-    print("formatted docs dataset:")
-    print(ds)
+    print("formatted docs dataset:", len(ds))
     print("example:", repr(ds[0]))

@@ -12,18 +12,24 @@ import logging
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 import numpy as np
+import torch
+
+torch.cuda.is_available = lambda: False  # set this before importing retrieval which loads a model
+
 import weaviate
 from weaviate.embedded import EmbeddedOptions
-from datasets import Dataset, concatenate_datasets
 
+import retrieval
 from dataset import lcstep
 from evaluation.eval import evaluate_all
 from systems import Model, Result, System, aag, rag
-from utils import log, spread_gather
-import vectorstore
+from utils import data, log, spread_gather
+
+if TYPE_CHECKING:
+    from dataset.base import Procedure
 
 
 def create_log_result(_id: int, source: str, res: Result, label: str) -> log.Result:
@@ -47,12 +53,12 @@ async def generate_and_evaluate(
 
     Returns the item ID and the scores for each metric on each generated answer.
     """
-    goal: str = item["goal"][0]
-    _id: int = item["id"][0]
-    source: str = item["path"][0]
-    ref: str = item["ref"][0]
+    p: Procedure = item["procedure"]
+    _id: int = item["id"]
+    source: str = item["path"]
+    ref: str = "\n".join(p.steps)
 
-    res = await model.agenerate(goal)
+    res = await model.agenerate(p.output)
     logger.result(create_log_result(_id, source, res, ref))
 
     scores = defaultdict(list)
@@ -69,12 +75,12 @@ async def generate_and_evaluate(
     return _id, scores
 
 
-async def evaluate(model: System, data: Dataset, n_workers: int = 10):
+async def evaluate(model: System, data: list[dict[str, Any]], n_workers: int = 10):
     """Evaluate the system with the given text generation dataset."""
     with log.ResultsLogger("output.csv", "logs") as logger:
         results = await spread_gather(
             lambda prompt: generate_and_evaluate(model, prompt, logger),
-            data.iter(1),
+            data,
             n_workers,
             len(data),
         )
@@ -114,19 +120,6 @@ def int_leq(v: int):
     return validate
 
 
-def modify_procedure_object_structure_for_RAG(data):
-    def combine_input_and_steps(example):
-        example["contents"] = example["input"] + "\n \n" + " ".join(example["steps"])
-        return example
-
-    new_column = ["TEMP"] * len(data)
-    data = data.add_column("contents", new_column)
-    updated_data = data.map(combine_input_and_steps)
-    updated_data = updated_data.rename_column("output", "title")
-    updated_data = updated_data.select_columns(["title", "contents"])
-    return updated_data
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -138,10 +131,12 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--dataset", 
-        type=str, 
-        default="LCSTEP", 
-        choices=["LCSTEP", "RECIPE_NLG"], help="Dataset to run the system on")
+        "--dataset",
+        type=str,
+        default="lcstep",
+        choices=["lcstep", "recipe_nlg"],
+        help="Dataset to run the system on",
+    )
 
     parser.add_argument(
         "-s",
@@ -157,7 +152,9 @@ if __name__ == "__main__":
         default="openai-gpt-3.5-turbo-0613",
         help="full name of service & model to use",
     )
-    parser.add_argument("-n", type=int, default=sys.maxsize, help="number of samples to use")
+    parser.add_argument(
+        "-n", type=int, default=sys.maxsize, help="limit the number of samples to test"
+    )
     parser.add_argument(
         "--workers", type=int, default=10, help="number of concurrent requests to make to the LLM"
     )
@@ -182,63 +179,70 @@ if __name__ == "__main__":
     cache_path = Path("cache")
 
     logger.info("loading data...")
-    if args.dataset == "LCSTEP":
-        data = lcstep.load_formatted_docs(args.data_dir)
-        data_splits = data.train_test_split(test_size=0.3, shuffle=False)
-        train_data = data_splits["train"]
+    if args.dataset.lower() == "lcstep":
+        lcstep_data = lcstep.load_formatted_docs(args.data_dir)
+        train_data, val_data, _ = data.train_val_test(lcstep_data, val=0.1, test=0.2)
+    else:
+        raise NotImplementedError(f"unrecognized dataset '{args.dataset}'")
 
-    # shorten dataset according to -n
-    n = min(args.n, len(train_data))
-    train_data = train_data.select(np.arange(0, n))
+    # shorten eval set according to -n
+    n = min(args.n, len(val_data))
+    val_data = val_data[:n]
+    logger.info(f"loaded {len(val_data)} eval examples")
 
     logger.info("creating system...")
     model = Model.from_full_name(args.model)
     system = args.system.lower()
-    if system == "rag":
-        client = weaviate.WeaviateClient(
-            embedded_options=EmbeddedOptions(persistence_data_path="./cache/weaviate")
+    with weaviate.WeaviateClient(
+        embedded_options=EmbeddedOptions(
+            persistence_data_path="./cache/weaviate",
+            version="1.24.6",
+            additional_env_vars={"AUTOSCHEMA_ENABLED": "false", "DISABLE_TELEMETRY": "true"},
         )
+    ) as client:
+        if system == "rag":
+            # set up vector store with training data, API refs concept docs
+            logger.debug("RAG: collecting docs")
 
-        client.connect()
-        # set up vector store with API refs and concept docs
-        api_ref = lcstep.load_api_ref(args.data_dir)
-        api_ref = api_ref.rename_columns({"api": "title", "ref": "contents"})
-        concept_docs = lcstep.load_concept_docs(args.data_dir)
-        concept_docs = concept_docs.rename_columns({"path": "title", "ref": "contents"})
-        procedure_objects_transformed = modify_procedure_object_structure_for_RAG(train_data)
-        docs = concatenate_datasets([procedure_objects_transformed, api_ref, concept_docs])
-        logger.debug(f"collected {len(docs)} docs for vector store")
+            # convert all procedures in training data to dicts with keys "title" and "contents"
+            proc_docs = []
+            for d in train_data:
+                proc_docs.append(
+                    {
+                        "title": d["procedure"].output,
+                        "contents": d["procedure"]._input + "\n\n" + " ".join(d["procedure"].steps),
+                    }
+                )
 
-        docs_store = rag.setup_store(
-            logger,
-            client,
-            store_name="Docs",
-            store_desc="Documentation for the LangChain Python library.",
-        )
+            api_ref = lcstep.load_api_ref(args.data_dir)
+            concept_docs = lcstep.load_concept_docs(args.data_dir)
 
-        if len(docs_store) == 0:
-            logger.info(f"uploading {len(docs)} chunks to Weaviate collection")
-            vectorstore.populate(logger, client, docs, collection_name="Docs")
+            docs = proc_docs + api_ref + concept_docs
+            logger.debug(f"RAG: collected {len(docs)} docs for vector store")
 
-        client.batch.wait_for_vector_indexing()
-        system = rag.RAG(model, docs_store, args.k)
-    elif system == "aag":
-        store = weaviate.connect_to_local()
+            docs_store = rag.setup_store(
+                logger, client, name="Docs", desc="Documentation for the LangChain Python library."
+            )
 
-        # set up API ref store
-        api_ref = lcstep.load_api_ref(args.data_dir)
-        api_ref = api_ref.rename_column("ref", "documentation")
-        aag.setup_api_ref(logger, store, list(api_ref.iter(1)))
+            if len(docs_store) == 0:
+                logger.info(f"uploading {len(docs)} chunks to Weaviate collection")
+                retrieval.populate(logger, docs_store, docs)
 
-        # set up skill library from concept docs
-        concept_docs = lcstep.load_concept_docs(args.data_dir)
-        skills = asyncio.run(aag.build_concept_skills(model, concept_docs))
-        aag.setup_skills(logger, store, skills)
+            system = rag.RAG(model, docs_store, args.k)
+        elif system == "aag":
+            # set up API ref store
+            api_ref = lcstep.load_api_ref(args.data_dir)
+            api_ref = api_ref.rename_column("ref", "documentation")
+            aag.setup_api_ref(logger, client, list(api_ref.iter(1)))
 
-        store.batch.wait_for_vector_indexing()
-        system = aag.AAG(model, store)
-    else:
-        raise NotImplementedError(args.system)
+            # set up skill library from concept docs
+            concept_docs = lcstep.load_concept_docs(args.data_dir)
+            skills = asyncio.run(aag.build_concept_skills(model, concept_docs))
+            aag.setup_skills(logger, client, skills)
 
-    print("running evaluation...", file=sys.stderr)
-    asyncio.run(evaluate(system, data, min(args.workers, n)))
+            system = aag.AAG(model, client)
+        else:
+            raise NotImplementedError(args.system)
+
+        logger.info("starting evaluation...")
+        asyncio.run(evaluate(system, val_data, min(args.workers, n)))
