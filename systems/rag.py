@@ -1,7 +1,7 @@
 import logging
 
 import weaviate
-import weaviate.classes as wvc
+import weaviate.classes.config as wc
 from langchain.schema import BaseMessage, HumanMessage, SystemMessage
 
 import retrieval
@@ -23,28 +23,25 @@ def setup_store(
             name=name,
             description=desc,
             properties=[
-                wvc.config.Property(
+                wc.Property(
                     name="title",
-                    data_type=wvc.config.DataType.TEXT,
+                    data_type=wc.DataType.TEXT,
                     description="The title of the document",
                 ),
-                wvc.config.Property(
+                wc.Property(
                     name="chunk",
-                    data_type=wvc.config.DataType.INT,
+                    data_type=wc.DataType.INT,
                     description="Zero-indexed chunk number in the document",
                     skip_vectorization=True,
                     vectorize_property_name=False,
                 ),
-                wvc.config.Property(
+                wc.Property(
                     name="contents",
-                    data_type=wvc.config.DataType.TEXT,
+                    data_type=wc.DataType.TEXT,
                     description="The contents of (this chunk of) the document",
                 ),
             ],
-            vectorizer_config=wvc.config.Configure.Vectorizer.none(),
-            vector_index_config=wvc.config.Configure.VectorIndex.hnsw(
-                distance_metric=wvc.config.VectorDistances.COSINE
-            ),
+            vectorizer_config=wc.Configure.Vectorizer.none(),
         )
     return out
 
@@ -104,8 +101,9 @@ class RAG(System):
     def get_docs(self, title: str) -> list[tuple[str, str]]:
         """Returns the docs that will be inserted into the prompt."""
         embedded_query = retrieval.get_embeds([title])[0]
+
         res = self.docs.query.near_vector(
-            near_vector=list(embedded_query),
+            near_vector=embedded_query.tolist(),
             limit=self.k,
             return_properties=["title", "contents"],
         )
