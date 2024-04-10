@@ -58,7 +58,7 @@ def weaviate_insert(
         objects.append(
             wvc.data.DataObject(
                 properties=d,
-                vector=v,
+                vector=v.tolist() if v is not None else None,
             )
         )
 
@@ -97,6 +97,7 @@ def populate(
             json.dump(chunks, f)
         np.save(_lcstep_rag_vectors, vectors)
     else:
+        logger.debug("loading cached chunks and vectors")
         # load cached data and vectors
         with _lcstep_rag_json.open("r") as f:
             chunks = json.load(f)
