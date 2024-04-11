@@ -43,7 +43,7 @@ def prepare_recipe_memory():
     for index, row in recipes.iterrows():
         _input, _output, _steps = process_recipe(row)
         procedure_obj = create_procedure(_input, _output, _steps)
-        recipe_procedures.append(procedure_obj.toJson())
+        recipe_procedures.append(procedure_obj.to_json())
         processed += 1
         if processed%1000 == 0:
             print(f"Processed {processed} recipes")
