@@ -1,11 +1,6 @@
 **/__pycache__/
 
-env/
-logs/
-slurm-*.out
-
-data/
 cache/
-weaviate_data/
+output/
 
 openai.key

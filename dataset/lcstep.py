@@ -4,39 +4,40 @@ import bisect
 import re
 from os import PathLike
 from pathlib import Path
-from typing import Any
 
-from dataset.base import Procedure
+from .base import Dataset, Doc, Procedure
 
 
-def load_api_ref(data_dir: str | PathLike = "./dataset/LCStep/docs") -> list[dict[str, str]]:
-    root = Path(data_dir) / "api"
+def load_api_ref(data_dir: str | PathLike = "./dataset/") -> list[Doc]:
+    """Returns the API reference docs."""
+    root = Path(data_dir) / "LCStep" / "docs" / "api"
 
     # walk the docs to collect all markdown files
-    dicts = []
+    out = []
     for file in root.glob("**/*.md"):
         api_fqn = file.name[:-8]  # remove .html.md
         ref = file.read_text()
 
         # sort by API name
-        bisect.insort(dicts, {"title": api_fqn, "contents": ref}, key=lambda v: v["title"])
+        bisect.insort(out, Doc(title=api_fqn, contents=ref), key=lambda d: d.title)
 
-    return dicts
+    return out
 
 
-def load_concept_docs(data_dir: str | PathLike = "./dataset/LCStep/docs") -> list[dict[str, str]]:
-    root = Path(data_dir) / "concepts"
+def load_concept_docs(data_dir: str | PathLike = "./dataset/") -> list[Doc]:
+    """Returns the conceptual documentation."""
+    root = Path(data_dir) / "LCStep" / "docs" / "concepts"
 
     # walk the docs to collect all markdown files
-    dicts = []
+    out = []
     for file in root.glob("**/*.md"):
         path = str(file)[:-3]  # remove .md
         ref = file.read_text()
 
         # sort by path
-        bisect.insort(dicts, {"title": path, "contents": ref}, key=lambda v: v["title"])
+        bisect.insort(out, Doc(title=path, contents=ref), key=lambda d: d.title)
 
-    return dicts
+    return out
 
 
 _ordering_re = re.compile(r"\d+\. ")
@@ -85,7 +86,7 @@ def procedure_from_text(text: str) -> tuple[Procedure, str]:
 
 def _goal_and_resources_from_text(text: str) -> tuple[str, str]:
     chunks = text.split("\n")
-    if len(chunks) < 1:  # noqa: PLR2004  # one line each for goal and resources
+    if len(chunks) < 1:
         raise ValueError("top of procedure does not contain goal and resources lines")
     if len(chunks) == 1:
         goal = chunks[0]
@@ -132,8 +133,14 @@ def format_steps(steps: list[str]) -> str:
     return out
 
 
-def load_formatted_docs(data_dir: str | PathLike = "./dataset/LCStep/docs") -> list[dict[str, Any]]:
-    root = Path(data_dir) / "procedures" / "formatted"
+def load_formatted_docs(
+    data_dir: str | PathLike = "./dataset/",
+) -> list[dict[str, str | Procedure]]:
+    """Returns the API reference docs.
+
+    The returned dicts have keys "path": str, "procedure": Procedure, and "side_note": str.
+    """
+    root = Path(data_dir) / "LCStep" / "docs" / "procedures" / "formatted"
 
     # walk the docs to collect all markdown files
     dicts = []
@@ -166,6 +173,17 @@ def load_formatted_docs(data_dir: str | PathLike = "./dataset/LCStep/docs") -> l
         d["id"] = i
 
     return dicts
+
+
+class LCStep(Dataset):
+    def _init_procedures(self) -> list[Procedure]:
+        return [d["procedure"] for d in load_formatted_docs(self.dir)]
+
+    def _get_docs(self) -> list[Doc]:
+        api_ref = load_api_ref(self.dir)
+        concept_docs = load_concept_docs(self.dir)
+
+        return api_ref + concept_docs
 
 
 if __name__ == "__main__":
