@@ -15,7 +15,9 @@ class Procedure:
 
 ### RecipeNLG
 
-(evaluation on a "normal" LM (T5, BERT, small Llama 2, etc.) because this task is too easy for LLMs)
+See [dataset/RecipeNLG/README.md](dataset/RecipeNLG/README.md) for details on preparing the RecipeNLG dataset.
+
+(TODO: evaluation on a "normal" LM (T5, BERT, small Llama 2, etc.) because this task is too easy for LLMs)
 
 ```python
 recipe = Procedure(
@@ -30,7 +32,7 @@ recipe = Procedure(
 
 ### LCStep
 
-We have created a dataset called LCStep containing LangChain tutorials condensed into concise steps. See [dataset/README.md](dataset/README.md) for details on creating LCStep. We will leverage LLMs to do perform retrieval-augmented generation (RAG), following several approaches:
+We have created a dataset called LCStep containing LangChain tutorials condensed into concise steps. See [dataset/LCStep/README.md](dataset/LCStep/README.md) for details on creating LCStep. We will leverage LLMs to do perform retrieval-augmented generation (RAG), following several approaches:
 
 (evaluation on a coding LLM)
 
@@ -130,3 +132,19 @@ Of course, you'll need to have your API key in `openai.key` for this to work. Th
   - [ ] add metrics (including dataset-specific ones)
   - [ ] think about tables/figures we want to include
     - [ ] a figure demonstrating that once the procedural memory is robust the system refers to external documents less
+
+## design thoughts
+
+- dataset determines what kinds of data are available
+  - recipenlg: procedures, general cooking material
+  - lcstep: procedures, concept docs, API ref
+- system determines what kinds of searches we need
+  - RAG: docs
+  - AAG: procedural memory, supporting docs
+- probably will want a custom ProceduralMemory class with specific search methods, but regular RAG can remain just a weaviate collection
+- the dataset has to set up a ProceduralMemory object and a generic set of docs
+
+```python
+lcstep.docs(include_procedures=True)
+lcstep.procedures()
+```
