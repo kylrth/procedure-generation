@@ -3,7 +3,7 @@ from dataset.base import Procedure
 
 def load_dataset():
     dataset = champ_dataset.load('v0')
-    return dataset.problems, dataset.hcd ints, dataset.concepts
+    return dataset.problems, dataset.hints, dataset.concepts
 
 def get_input(content, hints, concepts):
     input_str = ''
