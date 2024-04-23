@@ -16,7 +16,6 @@ class Result:
     """A structured object containing the information to log for a generated response to a query."""
 
     ID: int
-    source: str
     query: str
     label: str
     prompt: str | list[BaseMessage]
@@ -31,38 +30,34 @@ class ResultsLogger:
 
     _field_names: typing.ClassVar[list[str]] = []
 
-    def __init__(self, csv_path: str | os.PathLike | None, folder_path: str | os.PathLike | None):
-        self.csv = CSVLogger(csv_path) if csv_path is not None else None
-        self.human = HumanLogger(folder_path) if folder_path is not None else None
+    def __init__(self, path: str | os.PathLike):
+        path = Path(path)
+        csv_path = path / "output.csv"
+        folder_path = path / "logs"
+
+        self.csv = CSVLogger(csv_path)
+        self.human = HumanLogger(folder_path)
 
     def __enter__(self):
-        if self.csv:
-            self.csv.__enter__()
+        self.csv.__enter__()
 
         return self
 
     def result(self, r: Result):
         """Log the response(s) generated for a particular item."""
-        if self.csv:
-            self.csv.result(r)
-        if self.human:
-            self.human.result(r)
+        self.csv.result(r)
+        self.human.result(r)
 
     def exception(self, _id: int, msg: str):
         """Log an exception encountered while working on a particular item."""
-        if self.human:
-            self.human.exception(_id, msg)
+        self.human.exception(_id, msg)
 
     def evaluation(self, _id: int, scores: dict[str, typing.Any]):
         """Log evaluation results for a particular item."""
-        if self.human:
-            self.human.evaluation(_id, scores)
+        self.human.evaluation(_id, scores)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.csv:
-            return self.csv.__exit__(exc_type, exc_val, exc_tb)
-
-        return False
+        return self.csv.__exit__(exc_type, exc_val, exc_tb)
 
 
 class CSVLogger:
@@ -146,10 +141,10 @@ class HumanLogger:
             if isinstance(prompt, list):
                 prompt = self._format_messages(prompt)
 
-            f.write(f"processing query '{r.query}' from '{r.source}'\n")
+            f.write(f"processing query '{r.query}'\n")
             f.write(f"retrieved {len(r.retrieved_docs)} docs for query '{r.query}'\n")
             f.write("prompt:\n")
-            f.write(textwrap.indent(prompt, "  "))
+            f.write(textwrap.indent(prompt, "  ") + "\n")
 
             logged_completion = (
                 "BEGIN COMPLETION:\n"
@@ -157,6 +152,7 @@ class HumanLogger:
                 + "\nEND COMPLETION"
             )
             f.write(f"completion:\n{logged_completion}\n")
+            f.write(f"reference:\n{r.label}\n")
 
             def count(msg: str | list[BaseMessage]) -> int:
                 if isinstance(msg, list):
