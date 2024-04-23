@@ -1,11 +1,11 @@
 import asyncio
 from typing import Any
 
-from dataset import lcstep
+from dataset import Procedure
 from utils import log
 
 
-async def step_comparison(gold: lcstep.Procedure, generated: str, logger: log.ResultsLogger) -> int:
+async def step_comparison(gold: Procedure, generated: str, logger: log.ResultsLogger) -> int:
     """Judge the generated steps by letting GPT-4 compare with the gold steps.
 
     Score is out of 10.
@@ -19,7 +19,7 @@ async def step_comparison(gold: lcstep.Procedure, generated: str, logger: log.Re
 
 async def evaluate_all(
     generated: str,
-    gold: dict[str, Any],
+    gold: Procedure,
     logger: log.ResultsLogger,
 ) -> dict[str, Any]:
     """Evaluate a generated procedure by comparing with the gold procedure using various methods.
@@ -29,7 +29,7 @@ async def evaluate_all(
     results = {}  # TODO add synchronous evals here
 
     async_tasks = {
-        "compared": step_comparison(gold["procedure"], generated, logger),
+        "compared": step_comparison(gold, generated, logger),
         # TODO add more asyncronous evals here
     }
     resp = await asyncio.gather(*async_tasks.values())

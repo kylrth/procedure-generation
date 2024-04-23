@@ -4,10 +4,10 @@ from pathlib import Path
 from typing import Any
 
 import weaviate
-import weaviate.classes as wvc
+import weaviate.classes.config as wc
 
 import retrieval
-from dataset.base import Procedure
+from dataset import Doc, Procedure
 from utils import spread_gather
 
 from .interface import Result, System
@@ -87,7 +87,7 @@ _api_ref_collection = "APIRef"
 
 
 def setup_api_ref(
-    logger: logging.Logger, store: weaviate.WeaviateClient, docs: list[dict[str, str]]
+    logger: logging.Logger, store: weaviate.WeaviateClient, docs: list[Doc]
 ) -> weaviate.collections.Collection:
     """Create the vector store for the API reference docs.
 
@@ -102,23 +102,23 @@ def setup_api_ref(
             name=_api_ref_collection,
             description="API reference documentation for public methods of the LangChain Python "
             "library.",
-            vectorizer_config=wvc.Configure.Vectorizer.text2vec_transformers(),
+            vectorizer_config=wc.Configure.Vectorizer.text2vec_transformers(),
             properties=[
-                wvc.Property(
+                wc.Property(
                     name="api",
-                    data_type=wvc.DataType.TEXT,
+                    data_type=wc.DataType.TEXT,
                     description="The full import path of a LangChain method or class",
                 ),
-                wvc.Property(
+                wc.Property(
                     name="chunk",
-                    data_type=wvc.DataType.INT,
+                    data_type=wc.DataType.INT,
                     description="Zero-indexed chunk number in the documentation text",
                     skip_vectorization=True,
                     vectorize_property_name=False,
                 ),
-                wvc.Property(
+                wc.Property(
                     name="documentation",
-                    data_type=wvc.DataType.TEXT,
+                    data_type=wc.DataType.TEXT,
                     description="Full Markdown documentation for the method or class",
                 ),
             ],
