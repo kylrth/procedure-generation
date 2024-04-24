@@ -53,23 +53,40 @@ class RAG(System):
     model: Model
     docs: weaviate.collections.Collection
     k: int
-    instructions: str = (
+    dataset: str
+    instructions: dict[str, str] = {"lcstep": (
         "Please generate high-level steps to accomplish the specified goal using the LangChain "
         "Python library. Don't include code, extraneous commentary, or examples, but do refer to "
         "the specific LangChain APIs (or other APIs) used in each step. Don't produce any text "
         "other than the list of steps. Use any of the provided reference documentation to answer "
         "the question."
-    )
+    ),
+    "recipenlg": (
+        "Please generate high-level steps to accomplish the specified goal "
+        ". Don't include extraneous commentary, or examples, but do refer to "
+        "the special characteristics and state of the ingredients used in each step. Don't produce any text "
+        "other than the list of steps. Use any of the provided reference documentation to answer "
+        "the question."
+    ),
+    "champ": (
+        "Please generate high-level steps to accomplish the specified goal "
+        ". Don't include code, extraneous commentary, or examples, but do refer to "
+        "the concepts used in each step. Don't produce any text "
+        "other than the list of steps. Use any of the provided reference documentation to answer "
+        "the question. Provide the final answer in the last step. Your response should begin with 1. "
+    )}
 
     def __init__(
         self,
         model: Model,
         docs: weaviate.collections.Collection,
         k: int,
+        dataset: str
     ):
         self.model = model
         self.docs = docs
         self.k = k
+        self.dataset = dataset
 
     def generate(self, query: str) -> Result:
         out = self._prepare_result(query)
@@ -129,6 +146,6 @@ class RAG(System):
         msg += context
 
         return [
-            SystemMessage(content=self.instructions),
+            SystemMessage(content=self.instructions[self.dataset]),
             HumanMessage(content=msg),
         ]

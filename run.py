@@ -121,6 +121,7 @@ def int_leq(v: int):
 # constants
 dataset_lcstep = "lcstep"
 dataset_recipenlg = "recipenlg"
+dataset_champ = "champ"
 
 
 if __name__ == "__main__":
@@ -136,7 +137,7 @@ if __name__ == "__main__":
         "--dataset",
         type=str,
         default=dataset_lcstep,
-        choices=[dataset_lcstep, dataset_recipenlg],
+        choices=[dataset_lcstep, dataset_recipenlg, dataset_champ],
         help="Dataset to run the system on",
     )
 
@@ -185,6 +186,8 @@ if __name__ == "__main__":
         ds = dataset.LCStep(args.data_dir)
     elif dataset_name == dataset_recipenlg:
         ds = dataset.RecipeNLG(args.data_dir, n=10000)
+    elif dataset_name == dataset_champ:
+        ds = dataset.CHAMP(args.data_dir)
     else:
         raise NotImplementedError(f"unrecognized dataset '{args.dataset}'")
 
@@ -212,7 +215,7 @@ if __name__ == "__main__":
                 logger.info("RAG: uploading docs to Weaviate collection")
                 retrieval.populate(logger, dataset_name, docs_store, docs)
 
-            system = rag.RAG(model, docs_store, args.k)
+            system = rag.RAG(model, docs_store, args.k, args.dataset)
         else:
             raise NotImplementedError(args.system)
 
