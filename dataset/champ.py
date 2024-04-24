@@ -1,5 +1,6 @@
 from os import PathLike
-
+import random
+random.seed(10)
 import champ_dataset
 
 from .base import Dataset, Doc, Procedure
@@ -60,7 +61,7 @@ def parse_problems(probs, hints, concepts):
     for _, content in probs.items():
         proc_obj = make_procedure_object(content, hints, concepts)
         procedure_list.append(proc_obj)
-
+    random.shuffle(procedure_list)
     return procedure_list
 
 
