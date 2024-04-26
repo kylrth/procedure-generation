@@ -71,9 +71,9 @@ class RAG(System):
     "champ": (
         "Please generate high-level steps to accomplish the specified goal "
         ". Don't include code, extraneous commentary, or examples, but do refer to "
-        "the concepts used in each step. Don't produce any text "
+        "the concepts and hints used in each step. Don't produce any text "
         "other than the list of steps. Use any of the provided reference documentation to answer "
-        "the question. Provide the final answer in the last step. Your response should begin with 1. "
+        "the question."
     )}
 
     def __init__(
@@ -94,17 +94,17 @@ class RAG(System):
 
         return out
 
-    async def agenerate(self, query: str) -> Result:
-        out = self._prepare_result(query)
+    async def agenerate(self, query: str, inp_info: str) -> Result:
+        out = self._prepare_result(query, inp_info)
         out.answers = await self.model.agenerate(out.prompt)
 
         return out
 
-    def _prepare_result(self, query: str) -> Result:
+    def _prepare_result(self, query: str, inp_info: str) -> Result:
         """Do everything except get the completions (which can be async)"""
         docs = self.get_docs(query)
         context = self.build_context(docs)
-        prompt = self.build_prompt(query, context)
+        prompt = self.build_prompt(query, inp_info, context)
 
         return Result(
             query=query,
@@ -138,14 +138,23 @@ class RAG(System):
 
         return out
 
-    def build_prompt(self, title: str, context: str) -> list[BaseMessage]:
-        msg = (
+    def build_prompt(self, title: str, inp_info: str, context: str) -> list[BaseMessage]:
+        msg = {"lcstep":(
             f"Please generate a list of instructions to accomplish '{title}' using the "
-            "documentation below:"
-        )
-        msg += context
+            f"documentation below. You have to create and use these resources in your response: {inp_info}"
+        ),
+        "recipenlg" : (
+            f"Please generate a list of instructions to accomplish '{title}' using the "
+            f"documentation below. You are expected to use these ingredients in your response: {inp_info}"
+        ),
+        "champ" : (
+            f"Please generate a list of instructions to accomplish '{title}' using the "
+            f"documentation below. You are expected to use this additional information in preparing your response: {inp_info}"
+        )}
+        msg_prompt = msg[self.dataset]
+        msg_prompt += context
 
         return [
             SystemMessage(content=self.instructions[self.dataset]),
-            HumanMessage(content=msg),
+            HumanMessage(content=msg_prompt),
         ]

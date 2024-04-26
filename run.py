@@ -54,7 +54,7 @@ async def generate_and_evaluate(
     _id, p = item
     ref: str = "\n".join(p.steps)
 
-    res = await model.agenerate(p.output)
+    res = await model.agenerate(p.output, p._input)
     logger.result(create_log_result(_id, res, ref))
 
     scores = defaultdict(list)
