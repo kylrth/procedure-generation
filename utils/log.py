@@ -19,7 +19,7 @@ class Result:
     query: str
     label: str
     prompt: str | list[BaseMessage]
-    completions: list[str]
+    completion: str
     retrieved_docs: list[dict[str, str | float]]
     context: str
     model: BaseLanguageModel
@@ -64,7 +64,6 @@ class CSVLogger:
     """This object logs results to a CSV."""
 
     _field_names: typing.ClassVar[list[str]] = [
-        "",
         "question_id",
         "question",
         "labeled_answer",
@@ -84,9 +83,6 @@ class CSVLogger:
         self.f = self.path.open("w", newline="")
         self.w = csv.DictWriter(self.f, self._field_names)
 
-        # track row number
-        self.i = 0
-
         return self
 
     def result(self, r: Result):
@@ -95,21 +91,17 @@ class CSVLogger:
         if isinstance(prompt, list):
             prompt = self._format_messages(prompt)
 
-        for completion in r.completions:
-            self.w.writerow(
-                {
-                    "": self.i,
-                    "question_id": r.ID,
-                    "question": r.prompt,
-                    "labeled_answer": r.label,
-                    "prompt": r.prompt,
-                    "response": completion,
-                    "retrieved_docs": retrieved,
-                    "context": r.context,
-                }
-            )
-
-            self.i += 1
+        self.w.writerow(
+            {
+                "question_id": r.ID,
+                "question": r.prompt,
+                "labeled_answer": r.label,
+                "prompt": r.prompt,
+                "response": r.completion,
+                "retrieved_docs": retrieved,
+                "context": r.context,
+            }
+        )
 
     @staticmethod
     def _format_messages(messages: list[BaseMessage]) -> str:
@@ -146,13 +138,8 @@ class HumanLogger:
             f.write("prompt:\n")
             f.write(textwrap.indent(prompt, "  ") + "\n")
 
-            logged_completion = (
-                "BEGIN COMPLETION:\n"
-                + "END COMPLETION\nBEGIN COMPLETION".join(r.completions)
-                + "\nEND COMPLETION"
-            )
-            f.write(f"completion:\n{logged_completion}\n")
-            f.write(f"reference:\n{r.label}\n")
+            f.write(f"BEGIN COMPLETION:\n{r.completion}\nEND COMPLETION\n")
+            f.write(f"BEGIN REFERENCE:\n{r.label}\nEND REFERENCE\n")
 
             def count(msg: str | list[BaseMessage]) -> int:
                 if isinstance(msg, list):
@@ -160,11 +147,7 @@ class HumanLogger:
 
                 return r.model.get_num_tokens(msg)
 
-            f.write(
-                f"used {count(prompt) * len(r.completions)} input tokens and "
-                f"{sum(count(s) for s in r.completions)} output tokens\n"
-            )
-            f.write(f"got {len(r.completions)} completions\n")
+            f.write(f"used {count(prompt)} input tokens and {count(r.completion)} output tokens\n")
 
     @staticmethod
     def _format_messages(messages: list[BaseMessage]) -> str:

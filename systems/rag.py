@@ -6,7 +6,7 @@ from langchain.schema import BaseMessage, HumanMessage, SystemMessage
 
 import retrieval
 
-from .interface import Result, System
+from .interface import Response, System
 from .model import Model
 
 
@@ -54,62 +54,58 @@ class RAG(System):
     docs: weaviate.collections.Collection
     k: int
     dataset: str
-    instructions: dict[str, str] = {"lcstep": (
-        "Please generate high-level steps to accomplish the specified goal using the LangChain "
-        "Python library. Don't include code, extraneous commentary, or examples, but do refer to "
-        "the specific LangChain APIs (or other APIs) used in each step. Don't produce any text "
-        "other than the list of steps. Use any of the provided reference documentation to answer "
-        "the question."
-    ),
-    "recipenlg": (
-        "Please generate high-level steps to accomplish the specified goal "
-        ". Don't include extraneous commentary, or examples, but do refer to "
-        "the special characteristics and state of the ingredients used in each step. Don't produce any text "
-        "other than the list of steps. Use any of the provided reference documentation to answer "
-        "the question."
-    ),
-    "champ": (
-        "Please generate high-level steps to accomplish the specified goal "
-        ". Don't include code, extraneous commentary, or examples, but do refer to "
-        "the concepts and hints used in each step. Don't produce any text "
-        "other than the list of steps. Use any of the provided reference documentation to answer "
-        "the question."
-    )}
+    instructions: dict[str, str] = {
+        "lcstep": (
+            "Please generate high-level steps to accomplish the specified goal using the LangChain "
+            "Python library. Don't include code, extraneous commentary, or examples, but do refer to "
+            "the specific LangChain APIs (or other APIs) used in each step. Don't produce any text "
+            "other than the list of steps. Use any of the provided reference documentation to answer "
+            "the question."
+        ),
+        "recipenlg": (
+            "Please generate high-level steps to accomplish the specified goal "
+            ". Don't include extraneous commentary, or examples, but do refer to "
+            "the special characteristics and state of the ingredients used in each step. Don't produce any text "
+            "other than the list of steps. Use any of the provided reference documentation to answer "
+            "the question."
+        ),
+        "champ": (
+            "Please generate high-level steps to accomplish the specified goal "
+            ". Don't include code, extraneous commentary, or examples, but do refer to "
+            "the concepts and hints used in each step. Don't produce any text "
+            "other than the list of steps. Use any of the provided reference documentation to answer "
+            "the question."
+        ),
+    }
 
-    def __init__(
-        self,
-        model: Model,
-        docs: weaviate.collections.Collection,
-        k: int,
-        dataset: str
-    ):
+    def __init__(self, model: Model, docs: weaviate.collections.Collection, k: int, dataset: str):
         self.model = model
         self.docs = docs
         self.k = k
         self.dataset = dataset
 
-    def generate(self, query: str) -> Result:
-        out = self._prepare_result(query)
-        out.answers = self.model.generate(out.prompt)
-
-        return out
-
-    async def agenerate(self, query: str, inp_info: str) -> Result:
+    def generate(self, query: str, inp_info: str) -> Response:
         out = self._prepare_result(query, inp_info)
-        out.answers = await self.model.agenerate(out.prompt)
+        out.answer = self.model.generate(out.prompt)[0]
 
         return out
 
-    def _prepare_result(self, query: str, inp_info: str) -> Result:
-        """Do everything except get the completions (which can be async)"""
+    async def agenerate(self, query: str, inp_info: str) -> Response:
+        out = self._prepare_result(query, inp_info)
+        out.answer = (await self.model.agenerate(out.prompt))[0]
+
+        return out
+
+    def _prepare_result(self, query: str, inp_info: str) -> Response:
+        """Do everything except get the completion (which can be async)"""
         docs = self.get_docs(query)
         context = self.build_context(docs)
         prompt = self.build_prompt(query, inp_info, context)
 
-        return Result(
+        return Response(
             query=query,
             prompt=prompt,
-            answers=[],
+            answer="",  # not set yet
             model=self.model.model,
             retrieved_docs=[{"path": doc[0], "contents": doc[1]} for doc in docs],
             context=context,
@@ -139,18 +135,20 @@ class RAG(System):
         return out
 
     def build_prompt(self, title: str, inp_info: str, context: str) -> list[BaseMessage]:
-        msg = {"lcstep":(
-            f"Please generate a list of instructions to accomplish '{title}' using the "
-            f"documentation below. You have to create and use these resources in your response: {inp_info}"
-        ),
-        "recipenlg" : (
-            f"Please generate a list of instructions to accomplish '{title}' using the "
-            f"documentation below. You are expected to use these ingredients in your response: {inp_info}"
-        ),
-        "champ" : (
-            f"Please generate a list of instructions to accomplish '{title}' using the "
-            f"documentation below. You are expected to use this additional information in preparing your response: {inp_info}"
-        )}
+        msg = {
+            "lcstep": (
+                f"Please generate a list of instructions to accomplish '{title}' using the "
+                f"documentation below. You have to create and use these resources in your response: {inp_info}"
+            ),
+            "recipenlg": (
+                f"Please generate a list of instructions to accomplish '{title}' using the "
+                f"documentation below. You are expected to use these ingredients in your response: {inp_info}"
+            ),
+            "champ": (
+                f"Please generate a list of instructions to accomplish '{title}' using the "
+                f"documentation below. You are expected to use this additional information in preparing your response: {inp_info}"
+            ),
+        }
         msg_prompt = msg[self.dataset]
         msg_prompt += context
 
