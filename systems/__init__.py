@@ -3,13 +3,13 @@ specific LMs."""
 
 from .aag import AAG
 from .few_shot import FewShot
-from .interface import Result, System
+from .interface import Response, System
 from .model import Model
 from .rag import RAG
 
 
 __all__ = [
-    "Result",
+    "Response",
     "System",
     "Model",
     # systems

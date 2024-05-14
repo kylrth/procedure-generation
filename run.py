@@ -27,17 +27,17 @@ import dataset
 import retrieval
 from evaluation.eval import evaluate_all
 from dataset import Procedure
-from systems import Model, Result, System, aag, rag
+from systems import Model, Response, System, aag, rag
 from utils import log, spread_gather
 
 
-def create_log_result(_id: int, res: Result, label: str) -> log.Result:
+def create_log_result(_id: int, res: Response, label: str) -> log.Result:
     return log.Result(
         ID=_id,
         query=res.query,
         label=label,
         prompt=res.prompt,
-        completions=res.answers,
+        completion=res.answer,
         retrieved_docs=res.retrieved_docs if res.retrieved_docs is not None else [],
         context=res.context if res.context is not None else "",
         model=res.model,
@@ -46,7 +46,7 @@ def create_log_result(_id: int, res: Result, label: str) -> log.Result:
 
 async def generate_and_evaluate(
     model: System, item: tuple[int, Procedure], logger: log.ResultsLogger
-) -> tuple[int, dict[str, list[Any]]]:
+) -> tuple[int, dict[str, Any]]:
     """Generate a procedure for this item with the model, and then evaluate it.
 
     Returns the item ID and the scores for each metric on each generated answer.
@@ -57,18 +57,14 @@ async def generate_and_evaluate(
     res = await model.agenerate(p.output, p._input)
     logger.result(create_log_result(_id, res, ref))
 
-    scores = defaultdict(list)
-    for answer in res.answers:
-        try:
-            evals = await evaluate_all(answer, p, logger)
-            logger.evaluation(_id, evals)
-        except Exception:
-            logger.exception(_id, "exception during evaluation")
-            continue
-        for metric in evals:
-            scores[metric].append(evals[metric])
+    try:
+        evals = await evaluate_all(res.answer, p, logger)
+        logger.evaluation(_id, evals)
+    except Exception:
+        logger.exception(_id, "exception during evaluation")
+        evals = {}
 
-    return _id, scores
+    return _id, evals
 
 
 async def evaluate(
@@ -87,14 +83,13 @@ async def evaluate(
     scores = defaultdict(list)
     broken = []
     for _id, evals in results:
-        # if prompt had no correct completions
+        # if there was an issue
         if len(evals) == 0:
             broken.append(_id)
             continue
         # collect all scores of a metric
-        for metric, values in evals.items():
-            for v in values:
-                scores[metric].append(v)
+        for metric, value in evals.items():
+            scores[metric].append(value)
 
     # average the results
     for metric, score in scores.items():

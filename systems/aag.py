@@ -10,7 +10,7 @@ import retrieval
 from dataset import Doc, Procedure
 from utils import spread_gather
 
-from .interface import Result, System
+from .interface import Response, System
 from .model import Model
 
 
@@ -156,10 +156,10 @@ class AAG(System):
         self.skills = store.collections.get(_skills_collection)
         self.api_ref = store.collections.get(_api_ref_collection)
 
-    def generate(self, query: str, logger: logging.Logger | None = None) -> Result:
+    def generate(self, query: str, logger: logging.Logger | None = None) -> Response:
         return asyncio.run(self.agenerate(query, logger))
 
-    async def agenerate(self, query: str, _: logging.Logger | None = None) -> Result:
+    async def agenerate(self, query: str, _: logging.Logger | None = None) -> Response:
         # search skill library
         skills = self.find_relevant_skills(query, 5)
 

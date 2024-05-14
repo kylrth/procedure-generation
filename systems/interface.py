@@ -6,15 +6,15 @@ from langchain.schema import BaseMessage
 
 
 @dataclass
-class Result:
+class Response:
     # the query passed to the system
     query: str
 
     # the prompt that was sent to the LLM
     prompt: str | list[BaseMessage]
 
-    # answer(s) to the query (usually completion(s) from the LLM)
-    answers: list[str]
+    # answer to the query (e.g. completion from an LLM)
+    answer: str
 
     # the model used to generate completions
     model: BaseLanguageModel
@@ -31,9 +31,9 @@ class System(ABC):
     type annotations."""
 
     @abstractmethod
-    def generate(self, query: str) -> Result:
+    def generate(self, query: str, inp_info: str) -> Response:
         """The output is a list of generations, in case of n > 1."""
 
     @abstractmethod
-    async def agenerate(self, query: str) -> Result:
+    async def agenerate(self, query: str, inp_info: str) -> Response:
         """The output is a list of generations, in case of n > 1."""
