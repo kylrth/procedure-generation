@@ -1,6 +1,6 @@
-from os import PathLike
 import random
-random.seed(10)
+from os import PathLike
+
 import champ_dataset
 
 from .base import Dataset, Doc, Procedure
@@ -56,25 +56,22 @@ def make_procedure_object(content, hints, concepts):
     return procedure_obj
 
 
-def parse_problems(probs, hints, concepts):
-    procedure_list = []
-    for _, content in probs.items():
-        proc_obj = make_procedure_object(content, hints, concepts)
-        procedure_list.append(proc_obj)
-    random.shuffle(procedure_list)
-    return procedure_list
-
-
 # Pass data dir as None for CHAMP dataset
 class CHAMP(Dataset):
     def __init__(self, data_dir: str | PathLike, n: int | None = None):
         super().__init__(data_dir)
         self.n = n
+        self.rng = random.Random(42)
 
     def _init_procedures(self) -> list[Procedure]:
-        out = []
         probs, hints, concepts = load_dataset()
-        out = parse_problems(probs, hints, concepts)
+
+        out = []
+        for _, content in probs.items():
+            proc_obj = make_procedure_object(content, hints, concepts)
+            out.append(proc_obj)
+        self.rng.shuffle(out)
+
         return out
 
     def _get_docs(self) -> list[Doc]:

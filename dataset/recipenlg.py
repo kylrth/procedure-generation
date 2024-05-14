@@ -1,5 +1,6 @@
 import csv
 import json
+import random
 from itertools import islice
 from os import PathLike
 from typing import Any
@@ -19,6 +20,7 @@ class RecipeNLG(Dataset):
     def __init__(self, data_dir: str | PathLike, n: int | None = None):
         super().__init__(data_dir)
         self.n = n
+        self.rng = random.Random(42)
 
     def _init_procedures(self) -> list[Procedure]:
         out = []
@@ -26,6 +28,8 @@ class RecipeNLG(Dataset):
             reader = csv.DictReader(f)
             for row in islice(reader, self.n):
                 out.append(recipe_to_procedure(row))
+
+        self.rng.shuffle(out)
 
         return out
 
