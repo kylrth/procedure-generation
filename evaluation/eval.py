@@ -5,7 +5,7 @@ from dataset import Procedure
 from utils import log
 
 
-async def step_comparison(gold: Procedure, generated: str, logger: log.ResultsLogger) -> int:
+async def step_comparison(gold: Procedure, generated: list[str], logger: log.ResultsLogger) -> int:
     """Judge the generated steps by letting GPT-4 compare with the gold steps.
 
     Score is out of 10.
@@ -18,7 +18,7 @@ async def step_comparison(gold: Procedure, generated: str, logger: log.ResultsLo
 
 
 async def evaluate_all(
-    generated: str,
+    generated: list[str],
     gold: Procedure,
     logger: log.ResultsLogger,
 ) -> dict[str, Any]:

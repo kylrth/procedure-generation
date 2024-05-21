@@ -107,32 +107,6 @@ def _goal_and_resources_from_text(text: str) -> tuple[str, str]:
     return goal, resources
 
 
-def format_procedure(p: Procedure, side_note: str = "") -> str:
-    """Format the text of a procedure.
-
-    `goal` and `side_note` are optional and ignored if empty.
-    """
-    # allow blank goal if formatting just steps
-    out = "Goal: " + p.output + "\n\n" if p.output else ""
-
-    out += format_steps(p.steps)
-
-    if side_note:
-        out += "\nSide note: " + side_note + "\n"
-
-    return out
-
-
-def format_steps(steps: list[str]) -> str:
-    """Format just the steps of the procedure."""
-    out = ""
-
-    for i, step in enumerate(steps):
-        out += f"{i+1}. {step}\n"
-
-    return out
-
-
 def load_formatted_docs(
     data_dir: str | PathLike = "./dataset/",
 ) -> list[dict[str, str | Procedure]]:

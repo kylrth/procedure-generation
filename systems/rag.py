@@ -2,9 +2,10 @@ import logging
 
 import weaviate
 import weaviate.classes.config as wc
-from langchain.schema import BaseMessage, HumanMessage, SystemMessage
+from langchain.schema import BaseMessage
 
 import retrieval
+from dataset import Doc
 
 from .interface import Response, System
 from .model import Model
@@ -46,6 +47,48 @@ def setup_store(
     return out
 
 
+rag_task: dict[str, str] = {
+    "lcstep": (
+        "Please generate high-level steps to accomplish the specified goal using the LangChain "
+        "Python library. Don't include code, extraneous commentary, or examples, but do refer to "
+        "the specific LangChain APIs (or other APIs) used in each step. Don't produce any text "
+        "other than the list of steps. Use any of the provided reference documentation to answer "
+        "the question."
+    ),
+    "recipenlg": (
+        "Please generate high-level steps to create a recipe for the specified food. Don't include "
+        "extraneous commentary, or examples, but do refer to the special characteristics and state "
+        "of the ingredients used in each step. Don't produce any text other than the list of "
+        "steps. Use any of the provided reference recipes to answer the question."
+    ),
+    "champ": (
+        "Please generate high-level steps to solve the given math problem. Don't include code, "
+        "extraneous commentary, or examples, but do refer to the concepts and hints used in each "
+        "step. Don't produce any text other than the list of steps. Use any of the provided "
+        "similar problems and solutions to answer the question."
+    ),
+}
+rag_ex_names: dict[str, str] = {
+    "lcstep": "DOCUMENTATION",
+    "recipenlg": "RECIPE",
+    "champ": "EXAMPLE",
+}
+rag_inst = {
+    "lcstep": (
+        "Please generate a list of instructions to accomplish '{query}' using the procedures "
+        "above. Create and use these resources in your response: {_input}."
+    ),
+    "recipenlg": (
+        "Please generate a list of instructions to accomplish '{query}' using the recipes above. "
+        "Use these ingredients in your response: {_input}."
+    ),
+    "champ": (
+        "Please generate a list of instructions to solve '{query}' using the examples above. Use "
+        "this additional information in preparing your response: {_input}."
+    ),
+}
+
+
 class RAG(System):
     """This model prompts an LM to generate text few-shot, with the examples provided by searching a
     vector store for texts with similar embeddings to the title."""
@@ -54,29 +97,6 @@ class RAG(System):
     docs: weaviate.collections.Collection
     k: int
     dataset: str
-    instructions: dict[str, str] = {
-        "lcstep": (
-            "Please generate high-level steps to accomplish the specified goal using the LangChain "
-            "Python library. Don't include code, extraneous commentary, or examples, but do refer to "
-            "the specific LangChain APIs (or other APIs) used in each step. Don't produce any text "
-            "other than the list of steps. Use any of the provided reference documentation to answer "
-            "the question."
-        ),
-        "recipenlg": (
-            "Please generate high-level steps to accomplish the specified goal "
-            ". Don't include extraneous commentary, or examples, but do refer to "
-            "the special characteristics and state of the ingredients used in each step. Don't produce any text "
-            "other than the list of steps. Use any of the provided reference documentation to answer "
-            "the question."
-        ),
-        "champ": (
-            "Please generate high-level steps to accomplish the specified goal "
-            ". Don't include code, extraneous commentary, or examples, but do refer to "
-            "the concepts and hints used in each step. Don't produce any text "
-            "other than the list of steps. Use any of the provided reference documentation to answer "
-            "the question."
-        ),
-    }
 
     def __init__(self, model: Model, docs: weaviate.collections.Collection, k: int, dataset: str):
         self.model = model
@@ -84,36 +104,39 @@ class RAG(System):
         self.k = k
         self.dataset = dataset
 
-    def generate(self, query: str, inp_info: str) -> Response:
-        out = self._prepare_result(query, inp_info)
-        out.answer = self.model.generate(out.prompt)[0]
+    def generate(self, query: str, _input: str) -> Response:
+        out = self._prepare_result(query, _input)
+        completion = self.model.generate(out.prompt)[0]
+        out.answer = self.parse_completion(completion)
 
         return out
 
-    async def agenerate(self, query: str, inp_info: str) -> Response:
-        out = self._prepare_result(query, inp_info)
-        out.answer = (await self.model.agenerate(out.prompt))[0]
+    async def agenerate(self, query: str, _input: str) -> Response:
+        out = self._prepare_result(query, _input)
+        completion = (await self.model.agenerate(out.prompt))[0]
+        out.answer = self.parse_completion(completion)
 
         return out
 
-    def _prepare_result(self, query: str, inp_info: str) -> Response:
+    def _prepare_result(self, query: str, _input: str) -> Response:
         """Do everything except get the completion (which can be async)"""
-        docs = self.get_docs(query)
+        query_using_input = f"{query} using {_input}"
+
+        docs = self.get_docs(query_using_input)
         context = self.build_context(docs)
-        prompt = self.build_prompt(query, inp_info, context)
+        prompt = self.build_prompt(query, _input, context)
 
         return Response(
-            query=query,
+            answer=[],  # not set yet
             prompt=prompt,
-            answer="",  # not set yet
             model=self.model.model,
-            retrieved_docs=[{"path": doc[0], "contents": doc[1]} for doc in docs],
+            retrieved_docs=docs,
             context=context,
         )
 
-    def get_docs(self, title: str) -> list[tuple[str, str]]:
+    def get_docs(self, query: str) -> list[Doc]:
         """Returns the docs that will be inserted into the prompt."""
-        embedded_query = retrieval.get_embeds([title])[0]
+        embedded_query = retrieval.get_embeds([query])[0]
 
         res = self.docs.query.near_vector(
             near_vector=embedded_query.tolist(),
@@ -121,38 +144,20 @@ class RAG(System):
             return_properties=["title", "contents"],
         )
 
-        out: list[tuple[str, str]] = []
+        out = []
         for obj in res.objects:
-            out.append((obj.properties["title"], obj.properties["contents"]))
+            out.append(Doc(obj.properties["title"], obj.properties["contents"]))
 
         return out
 
-    def build_context(self, docs: list[tuple[str, str]]) -> str:
+    def build_context(self, docs: list[Doc]) -> str:
         out = ""
-        for title, contents in docs:
-            out += f"\n\nDOCUMENTATION FOR '{title}':\n\n{contents}"
+        for doc in docs:
+            out += f"\n\n{rag_ex_names[self.dataset]} '{doc.title}':\n\n{doc.contents}"
 
-        return out
+        return out[2:]  # skip first "\n\n"
 
-    def build_prompt(self, title: str, inp_info: str, context: str) -> list[BaseMessage]:
-        msg = {
-            "lcstep": (
-                f"Please generate a list of instructions to accomplish '{title}' using the "
-                f"documentation below. You have to create and use these resources in your response: {inp_info}"
-            ),
-            "recipenlg": (
-                f"Please generate a list of instructions to accomplish '{title}' using the "
-                f"documentation below. You are expected to use these ingredients in your response: {inp_info}"
-            ),
-            "champ": (
-                f"Please generate a list of instructions to accomplish '{title}' using the "
-                f"documentation below. You are expected to use this additional information in preparing your response: {inp_info}"
-            ),
-        }
-        msg_prompt = msg[self.dataset]
-        msg_prompt += context
+    def build_prompt(self, query: str, _input: str, context: str) -> str | list[BaseMessage]:
+        msg_prompt = context + "\n\n" + rag_inst[self.dataset].format(query=query, _input=_input)
 
-        return [
-            SystemMessage(content=self.instructions[self.dataset]),
-            HumanMessage(content=msg_prompt),
-        ]
+        return self.model.build_prompt(msg_prompt, rag_task[self.dataset])

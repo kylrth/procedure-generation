@@ -13,6 +13,30 @@ class Procedure:
     output: str
     steps: list[str]
 
+    def fmt(self, side_note: str = "") -> str:
+        """Format the text of a procedure.
+
+        `goal` and `side_note` are optional and ignored if empty.
+        """
+        # allow blank goal if formatting just steps
+        out = "Goal: " + self.output + "\n\n" if self.output else ""
+
+        out += self.format_steps()
+
+        if side_note:
+            out += "\nSide note: " + side_note + "\n"
+
+        return out
+
+    def format_steps(self) -> str:
+        """Format just the steps of the procedure."""
+        out = ""
+
+        for i, step in enumerate(self.steps):
+            out += f"{i+1}. {step}\n"
+
+        return out
+
 
 @dataclass
 class Doc:
@@ -20,6 +44,12 @@ class Doc:
 
     title: str
     contents: str
+
+    def json(self):
+        return {
+            "title": self.title,
+            "contents": self.contents,
+        }
 
 
 def train_val_test(data: list, val: float, test: float) -> tuple[list, list, list]:
@@ -107,8 +137,8 @@ class Dataset(ABC):
         for p in procedures:
             out.append(
                 Doc(
-                    title=p.output,
-                    contents=p._input + "\n\n" + "\n".join("- " + s for s in p.steps),
+                    title=p.output + " using " + p._input,
+                    contents="\n".join("- " + s for s in p.steps),
                 )
             )
 

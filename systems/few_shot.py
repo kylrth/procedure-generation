@@ -18,24 +18,27 @@ class FewShot(System):
         self.model = model
         self.shots = shots if shots is not None else []
 
-    def generate(self, query: str) -> Response:
-        prompt = self.model.build_prompt(query, self.instructions, self.shots)
+    def generate(self, query: str, _input: str) -> Response:
+        prompt = self._make_prompt(query, _input)
         completion = self.model.generate(prompt)
 
-        return self._make_result(query, prompt, completion)
+        return self._make_result(prompt, completion)
 
-    async def agenerate(self, query: str) -> Response:
-        prompt = self.model.build_prompt(query, self.instructions, self.shots)
+    async def agenerate(self, query: str, _input: str) -> Response:
+        prompt = self._make_prompt(query, _input)
         completion = await self.model.agenerate(prompt)
 
-        return self._make_result(query, prompt, completion)
+        return self._make_result(prompt, completion)
 
-    def _make_result(self, query: str, prompt: str | list[BaseMessage], completions: list[str]):
+    def _make_prompt(self, query: str, _input: str) -> str | list[BaseMessage]:
+        # merge the input string into the query
+        query = f"{query} using {_input}"
+
+        return self.model.build_prompt(query, self.instructions, self.shots)
+
+    def _make_result(self, prompt: str | list[BaseMessage], completions: list[str]):
         return Response(
-            query,
+            self.parse_completion(completions[0]),
             prompt,
-            completions[0],
             self.model.model,
-            [],
-            prompt if isinstance(prompt, str) else "\n\n".join(str(msg.content) for msg in prompt),
         )
