@@ -11,32 +11,22 @@ def load_dataset():
     return dataset.problems, dataset.hints, dataset.concepts
 
 
-def get_input(content, hints, concepts):
+def get_input(content, hints):
     input_str = ""
 
     # Adding category now
     input_str += f"Category: {content.category}\n"
 
-    # concept_list = []
     hints_list = []
 
     for elem in content.ch_list:
-        # if elem[0] == 'C':
-        #     concept_list.append(concepts[elem]._text)
         if elem[0] == "H":
             hints_list.append(hints[elem]._text)
 
-    # # Adding concepts now
-    # input_str += f'Concepts: {str(concept_list)}\n'
-
     # Adding hints now
-    input_str += f"Hints: {str(hints_list)}"
+    input_str += f"Hints: {hints_list}"
 
     return input_str
-
-
-def get_output(content):
-    return content.text
 
 
 def get_solution_steps(content):
@@ -48,12 +38,11 @@ def get_solution_steps(content):
     return steps_list
 
 
-def make_procedure_object(content, hints, concepts):
-    input_str = get_input(content, hints, concepts)
-    output_str = get_output(content)
+def make_procedure_object(content, hints):
+    input_str = get_input(content, hints)
     step_list = get_solution_steps(content)
-    procedure_obj = Procedure(input_str, output_str, step_list)
-    return procedure_obj
+
+    return Procedure(input_str, content.text, step_list)
 
 
 # Pass data dir as None for CHAMP dataset
@@ -64,11 +53,11 @@ class CHAMP(Dataset):
         self.rng = random.Random(42)
 
     def _init_procedures(self) -> list[Procedure]:
-        probs, hints, concepts = load_dataset()
+        probs, hints, _ = load_dataset()  # don't use concepts
 
         out = []
         for _, content in probs.items():
-            proc_obj = make_procedure_object(content, hints, concepts)
+            proc_obj = make_procedure_object(content, hints)
             out.append(proc_obj)
         self.rng.shuffle(out)
 
