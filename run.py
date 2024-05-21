@@ -27,21 +27,8 @@ import dataset
 import retrieval
 from evaluation.eval import evaluate_all
 from dataset import Procedure
-from systems import Model, Response, System, aag, rag
+from systems import Model, System, rag
 from utils import log, spread_gather
-
-
-def create_log_result(_id: int, res: Response, label: str) -> log.Result:
-    return log.Result(
-        ID=_id,
-        query=res.query,
-        label=label,
-        prompt=res.prompt,
-        completion=res.answer,
-        retrieved_docs=res.retrieved_docs if res.retrieved_docs is not None else [],
-        context=res.context if res.context is not None else "",
-        model=res.model,
-    )
 
 
 async def generate_and_evaluate(
@@ -52,10 +39,20 @@ async def generate_and_evaluate(
     Returns the item ID and the scores for each metric on each generated answer.
     """
     _id, p = item
-    ref: str = "\n".join(p.steps)
 
     res = await model.agenerate(p.output, p._input)
-    logger.result(create_log_result(_id, res, ref))
+
+    logger.result(
+        log.Result(
+            ID=_id,
+            gold=p,
+            prompt=res.prompt,
+            completion=res.answer,
+            retrieved_docs=res.retrieved_docs,
+            context=res.context,
+            model=res.model,
+        )
+    )
 
     try:
         evals = await evaluate_all(res.answer, p, logger)
@@ -191,8 +188,8 @@ if __name__ == "__main__":
     system = args.system.lower()
     with weaviate.WeaviateClient(
         embedded_options=EmbeddedOptions(
-            persistence_data_path=Path("./cache/weaviate") / dataset_name,
-            version="1.24.6",
+            persistence_data_path=str(Path("./cache/weaviate") / dataset_name),
+            version="1.25.1",
             additional_env_vars={"AUTOSCHEMA_ENABLED": "false", "DISABLE_TELEMETRY": "true"},
         )
     ) as client:

@@ -10,25 +10,24 @@ from pathlib import Path
 from langchain.base_language import BaseLanguageModel
 from langchain.schema import BaseMessage
 
+from dataset import Doc, Procedure
+
 
 @dataclass
 class Result:
     """A structured object containing the information to log for a generated response to a query."""
 
     ID: int
-    query: str
-    label: str
+    gold: Procedure
     prompt: str | list[BaseMessage]
-    completion: str
-    retrieved_docs: list[dict[str, str | float]]
-    context: str
+    completion: list[str]
+    retrieved_docs: list[Doc] | None
+    context: str | None
     model: BaseLanguageModel
 
 
 class ResultsLogger:
     """This object logs results to a CSV as well as a more human-readable log folder."""
-
-    _field_names: typing.ClassVar[list[str]] = []
 
     def __init__(self, path: str | os.PathLike):
         path = Path(path)
@@ -65,12 +64,14 @@ class CSVLogger:
 
     _field_names: typing.ClassVar[list[str]] = [
         "question_id",
-        "question",
-        "labeled_answer",
+        "input",
+        "output",
+        "gold_steps",
         "prompt",
-        "response",
+        "completion",
         "retrieved_docs",
         "context",
+        "model",
     ]
 
     def __init__(self, path: str | os.PathLike):
@@ -86,26 +87,27 @@ class CSVLogger:
         return self
 
     def result(self, r: Result):
-        retrieved = json.dumps(r.retrieved_docs)
         prompt = r.prompt
         if isinstance(prompt, list):
-            prompt = self._format_messages(prompt)
+            prompt = "\n\n".join(msg.content for msg in prompt)
+
+        docs = ""
+        if r.retrieved_docs:
+            docs = json.dumps([doc.json() for doc in r.retrieved_docs])
 
         self.w.writerow(
             {
                 "question_id": r.ID,
-                "question": r.prompt,
-                "labeled_answer": r.label,
-                "prompt": r.prompt,
-                "response": r.completion,
-                "retrieved_docs": retrieved,
+                "input": r.gold._input,
+                "output": r.gold.output,
+                "gold_steps": json.dumps(r.gold.steps),
+                "prompt": prompt,
+                "completion": json.dumps(r.completion),
+                "retrieved_docs": docs,
                 "context": r.context,
+                "model": r.model,
             }
         )
-
-    @staticmethod
-    def _format_messages(messages: list[BaseMessage]) -> str:
-        return "\n\n".join(msg.content for msg in messages)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.f.close()
@@ -133,16 +135,21 @@ class HumanLogger:
             if isinstance(prompt, list):
                 prompt = self._format_messages(prompt)
 
-            f.write(f"processing query '{r.query}'\n")
-            f.write(f"retrieved {len(r.retrieved_docs)} docs for query '{r.query}'\n")
-            f.write("prompt:\n")
+            f.write(f"processing query '{r.gold.output} ({r.gold._input})'\n")
+            if r.retrieved_docs:
+                f.write(f"retrieved {len(r.retrieved_docs)} docs\n")
+            f.write(f"prompt to model {type(r.model).__name__}:\n")
             f.write(textwrap.indent(prompt, "  ") + "\n")
 
-            f.write(f"BEGIN COMPLETION:\n{r.completion}\nEND COMPLETION\n")
-            f.write(f"BEGIN REFERENCE:\n{r.label}\nEND REFERENCE\n")
+            generated = Procedure(r.gold._input, r.gold.output, r.completion)
+            f.write(f"BEGIN COMPLETION:\n{generated.format_steps()}\nEND COMPLETION\n")
+            f.write(f"BEGIN REFERENCE:\n{r.gold.format_steps()}\nEND REFERENCE\n")
 
-            def count(msg: str | list[BaseMessage]) -> int:
+            def count(msg: str | list[BaseMessage] | list[str]) -> int:
                 if isinstance(msg, list):
+                    if len(msg) > 0 and isinstance(msg[0], str):
+                        return count(Procedure("", "", msg).format_steps())
+
                     return r.model.get_num_tokens_from_messages(msg)
 
                 return r.model.get_num_tokens(msg)

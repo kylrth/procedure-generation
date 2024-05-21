@@ -1,26 +1,26 @@
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from langchain.base_language import BaseLanguageModel
 from langchain.schema import BaseMessage
 
+from dataset import Doc
+
 
 @dataclass
 class Response:
-    # the query passed to the system
-    query: str
+    # answer in the form of a list of steps
+    answer: list[str]
 
     # the prompt that was sent to the LLM
     prompt: str | list[BaseMessage]
-
-    # answer to the query (e.g. completion from an LLM)
-    answer: str
 
     # the model used to generate completions
     model: BaseLanguageModel
 
     # any documents retrieved during processing
-    retrieved_docs: list[dict[str, str | float]] | None = None
+    retrieved_docs: list[Doc] | None = None
 
     # those same documents, formatted as they appear in the prompt
     context: str | None = None
@@ -31,9 +31,26 @@ class System(ABC):
     type annotations."""
 
     @abstractmethod
-    def generate(self, query: str, inp_info: str) -> Response:
-        """The output is a list of generations, in case of n > 1."""
+    def generate(self, query: str, _input: str) -> Response:
+        pass
 
     @abstractmethod
-    async def agenerate(self, query: str, inp_info: str) -> Response:
-        """The output is a list of generations, in case of n > 1."""
+    async def agenerate(self, query: str, _input: str) -> Response:
+        pass
+
+    _step_prefixes = re.compile(r"^\s*(?:\d+\.\s*|-)\s*(.*)$")
+
+    @classmethod
+    def parse_completion(cls, s: str) -> list[str]:
+        """Utility method for parsing a list of steps from text."""
+        lines = s.strip().split("\n")
+
+        steps = []
+        for line in lines:
+            m = cls._step_prefixes.match(line)
+            if m:
+                steps.append(m.group(1))
+            else:
+                steps.append(line.strip())
+
+        return steps

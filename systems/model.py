@@ -6,6 +6,8 @@ from langchain.chat_models import ChatOpenAI
 from langchain.llms import OpenAI
 from langchain.schema import AIMessage, BaseMessage, HumanMessage, SystemMessage
 
+from dataset import Doc
+
 
 @dataclass
 class ModelDetails:
@@ -71,7 +73,7 @@ class Model:
         self,
         prompt: str,
         context: str | None = None,
-        examples: list[tuple[str, str]] | None = None,
+        examples: list[Doc] | None = None,
     ) -> list[str]:
         """Generate calls the model with the prompt and returns the response text.
 
@@ -107,8 +109,8 @@ class Model:
             ...
             Human: {prompt}
         """
-        prompt = self.build_prompt(prompt, context, examples)
-        return self.generate(prompt)
+        full_prompt = self.build_prompt(prompt, context, examples)
+        return self.generate(full_prompt)
 
     def generate(self, final_prompt: str | list[BaseMessage]) -> list[str]:
         """Calls the model on the already-constructed prompt. Can be used in conjunction with
@@ -130,7 +132,7 @@ class Model:
         self,
         prompt: str,
         context: str | None = None,
-        examples: list[tuple[str, str]] | None = None,
+        examples: list[Doc] | None = None,
     ) -> str | list[BaseMessage]:
         """Builds the final prompt as described in documentation for __call__, but returns the
         constructed prompt instead of running the model.
@@ -143,7 +145,7 @@ class Model:
 
     @staticmethod
     def build_chat_prompt(
-        prompt: str, context: str | None = None, examples: list[tuple[str, str]] | None = None
+        prompt: str, context: str | None = None, examples: list[Doc] | None = None
     ) -> list[BaseMessage]:
         out = []
 
@@ -152,8 +154,8 @@ class Model:
 
         if examples:
             for example in examples:
-                out.append(HumanMessage(content=example[0]))
-                out.append(AIMessage(content=example[1]))
+                out.append(HumanMessage(content=example.title))
+                out.append(AIMessage(content=example.contents))
 
         out.append(HumanMessage(content=prompt))
 
@@ -163,7 +165,7 @@ class Model:
         self,
         prompt: str,
         context: str | None = None,
-        examples: list[tuple[str, str]] | None = None,
+        examples: list[Doc] | None = None,
     ) -> str:
         out = ""
 
@@ -172,23 +174,25 @@ class Model:
 
         if examples:
             for example in examples:
-                out += self.example_fmt.format(input=example[0], output=example[1]) + "\n\n"
+                out += (
+                    self.example_fmt.format(input=example.title, output=example.contents) + "\n\n"
+                )
 
         out += prompt + "\n"
 
         return out
 
-    def get_num_tokens(self, example: tuple[str, str]) -> int:
+    def get_num_tokens(self, example: Doc) -> int:
         """Get the number of tokens that would be used for this example, including all necessary
         formatting."""
         if self.chat:
             return self.model.get_num_tokens_from_messages(
                 [
-                    HumanMessage(content=example[0]),
-                    AIMessage(content=example[1]),
+                    HumanMessage(content=example.title),
+                    AIMessage(content=example.contents),
                 ]
             )
 
         return self.model.get_num_tokens(
-            self.example_fmt.format(input=example[0], output=example[1]) + "\n\n"
+            self.example_fmt.format(input=example.title, output=example.contents) + "\n\n"
         )
