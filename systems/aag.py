@@ -54,22 +54,22 @@ def setup_skills(
     out = store.collections.create(
         name=_skills_collection,
         description="Skills extracted from high-level documentation about LangChain.",
-        vectorizer_config=wvc.Configure.Vectorizer.text2vec_transformers(),
+        vectorizer_config=wc.Configure.Vectorizer.text2vec_transformers(),
         properties=[
-            wvc.config.Property(
+            wc.Property(
                 name="goal",
-                data_type=wvc.config.DataType.TEXT,
+                data_type=wc.DataType.TEXT,
                 description="The goal achieved by this skill",
             ),
-            wvc.config.Property(
+            wc.Property(
                 name="steps",
-                data_type=wvc.config.DataType.TEXT_ARRAY,
+                data_type=wc.DataType.TEXT_ARRAY,
                 description="The procedure to accomplish the goal, expressed as "
                 "step-by-step instructions",
             ),
-            wvc.config.Property(
+            wc.Property(
                 name="sidenote",
-                data_type=wvc.config.DataType.TEXT,
+                data_type=wc.DataType.TEXT,
                 description="Optional extra information related to this procedure",
             ),
         ],
