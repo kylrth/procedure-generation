@@ -3,6 +3,7 @@ import unittest
 from langchain.llms.fake import FakeListLLM
 from langchain.schema import AIMessage, ChatGeneration, HumanMessage, LLMResult, SystemMessage
 
+from dataset import Doc
 from systems.model import Model
 
 
@@ -49,7 +50,7 @@ class TestModel(unittest.TestCase):
         got = Model(FakeListLLM(responses=[])).build_completion_prompt(
             "Hello",
             "Please respond to the following as if you don't speak English.",
-            [("What's your name?", "Désolé, je ne parle pas anglais.")],
+            [Doc("What's your name?", "Désolé, je ne parle pas anglais.")],
         )
 
         self.assertEqual(want, got)
@@ -65,7 +66,7 @@ class TestModel(unittest.TestCase):
         got = Model.build_chat_prompt(
             "Hello",
             "Please respond to the following as if you don't speak English.",
-            [("What's your name?", "Désolé, je ne parle pas anglais.")],
+            [Doc("What's your name?", "Désolé, je ne parle pas anglais.")],
         )
 
         self.assertEqual(want, got)
