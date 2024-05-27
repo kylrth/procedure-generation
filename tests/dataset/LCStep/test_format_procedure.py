@@ -2,7 +2,7 @@
 
 import unittest
 
-from dataset import format_procedure
+from dataset.LCStep import format_procedure
 
 
 class TestFormatOutput(unittest.TestCase):
