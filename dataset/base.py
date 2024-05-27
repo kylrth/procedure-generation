@@ -58,7 +58,7 @@ def train_val_test(data: list, val: float, test: float) -> tuple[list, list, lis
 
     If you need a random grouping, shuffle beforehand.
     """
-    if val < 0.0 or test < 0.0 or val + test > 1.0:  # noqa: PLR2004  # just percentages
+    if val < 0.0 or test < 0.0 or val + test > 1.0:
         raise ValueError(f"invalid val percentage {val} or test percentage {test}")
 
     train_len = int(len(data) * (1.0 - val - test))

@@ -274,7 +274,7 @@ def scrape_langchain():
         with out_path.open("w") as f:
             f.write(doc)
 
-        time.sleep(1.5 + 2 * random.random())  # noqa: S311  # not doing cryptography
+        time.sleep(1.5 + 2 * random.random())
 
 
 if __name__ == "__main__":
