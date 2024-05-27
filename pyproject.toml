@@ -2,6 +2,9 @@
 line-length = 100
 
 [tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
 select = [
     "A",
     "B",
@@ -49,11 +52,11 @@ ignore = [
     "PLW2901",
     "PT009",
     "RET504",
+    "S311",  # we're not doing any cryptography
     "S603",
     "S607",
     "TRY003",
 ]
-line-length = 100
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 lines-after-imports = 2

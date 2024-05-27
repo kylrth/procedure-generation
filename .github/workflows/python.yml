@@ -40,7 +40,7 @@ jobs:
     - name: lint
       run: |
         black --check .
-        ruff .
+        ruff check .
     - name: test
       run: PYTHONPATH=$(pwd) pytest
 

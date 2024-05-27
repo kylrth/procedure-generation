@@ -44,10 +44,8 @@ def get_prompt_messages(few_shot_as_ex: bool) -> list[BaseMessage]:
                 out.append(HumanMessage(content=f.read().strip()))
         with (prompt_dir / "few_shot" / f"{ex}_output.txt").open() as f:
             if few_shot_as_ex:
-                add = "\n\nBEGIN EXAMPLE {exnum}\n{content}\nEND EXAMPLE {exnum}".format(
-                    content=f.read().strip(),
-                    exnum=ex + _num_examples,
-                )
+                exnum = ex + _num_examples
+                add = f"\n\nBEGIN EXAMPLE {exnum}\n{f.read().strip()}\nEND EXAMPLE {exnum}"
                 out[0].content += add
             else:
                 out.append(AIMessage(content=f.read().strip()))
