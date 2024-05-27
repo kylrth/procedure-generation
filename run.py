@@ -16,9 +16,6 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import torch
-
-torch.cuda.is_available = lambda: False  # set this before importing retrieval which loads a model
 
 import weaviate
 from weaviate.embedded import EmbeddedOptions
