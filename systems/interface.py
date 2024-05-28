@@ -2,7 +2,6 @@ import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from langchain.base_language import BaseLanguageModel
 from langchain.schema import BaseMessage
 
 from dataset import Doc
@@ -17,7 +16,10 @@ class Response:
     prompt: str | list[BaseMessage]
 
     # the model used to generate completions
-    model: BaseLanguageModel
+    model: str
+
+    input_tokens: int
+    output_tokens: int
 
     # any documents retrieved during processing
     retrieved_docs: list[Doc] | None = None

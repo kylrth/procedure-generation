@@ -42,6 +42,8 @@ class Model:
     # the number of tokens this model supports; set automatically by from_full_name
     max_tokens: int | None = None
 
+    name: str
+
     def __init__(self, model: BaseLanguageModel, chat: bool = False):
         self.model = model
         self.chat = chat
@@ -66,6 +68,7 @@ class Model:
 
         out = cls(model, details.is_chat)
         out.max_tokens = details.max_tokens
+        out.name = full_name
 
         return out
 
@@ -182,17 +185,10 @@ class Model:
 
         return out
 
-    def get_num_tokens(self, example: Doc) -> int:
+    def get_num_tokens(self, msg: str | list[BaseMessage]) -> int:
         """Get the number of tokens that would be used for this example, including all necessary
         formatting."""
-        if self.chat:
-            return self.model.get_num_tokens_from_messages(
-                [
-                    HumanMessage(content=example.title),
-                    AIMessage(content=example.contents),
-                ]
-            )
+        if isinstance(msg, list):
+            return self.model.get_num_tokens_from_messages(msg)
 
-        return self.model.get_num_tokens(
-            self.example_fmt.format(input=example.title, output=example.contents) + "\n\n"
-        )
+        return self.model.get_num_tokens(msg)

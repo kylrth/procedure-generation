@@ -48,6 +48,8 @@ async def generate_and_evaluate(
             retrieved_docs=res.retrieved_docs,
             context=res.context,
             model=res.model,
+            input_tokens=res.input_tokens,
+            output_tokens=res.output_tokens,
         )
     )
 

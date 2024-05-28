@@ -1,5 +1,7 @@
 from langchain.schema import BaseMessage
 
+from dataset import Doc
+
 from .interface import Response, System
 from .model import Model
 
@@ -14,7 +16,7 @@ class FewShot(System):
         "other than the list of steps."
     )
 
-    def __init__(self, model: Model, shots: list[tuple[str, str]] | None = None):
+    def __init__(self, model: Model, shots: list[Doc] | None = None):
         self.model = model
         self.shots = shots if shots is not None else []
 
@@ -38,7 +40,9 @@ class FewShot(System):
 
     def _make_result(self, prompt: str | list[BaseMessage], completions: list[str]):
         return Response(
-            self.parse_completion(completions[0]),
-            prompt,
-            self.model.model,
+            answer=self.parse_completion(completions[0]),
+            prompt=prompt,
+            model=self.model.name,
+            input_tokens=self.model.get_num_tokens(prompt),
+            output_tokens=sum(self.model.get_num_tokens(c) for c in completions),
         )
