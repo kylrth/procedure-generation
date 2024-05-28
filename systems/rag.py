@@ -47,7 +47,9 @@ def setup_store(
     return out
 
 
-rag_task: dict[str, str] = {
+## PROMPTS ##
+
+_prompt_task = {
     "lcstep": (
         "Please generate high-level steps to accomplish the specified goal using the LangChain "
         "Python library. Don't include code, extraneous commentary, or examples, but do refer to "
@@ -68,12 +70,12 @@ rag_task: dict[str, str] = {
         "similar problems and solutions to answer the question."
     ),
 }
-rag_ex_names: dict[str, str] = {
+_prompt_ex_names = {
     "lcstep": "DOCUMENTATION",
     "recipenlg": "RECIPE",
     "champ": "EXAMPLE",
 }
-rag_inst = {
+_prompt_inst = {
     "lcstep": (
         "Please generate a list of instructions to accomplish '{query}' using the procedures "
         "above. Create and use these resources in your response: {_input}."
@@ -157,11 +159,13 @@ class RAG(System):
     def build_context(self, docs: list[Doc]) -> str:
         out = ""
         for doc in docs:
-            out += f"\n\n{rag_ex_names[self.dataset]} '{doc.title}':\n\n{doc.contents}"
+            out += f"\n\n{_prompt_ex_names[self.dataset]} '{doc.title}':\n\n{doc.contents}"
 
         return out[2:]  # skip first "\n\n"
 
     def build_prompt(self, query: str, _input: str, context: str) -> str | list[BaseMessage]:
-        msg_prompt = context + "\n\n" + rag_inst[self.dataset].format(query=query, _input=_input)
+        msg_prompt = (
+            context + "\n\n" + _prompt_inst[self.dataset].format(query=query, _input=_input)
+        )
 
-        return self.model.build_prompt(msg_prompt, rag_task[self.dataset])
+        return self.model.build_prompt(msg_prompt, _prompt_task[self.dataset])

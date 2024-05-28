@@ -6,6 +6,20 @@ from pathlib import Path
 
 
 @dataclass
+class Doc:
+    """The base definition of a supporting document, as used across all datasets."""
+
+    title: str
+    contents: str
+
+    def json(self):
+        return {
+            "title": self.title,
+            "contents": self.contents,
+        }
+
+
+@dataclass
 class Procedure:
     """The base definition of a procedure as used across all datasets."""
 
@@ -37,19 +51,12 @@ class Procedure:
 
         return out
 
-
-@dataclass
-class Doc:
-    """The base definition of a supporting document, as used across all datasets."""
-
-    title: str
-    contents: str
-
-    def json(self):
-        return {
-            "title": self.title,
-            "contents": self.contents,
-        }
+    def to_doc(self) -> Doc:
+        """Represent the procedure as a Doc."""
+        return Doc(
+            title=self.output + " using " + self._input,
+            contents=self.format_steps(),
+        )
 
 
 def train_val_test(data: list, val: float, test: float) -> tuple[list, list, list]:
@@ -135,11 +142,6 @@ class Dataset(ABC):
 
         procedures = self.procedures(include_procedures)
         for p in procedures:
-            out.append(
-                Doc(
-                    title=p.output + " using " + p._input,
-                    contents="\n".join("- " + s for s in p.steps),
-                )
-            )
+            out.append(p.to_doc())
 
         return out
