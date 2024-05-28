@@ -72,7 +72,7 @@ def weaviate_insert(
         raise ValueError(f"{len(res.errors)} errors while inserting to Weaviate")
 
 
-_rag_cache = "./cache/data/{name}"
+_rag_cache = "./cache/vectors/{name}"
 
 
 def populate(

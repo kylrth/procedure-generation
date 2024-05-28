@@ -24,7 +24,7 @@ import dataset
 import retrieval
 from evaluation.eval import evaluate_all
 from dataset import Procedure
-from systems import Model, System, rag
+from systems import Model, System, aag, rag
 from utils import log, spread_gather
 
 
@@ -184,7 +184,7 @@ if __name__ == "__main__":
 
     logger.info("creating system...")
     model = Model.from_full_name(args.model)
-    system = args.system.lower()
+    system_name = args.system.lower()
     with weaviate.WeaviateClient(
         embedded_options=EmbeddedOptions(
             persistence_data_path=str(Path("./cache/weaviate") / dataset_name),
@@ -192,21 +192,40 @@ if __name__ == "__main__":
             additional_env_vars={"AUTOSCHEMA_ENABLED": "false", "DISABLE_TELEMETRY": "true"},
         )
     ) as client:
-        if system == "rag":
+        if system_name == "rag":
             # set up vector store with supporting docs + the train set of procedures
             logger.debug("RAG: collecting docs")
             docs = ds.docs(include_procedures=dataset.Split.TRAIN)
             logger.debug(f"RAG: collected {len(docs)} docs for vector store")
 
-            docs_store = rag.setup_store(
-                logger, client, name="Docs", desc="Documentation for the LangChain Python library."
-            )
+            client.collections.delete("Docs")
+            docs_store = rag.setup_store(logger, client, name="Docs", desc="Supporting documents")
 
-            if len(docs_store) == 0:
-                logger.info("RAG: uploading docs to Weaviate collection")
-                retrieval.populate(logger, dataset_name, docs_store, docs)
+            logger.info("RAG: uploading docs to Weaviate collection")
+            retrieval.populate(logger, system_name + "/" + dataset_name, docs_store, docs)
 
             system = rag.RAG(model, docs_store, args.k, args.dataset)
+        if system_name == "aag":
+            # set up vector store for unchunked train procedures
+            logger.debug("AAG: collecting train procedures")
+            procedures = ds.procedures(dataset.Split.TRAIN)
+            logger.debug(f"AAG: collected {len(procedures)} procedures for skill library")
+
+            # TODO we're re-using the RAG vector store code for now, which does chunking and stuff
+            client.collections.delete("Procedures")
+            proc_store = rag.setup_store(logger, client, name="Procedures", desc="Skill library")
+
+            logger.info("AAG: uploading docs to Weaviate collection")
+            retrieval.populate(
+                logger,
+                system_name + "/" + dataset_name,
+                proc_store,
+                [p.to_doc() for p in procedures],
+            )
+
+            # TODO vector store for supporting docs
+
+            system = aag.AAG(model, proc_store, args.k, args.dataset)
         else:
             raise NotImplementedError(args.system)
 

@@ -1,149 +1,43 @@
 import asyncio
-import logging
-from pathlib import Path
-from typing import Any
 
 import weaviate
-import weaviate.classes.config as wc
+import yaml
 
 import retrieval
-from dataset import Doc, Procedure
-from utils import spread_gather
+from dataset import Doc
 
 from .interface import Response, System
 from .model import Model
 
 
-with (Path(__file__).parent / "prompts/concept_skills.txt").open() as f:
-    _concept_skill_instructions = f.read().strip()
+## PROMPTS ##
 
-
-async def _get_concept_skills(model: Model, doc: str) -> list[Procedure]:
-    prompt = model.build_prompt(prompt=doc, context=_concept_skill_instructions)
-
-    res = await model.agenerate(prompt)
-
-    return [Procedure.from_text(skill.strip()) for skill in res[0].split("NEW PROCEDURE")]
-
-
-async def build_concept_skills(model: Model, concept_docs: list[dict[str, Any]]) -> list[Procedure]:
-    res = await spread_gather(
-        lambda doc: _get_concept_skills(model, doc), concept_docs, 10, len(concept_docs)
-    )
-
-    # flatten
-    return [skill for sublist in res for skill in sublist]
-
-
-_skills_collection = "Skills"
-
-
-def setup_skills(
-    logger: logging.Logger, store: weaviate.WeaviateClient, skills: list[Procedure]
-) -> weaviate.collections.Collection:
-    """Create the skill library with the provided skills as a start.
-
-    Since this collection will be updated over time, a pre-existing collection by the same name will
-    be deleted.
-    """
-    if store.collections.exists(_skills_collection):
-        logger.info("destroying existing Weaviate collection for skills")
-        store.collections.delete(_skills_collection)
-
-    logger.info("creating new Weaviate collection for skills")
-    out = store.collections.create(
-        name=_skills_collection,
-        description="Skills extracted from high-level documentation about LangChain.",
-        vectorizer_config=wc.Configure.Vectorizer.text2vec_transformers(),
-        properties=[
-            wc.Property(
-                name="goal",
-                data_type=wc.DataType.TEXT,
-                description="The goal achieved by this skill",
-            ),
-            wc.Property(
-                name="steps",
-                data_type=wc.DataType.TEXT_ARRAY,
-                description="The procedure to accomplish the goal, expressed as "
-                "step-by-step instructions",
-            ),
-            wc.Property(
-                name="sidenote",
-                data_type=wc.DataType.TEXT,
-                description="Optional extra information related to this procedure",
-            ),
-        ],
-    )
-
-    logger.info(f"uploading {len(skills)} skills to Weaviate collection")
-    retrieval.weaviate_insert(
-        logger, out, [{"goal": p.goal, "skill": p.steps, "sidenote": p.side_note} for p in skills]
-    )
-
-    return out
-
-
-_api_ref_collection = "APIRef"
-
-
-def setup_api_ref(
-    logger: logging.Logger, store: weaviate.WeaviateClient, docs: list[Doc]
-) -> weaviate.collections.Collection:
-    """Create the vector store for the API reference docs.
-
-    Expects an iterable of dicts with keys "api" and "documentation".
-    """
-    if store.collections.exists(_api_ref_collection):
-        logger.info("reusing existing Weaviate collection for API ref")
-        out = store.collections.get(_api_ref_collection)
-    else:
-        logger.info("creating new Weaviate collection for API ref")
-        out = store.collections.create(
-            name=_api_ref_collection,
-            description="API reference documentation for public methods of the LangChain Python "
-            "library.",
-            vectorizer_config=wc.Configure.Vectorizer.text2vec_transformers(),
-            properties=[
-                wc.Property(
-                    name="api",
-                    data_type=wc.DataType.TEXT,
-                    description="The full import path of a LangChain method or class",
-                ),
-                wc.Property(
-                    name="chunk",
-                    data_type=wc.DataType.INT,
-                    description="Zero-indexed chunk number in the documentation text",
-                    skip_vectorization=True,
-                    vectorize_property_name=False,
-                ),
-                wc.Property(
-                    name="documentation",
-                    data_type=wc.DataType.TEXT,
-                    description="Full Markdown documentation for the method or class",
-                ),
-            ],
-        )
-
-    if len(out) == 0:
-        logger.info(f"uploading {len(docs)} API ref chunks to Weaviate collection")
-        retrieval.weaviate_insert(logger, out, docs)
-    else:
-        logger.info(f"using old data, {len(out)} chunks")
-
-    return out
+_prompt_query_gen_inst = (
+    "Please output high-level steps to complete the task below.\n\n"
+    "Then, given this high-level solution, think carefully step by step and provide search engine "
+    "queries for knowledge that you need to refine the solution to the question.\n\n"
+    "The output should be in YAML format, with the steps listed under `steps:` and the queries "
+    "under `queries:`."
+)
+_prompt_query_gen = {
+    "lcstep": "I want to create {query} using resources like {_input}. ",
+    "recipenlg": "I want to make a {query} using {_input}. ",
+    "champ": (
+        "Given the following hints:\n\n"
+        "{_input}\n\n"
+        "I want to solve the following math problem:\n\n"
+        "{query}\n\n"
+    ),
+}
 
 
 class AAG(System):
-    store: weaviate.WeaviateClient
-    skills: weaviate.collections.Collection
-    api_ref: weaviate.collections.Collection
     model: Model
+    skills: weaviate.collections.Collection
+    k: int
+    dataset: str
 
-    def __init__(
-        self,
-        model: Model,
-        store: weaviate.WeaviateClient,
-    ):
+    def __init__(self, model: Model, skills: weaviate.collections.Collection, k: int, dataset: str):
         """Create a new AAG system that maintains the skill library in the Weaviate instance.
 
         The model will only return one result when calling generate or agenerate.
@@ -152,71 +46,60 @@ class AAG(System):
         assumed to contain the bootstrapped skills.
         """
         self.model = model
-        self.store = store
-        self.skills = store.collections.get(_skills_collection)
-        self.api_ref = store.collections.get(_api_ref_collection)
+        self.skills = skills
+        self.k = k
+        self.dataset = dataset
 
-    def generate(self, query: str, logger: logging.Logger | None = None) -> Response:
-        return asyncio.run(self.agenerate(query, logger))
+    def generate(self, query: str, _input: str) -> Response:
+        return asyncio.run(self.agenerate(query, _input))
 
-    async def agenerate(self, query: str, _: logging.Logger | None = None) -> Response:
-        # search skill library
-        skills = self.find_relevant_skills(query, 5)
+    async def agenerate(self, query: str, _input: str) -> Response:
+        queries = await self.queries_relevant_to(query, _input)
 
-        # use model to filter out irrelevant skills
-        skills = [skills[i] for i in await self.ask_relevance(query, skills)]
+        docs: list[list[Doc]] = []
+        for query in queries:
+            docs.append(self.get_docs(query))
 
-        if len(skills) == 0:
-            # if nothing was similar enough, search docs
-            procedure = await self.skill_from_docs(query)
-        elif len(skills) == 1:
-            procedure = skills[0]
-        else:
-            # ask the model to synthesize the skills into a single procedure
-            procedure = await self.merge_skills(query, skills)
+        for q in asyncio.as_completed([self.only_useful_docs(q, d) for q, d in zip(queries, docs)]):
+            useful = await q
 
-        # iteratively improve
-        while "TODO" in procedure:
-            procedure = await self.refine(query, procedure)
-
-        # review and compare with requirements
-        procedure = await self.review(query, procedure)
-
-        # store in skill library
-
-        return [procedure]
-
-    def find_relevant_skills(self, text: str, n: int) -> list[str]:
-        """Retrieve skills that are most relevant to the given text."""
-        res = self.skills.query.near_text(
-            query=text,
-            limit=n,
+    async def queries_relevant_to(self, query: str, _input: str) -> list[str]:
+        prompt = self.model.build_prompt(
+            _prompt_query_gen[self.dataset].format(query=query, _input=_input),
+            context=_prompt_query_gen_inst,
         )
 
-        return [obj.properties["data"]["Get"] for obj in res.objects]
+        # Have the model generate an output, and check that it contains the query list. If it
+        # doesn't, ask again.
+        for _ in range(3):
+            completion = (await self.model.agenerate(prompt))[0]
+            out = yaml.safe_load(completion)
 
-    def store_skill(self, skill: str):
-        """Add a new skill to the skill library."""
-        self.skills.data.insert({"skill": skill})
+            if "queries" in out and isinstance(out["queries"], list):
+                break
+        else:
+            raise ValueError("could not get good response from LLM after 3 tries")
 
-    async def ask_relevance(self, goal: str, skills: list[str]) -> list[int]:
-        """Ask the model if any of these skills are relevant enough to the given goal to consider
-        starting from for creating a procedure for the goal."""
+        return out["queries"]
 
-    async def skill_from_docs(self, goal: str) -> str:
-        """Search the docs for information related to the goal, and ask the model to create a
-        candidate procedure based on that information."""
+    def get_docs(self, query: str) -> list[Doc]:
+        """Returns the skills relevant to the query as docs.
 
-    async def merge_skills(self, goal: str, skills: list[str]) -> str:
-        """Ask the model to use these skills to generate a single procedure for the goal."""
-
-    async def refine(self, goal: str, procedure: str) -> str:
-        """Ask the model to handle a single TODO in the candidate procedure.
-
-        The model designs a retrieval query to search the skill library, API ref, or concept docs
-        in order to improve or complete the given TODO. Then, given the retrieved information, the
-        model modifies the procedure to resolve the TODO.
+        TODO this will be list[Procedures] once we build the AAG-specific vector store
         """
+        embedded_query = retrieval.get_embeds([query])[0]
 
-    async def review(self, goal: str, procedure: str) -> str:
-        """Give the model another chance to review the procedure to ensure it meets requirements."""
+        res = self.skills.query.near_vector(
+            near_vector=embedded_query.tolist(),
+            limit=self.k,
+            return_properties=["title", "contents"],
+        )
+
+        out = []
+        for obj in res.objects:
+            out.append(Doc(obj.properties["title"], obj.properties["contents"]))
+
+        return out
+
+    async def only_useful_docs(self, query: str, docs: list[Doc]) -> list[Doc]:
+        pass
