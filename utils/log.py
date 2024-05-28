@@ -7,7 +7,6 @@ import typing
 from dataclasses import dataclass
 from pathlib import Path
 
-from langchain.base_language import BaseLanguageModel
 from langchain.schema import BaseMessage
 
 from dataset import Doc, Procedure
@@ -23,7 +22,9 @@ class Result:
     completion: list[str]
     retrieved_docs: list[Doc] | None
     context: str | None
-    model: BaseLanguageModel
+    model: str
+    input_tokens: int
+    output_tokens: int
 
 
 class ResultsLogger:
@@ -64,14 +65,11 @@ class CSVLogger:
 
     _field_names: typing.ClassVar[list[str]] = [
         "question_id",
+        "model",
         "input",
         "output",
         "gold_steps",
-        "prompt",
         "completion",
-        "retrieved_docs",
-        "context",
-        "model",
     ]
 
     def __init__(self, path: str | os.PathLike):
@@ -83,29 +81,19 @@ class CSVLogger:
 
         self.f = self.path.open("w", newline="")
         self.w = csv.DictWriter(self.f, self._field_names)
+        self.w.writeheader()
 
         return self
 
     def result(self, r: Result):
-        prompt = r.prompt
-        if isinstance(prompt, list):
-            prompt = "\n\n".join(msg.content for msg in prompt)
-
-        docs = ""
-        if r.retrieved_docs:
-            docs = json.dumps([doc.json() for doc in r.retrieved_docs])
-
         self.w.writerow(
             {
                 "question_id": r.ID,
+                "model": r.model,
                 "input": r.gold._input,
                 "output": r.gold.output,
                 "gold_steps": json.dumps(r.gold.steps),
-                "prompt": prompt,
                 "completion": json.dumps(r.completion),
-                "retrieved_docs": docs,
-                "context": r.context,
-                "model": r.model,
             }
         )
 
@@ -145,16 +133,7 @@ class HumanLogger:
             f.write(f"BEGIN COMPLETION:\n{generated.format_steps()}\nEND COMPLETION\n")
             f.write(f"BEGIN REFERENCE:\n{r.gold.format_steps()}\nEND REFERENCE\n")
 
-            def count(msg: str | list[BaseMessage] | list[str]) -> int:
-                if isinstance(msg, list):
-                    if len(msg) > 0 and isinstance(msg[0], str):
-                        return count(Procedure("", "", msg).format_steps())
-
-                    return r.model.get_num_tokens_from_messages(msg)
-
-                return r.model.get_num_tokens(msg)
-
-            f.write(f"used {count(prompt)} input tokens and {count(r.completion)} output tokens\n")
+            f.write(f"used {r.input_tokens} input tokens and {r.output_tokens} output tokens\n")
 
     @staticmethod
     def _format_messages(messages: list[BaseMessage]) -> str:

@@ -113,8 +113,10 @@ class RAG(System):
 
     async def agenerate(self, query: str, _input: str) -> Response:
         out = self._prepare_result(query, _input)
+
         completion = (await self.model.agenerate(out.prompt))[0]
         out.answer = self.parse_completion(completion)
+        out.output_tokens = self.model.get_num_tokens(completion)
 
         return out
 
@@ -129,9 +131,11 @@ class RAG(System):
         return Response(
             answer=[],  # not set yet
             prompt=prompt,
-            model=self.model.model,
+            model=self.model.name,
             retrieved_docs=docs,
             context=context,
+            input_tokens=self.model.get_num_tokens(prompt),
+            output_tokens=0,  # not set yet
         )
 
     def get_docs(self, query: str) -> list[Doc]:
