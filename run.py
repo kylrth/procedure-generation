@@ -205,7 +205,7 @@ if __name__ == "__main__":
             retrieval.populate(logger, system_name + "/" + dataset_name, docs_store, docs)
 
             system = rag.RAG(model, docs_store, args.k, args.dataset)
-        if system_name == "aag":
+        elif system_name == "aag":
             # set up vector store for unchunked train procedures
             logger.debug("AAG: collecting train procedures")
             procedures = ds.procedures(dataset.Split.TRAIN)
@@ -229,7 +229,7 @@ if __name__ == "__main__":
         else:
             raise NotImplementedError(args.system)
 
-        outdir = Path("./output") / dataset_name
+        outdir = Path("./output") / system_name / dataset_name
 
         # shorten eval set according to -n
         val_data = ds.procedures(dataset.Split.VAL)

@@ -1,34 +1,15 @@
 import asyncio
+from typing import ClassVar
 
 import weaviate
 import yaml
 
 import retrieval
-from dataset import Doc
+from dataset import Doc, Procedure
 
 from .interface import Response, System
 from .model import Model
-
-
-## PROMPTS ##
-
-_prompt_query_gen_inst = (
-    "Please output high-level steps to complete the task below.\n\n"
-    "Then, given this high-level solution, think carefully step by step and provide search engine "
-    "queries for knowledge that you need to refine the solution to the question.\n\n"
-    "The output should be in YAML format, with the steps listed under `steps:` and the queries "
-    "under `queries:`."
-)
-_prompt_query_gen = {
-    "lcstep": "I want to create {query} using resources like {_input}. ",
-    "recipenlg": "I want to make a {query} using {_input}. ",
-    "champ": (
-        "Given the following hints:\n\n"
-        "{_input}\n\n"
-        "I want to solve the following math problem:\n\n"
-        "{query}\n\n"
-    ),
-}
+from .rag import _prompt_ex_names
 
 
 class AAG(System):
@@ -60,13 +41,48 @@ class AAG(System):
         for query in queries:
             docs.append(self.get_docs(query))
 
-        for q in asyncio.as_completed([self.only_useful_docs(q, d) for q, d in zip(queries, docs)]):
-            useful = await q
+        # TODO in the future try filtering
+
+        # iteratively prompt LLM with the first doc from each query, then the second ones, etc.
+        candidate: Procedure = Procedure(_input, query, [])
+        for doc_set in zip(*docs, strict=True):
+            if len(candidate.steps) == 0:
+                candidate.steps = await self.create_candidate(query, _input, doc_set)
+            else:
+                candidate.steps = await self.update_candidate(candidate, doc_set)
+
+        return Response(
+            answer=candidate.steps,
+            prompt="\n".join(queries),
+            model=self.model.name,
+            retrieved_docs=[doc for doc_set in docs for doc in doc_set],
+            context="",
+            input_tokens=-1,
+            output_tokens=-1,
+        )
+
+    _prompt_query_gen_inst: ClassVar[str] = (
+        "Please output high-level steps to complete the task below.\n\n"
+        "Then, given this high-level solution, think carefully step by step and provide search "
+        "engine queries for knowledge that you need to refine the solution to the question.\n\n"
+        "The output should be in YAML format, with the steps listed under `steps:` and the queries "
+        "under `queries:`."
+    )
+    _prompt_query_gen: ClassVar[dict[str, str]] = {
+        "lcstep": "I want to create {query} using these resources: {_input}. ",
+        "recipenlg": "I want to make a {query} using these ingredients: {_input}. ",
+        "champ": (
+            "Given the following hints:\n\n"
+            "{_input}\n\n"
+            "I want to solve the following math problem:\n\n"
+            "{query}\n\n"
+        ),
+    }
 
     async def queries_relevant_to(self, query: str, _input: str) -> list[str]:
         prompt = self.model.build_prompt(
-            _prompt_query_gen[self.dataset].format(query=query, _input=_input),
-            context=_prompt_query_gen_inst,
+            self._prompt_query_gen[self.dataset].format(query=query, _input=_input),
+            context=self._prompt_query_gen_inst,
         )
 
         # Have the model generate an output, and check that it contains the query list. If it
@@ -101,5 +117,97 @@ class AAG(System):
 
         return out
 
-    async def only_useful_docs(self, query: str, docs: list[Doc]) -> list[Doc]:
-        pass
+    def build_context(self, docs: list[Doc]) -> str:
+        out = ""
+        for doc in docs:
+            out += f"\n\n{_prompt_ex_names[self.dataset]} '{doc.title}':\n\n{doc.contents}"
+
+        return out[2:]  # skip first "\n\n"
+
+    _prompt_candidate: ClassVar[dict[str, str]] = {
+        "lcstep": (
+            "Please create a candidate step-by-step solution to use LangChain to create {query} "
+            "using these resources: {_input}. Borrow useful information from the following similar "
+            "solutions:\n\n"
+            "{procedures}\n\n"
+            "Your response should begin with '1.'."
+        ),
+        "recipenlg": (
+            "Please create a candidate step-by-step recipe for making {query} using these "
+            "ingredients: {_input}. Borrow useful information from the following similar "
+            "recipes:\n\n"
+            "{procedures}\n\n"
+            "Your response should begin with '1.'."
+        ),
+        "champ": (
+            "Given the following hints:\n\n"
+            "{_input}\n\n"
+            "I want to solve the following math problem:\n\n"
+            "{query}\n\n"
+            "Please create a candidate step-by-step solution by borrowing useful information from "
+            "the following similar solutions:\n\n"
+            "{procedures}\n\n"
+            "Your response should begin with '1.'."
+        ),
+    }
+
+    async def create_candidate(self, query: str, _input: str, docs: list[Doc]) -> list[str]:
+        prompt = self.model.build_prompt(
+            self._prompt_candidate[self.dataset].format(
+                query=query, _input=_input, procedures=self.build_context(docs)
+            )
+        )
+
+        completion = (await self.model.agenerate(prompt))[0]
+
+        return self.parse_completion(completion)
+
+    _prompt_update_candidate: ClassVar[dict[str, str]] = {
+        "lcstep": (
+            "Please update this candidate step-by-step solution to use LangChain to create {query} "
+            "using these resources: {_input}:\n\n"
+            "[BEGIN CANDIDATE]\n"
+            "{candidate}\n"
+            "[END CANDIDATE]\n\n"
+            "Borrow useful information from the following similar solutions:\n\n"
+            "{procedures}\n\n"
+            "Your response should begin with '1.'."
+        ),
+        "recipenlg": (
+            "Please update this candidate step-by-step recipe for making {query} using these "
+            "ingredients: {_input}:\n\n"
+            "[BEGIN CANDIDATE]\n"
+            "{candidate}\n"
+            "[END CANDIDATE]\n\n"
+            "Borrow useful information from the following similar recipes:\n\n"
+            "{procedures}\n\n"
+            "Your response should begin with '1.'."
+        ),
+        "champ": (
+            "Given the following hints:\n\n"
+            "{_input}\n\n"
+            "I want to solve the following math problem:\n\n"
+            "{query}\n\n"
+            "Please update this candidate step-by-step solution to do so:\n\n"
+            "[BEGIN CANDIDATE]\n"
+            "{candidate}\n"
+            "[END CANDIDATE]\n\n"
+            "Borrow useful information from the following similar solutions:\n\n"
+            "{procedures}\n\n"
+            "Your response should begin with '1.'."
+        ),
+    }
+
+    async def update_candidate(self, candidate: Procedure, docs: list[Doc]) -> list[str]:
+        prompt = self.model.build_prompt(
+            self._prompt_update_candidate[self.dataset].format(
+                query=candidate.output,
+                _input=candidate._input,
+                candidate=candidate.format_steps(),
+                procedures=self.build_context(docs),
+            )
+        )
+
+        completion = (await self.model.agenerate(prompt))[0]
+
+        return self.parse_completion(completion)
