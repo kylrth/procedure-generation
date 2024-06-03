@@ -19,11 +19,21 @@ class Doc:
         }
 
 
+def format_steps(steps: list[str]) -> str:
+    """Format steps of a procedure."""
+    out = ""
+
+    for i, step in enumerate(steps):
+        out += f"{i+1}. {step}\n"
+
+    return out
+
+
 @dataclass
 class Procedure:
     """The base definition of a procedure as used across all datasets."""
 
-    _input: str
+    input_: str
     output: str
     steps: list[str]
 
@@ -44,17 +54,12 @@ class Procedure:
 
     def format_steps(self) -> str:
         """Format just the steps of the procedure."""
-        out = ""
-
-        for i, step in enumerate(self.steps):
-            out += f"{i+1}. {step}\n"
-
-        return out
+        return format_steps(self.steps)
 
     def to_doc(self) -> Doc:
         """Represent the procedure as a Doc."""
         return Doc(
-            title=self.output + " using " + self._input,
+            title=self.output + " using " + self.input_,
             contents=self.format_steps(),
         )
 

@@ -6,7 +6,7 @@ Procedures are defined like this:
 
 ```python
 class Procedure:
-    _input: str
+    input_: str
     output: str
     steps: list[str]
 ```
@@ -21,7 +21,7 @@ See [dataset/RecipeNLG/README.md](dataset/RecipeNLG/README.md) for details on pr
 
 ```python
 recipe = Procedure(
-    _input="flour, milk, eggs, vanilla, sugar",
+    input_="flour, milk, eggs, vanilla, sugar",
     output="crèpe",
     steps=[
         "set the skillet to medium heat",
@@ -38,7 +38,7 @@ We have created a dataset called LCStep containing LangChain tutorials condensed
 
 ```python
 tut = Procedure(
-      _input="dataset of Wikipedia articles",
+      input_="dataset of Wikipedia articles",
       output="question-answering RAG system",
       steps=[
           "instantiate a model such as langchain.llms.OpenAI",
@@ -55,7 +55,7 @@ tut = Procedure(
 
 ```python
 solution = Procedure(
-    _input="word problem",
+    input_="word problem",
     output="answer",
     steps=[
         "We know that the train is traveling at 40km/h...",

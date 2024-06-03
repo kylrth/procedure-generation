@@ -2,7 +2,6 @@
 # This script needs to print.
 # ruff: noqa: I001, E402  # need to shut up before importing langchain
 
-import os
 import shutup
 
 shutup.please()
@@ -11,89 +10,46 @@ import argparse
 import asyncio
 import logging
 import sys
-from collections import defaultdict
 from pathlib import Path
-from typing import Any
-
-import numpy as np
 
 import weaviate
 from weaviate.embedded import EmbeddedOptions
 
 import dataset
 import retrieval
-from evaluation.eval import evaluate_all
 from dataset import Procedure
 from systems import Model, System, aag, rag
 from utils import log, spread_gather
 
 
-async def generate_and_evaluate(
-    model: System, item: tuple[int, Procedure], logger: log.ResultsLogger
-) -> tuple[int, dict[str, Any]]:
-    """Generate a procedure for this item with the model, and then evaluate it.
-
-    Returns the item ID and the scores for each metric on each generated answer.
-    """
-    _id, p = item
-
-    res = await model.agenerate(p.output, p._input)
-
-    logger.result(
-        log.Result(
-            ID=_id,
-            gold=p,
-            prompt=res.prompt,
-            completion=res.answer,
-            retrieved_docs=res.retrieved_docs,
-            context=res.context,
-            model=res.model,
-            input_tokens=res.input_tokens,
-            output_tokens=res.output_tokens,
-        )
-    )
-
-    try:
-        evals = await evaluate_all(res.answer, p, logger)
-        logger.evaluation(_id, evals)
-    except Exception:
-        logger.exception(_id, "exception during evaluation")
-        evals = {}
-
-    return _id, evals
-
-
-async def evaluate(
-    outdir: str | os.PathLike, model: System, data: list[Procedure], n_workers: int = 10
+async def generate_and_record(
+    logger: logging.Logger,
+    csv: log.CSVLogger,
+    human: log.HumanLogger,
+    model: System,
+    id_: int,
+    p: Procedure,
 ):
-    """Evaluate the system with the given text generation dataset."""
-    with log.ResultsLogger(outdir) as logger:
-        results = await spread_gather(
-            lambda prompt: generate_and_evaluate(model, prompt, logger),
-            enumerate(data),
-            n_workers,
-            len(data),
-        )
-
-    # collect results
-    scores = defaultdict(list)
-    broken = []
-    for _id, evals in results:
-        # if there was an issue
-        if len(evals) == 0:
-            broken.append(_id)
-            continue
-        # collect all scores of a metric
-        for metric, value in evals.items():
-            scores[metric].append(value)
-
-    # average the results
-    for metric, score in scores.items():
-        avg = np.round(np.mean(score), 3)
-        print(f"{metric}: {avg}")
-
-    if broken:
-        print("\nno evaluation results for these IDs:", " ".join(str(i) for i in broken))
+    """Generate a procedure for this item with the model, and log the result."""
+    with human.for_id(id_) as hlog:
+        try:
+            hlog.write(f"processing query '{p.output} ({p.input_})'\n")
+            res = await model.agenerate(hlog, p.output, p.input_)
+            csv.result(
+                log.Result(
+                    ID=id_,
+                    model=res.model,
+                    gold=p,
+                    completion=res.answer,
+                )
+            )
+            hlog.write(f"BEGIN COMPLETION:\n{dataset.format_steps(res.answer)}\nEND COMPLETION\n")
+            hlog.write(f"BEGIN REFERENCE:\n{p.format_steps()}\nEND REFERENCE\n")
+            if res.input_tokens != -1 or res.output_tokens != -1:
+                hlog.write(f"used {res.input_tokens} input and {res.output_tokens} output tokens\n")
+        except Exception:  # noqa: BLE001  # logging the exception for tracing purposes
+            hlog.write(f"EXCEPTION for id {id_}: {sys.exc_info()}\n")
+            logger.error(f"exception for {id_}; see {id_}.log for details\n")  # noqa: TRY400
 
 
 def int_leq(v: int):
@@ -237,5 +193,15 @@ if __name__ == "__main__":
         val_data = val_data[:n]
         logger.info(f"loaded {len(val_data)} eval examples")
 
-        logger.info("starting evaluation...")
-        asyncio.run(evaluate(outdir, system, val_data, min(args.workers, n)))
+        human = log.HumanLogger(outdir)
+        logger.info("starting generation...")
+
+        with log.CSVLogger(outdir / "output.csv") as csv:
+            asyncio.run(
+                spread_gather(
+                    lambda item: generate_and_record(logger, csv, human, system, *item),
+                    enumerate(val_data),
+                    min(args.workers, n),
+                    len(val_data),
+                )
+            )

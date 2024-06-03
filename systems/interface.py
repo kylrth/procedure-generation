@@ -2,9 +2,7 @@ import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from langchain.schema import BaseMessage
-
-from dataset import Doc
+from utils import log
 
 
 @dataclass
@@ -12,20 +10,11 @@ class Response:
     # answer in the form of a list of steps
     answer: list[str]
 
-    # the prompt that was sent to the LLM
-    prompt: str | list[BaseMessage]
-
     # the model used to generate completions
     model: str
 
-    input_tokens: int
-    output_tokens: int
-
-    # any documents retrieved during processing
-    retrieved_docs: list[Doc] | None = None
-
-    # those same documents, formatted as they appear in the prompt
-    context: str | None = None
+    input_tokens: int = -1
+    output_tokens: int = -1
 
 
 class System(ABC):
@@ -33,11 +22,11 @@ class System(ABC):
     type annotations."""
 
     @abstractmethod
-    def generate(self, query: str, _input: str) -> Response:
+    def generate(self, logger: log.InstanceLogger, query: str, input_: str) -> Response:
         pass
 
     @abstractmethod
-    async def agenerate(self, query: str, _input: str) -> Response:
+    async def agenerate(self, logger: log.InstanceLogger, query: str, input_: str) -> Response:
         pass
 
     _step_prefixes = re.compile(r"^\s*(?:\d+\.\s*|-)\s*(.*)$")

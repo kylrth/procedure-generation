@@ -1,4 +1,5 @@
 import asyncio
+import textwrap
 from typing import ClassVar
 
 import weaviate
@@ -6,10 +7,11 @@ import yaml
 
 import retrieval
 from dataset import Doc, Procedure
+from utils import log
 
 from .interface import Response, System
 from .model import Model
-from .rag import _prompt_ex_names
+from .rag import RAG
 
 
 class AAG(System):
@@ -31,34 +33,39 @@ class AAG(System):
         self.k = k
         self.dataset = dataset
 
-    def generate(self, query: str, _input: str) -> Response:
-        return asyncio.run(self.agenerate(query, _input))
+    def generate(self, logger: log.InstanceLogger, query: str, input_: str) -> Response:
+        return asyncio.run(self.agenerate(logger, query, input_))
 
-    async def agenerate(self, query: str, _input: str) -> Response:
-        queries = await self.queries_relevant_to(query, _input)
+    async def agenerate(self, logger: log.InstanceLogger, query: str, input_: str) -> Response:
+        queries = await self.queries_relevant_to(query, input_)
 
         docs: list[list[Doc]] = []
         for query in queries:
             docs.append(self.get_docs(query))
 
+        logger.write(f"got {len(queries)} search queries from {self.model.name}:\n")
+        for i, q in enumerate(queries):
+            logger.write(f"- {q}\n")
+            for doc in docs[i]:
+                logger.write(f"  - {doc.title}\n")
+
         # TODO in the future try filtering
 
         # iteratively prompt LLM with the first doc from each query, then the second ones, etc.
-        candidate: Procedure = Procedure(_input, query, [])
-        for doc_set in zip(*docs, strict=True):
+        candidate: Procedure = Procedure(input_, query, [])
+        for i, doc_set in enumerate(zip(*docs, strict=True)):
             if len(candidate.steps) == 0:
-                candidate.steps = await self.create_candidate(query, _input, doc_set)
+                candidate.steps = await self.create_candidate(query, input_, doc_set)
             else:
                 candidate.steps = await self.update_candidate(candidate, doc_set)
 
+            logger.write(f"candidate steps after looking at docs for query '{queries[i]}':\n")
+            logger.write(textwrap.indent(candidate.format_steps(), "  ") + "\n")
+
         return Response(
             answer=candidate.steps,
-            prompt="\n".join(queries),
             model=self.model.name,
-            retrieved_docs=[doc for doc_set in docs for doc in doc_set],
-            context="",
-            input_tokens=-1,
-            output_tokens=-1,
+            # TODO token counts
         )
 
     _prompt_query_gen_inst: ClassVar[str] = (
@@ -69,19 +76,19 @@ class AAG(System):
         "under `queries:`."
     )
     _prompt_query_gen: ClassVar[dict[str, str]] = {
-        "lcstep": "I want to create {query} using these resources: {_input}. ",
-        "recipenlg": "I want to make a {query} using these ingredients: {_input}. ",
+        "lcstep": "I want to create {query} using these resources: {input_}. ",
+        "recipenlg": "I want to make a {query} using these ingredients: {input_}. ",
         "champ": (
             "Given the following hints:\n\n"
-            "{_input}\n\n"
+            "{input_}\n\n"
             "I want to solve the following math problem:\n\n"
             "{query}\n\n"
         ),
     }
 
-    async def queries_relevant_to(self, query: str, _input: str) -> list[str]:
+    async def queries_relevant_to(self, query: str, input_: str) -> list[str]:
         prompt = self.model.build_prompt(
-            self._prompt_query_gen[self.dataset].format(query=query, _input=_input),
+            self._prompt_query_gen[self.dataset].format(query=query, input_=input_),
             context=self._prompt_query_gen_inst,
         )
 
@@ -120,28 +127,28 @@ class AAG(System):
     def build_context(self, docs: list[Doc]) -> str:
         out = ""
         for doc in docs:
-            out += f"\n\n{_prompt_ex_names[self.dataset]} '{doc.title}':\n\n{doc.contents}"
+            out += f"\n\n{RAG._example_name[self.dataset]} '{doc.title}':\n\n{doc.contents}"
 
         return out[2:]  # skip first "\n\n"
 
     _prompt_candidate: ClassVar[dict[str, str]] = {
         "lcstep": (
             "Please create a candidate step-by-step solution to use LangChain to create {query} "
-            "using these resources: {_input}. Borrow useful information from the following similar "
+            "using these resources: {input_}. Borrow useful information from the following similar "
             "solutions:\n\n"
             "{procedures}\n\n"
             "Your response should begin with '1.'."
         ),
         "recipenlg": (
             "Please create a candidate step-by-step recipe for making {query} using these "
-            "ingredients: {_input}. Borrow useful information from the following similar "
+            "ingredients: {input_}. Borrow useful information from the following similar "
             "recipes:\n\n"
             "{procedures}\n\n"
             "Your response should begin with '1.'."
         ),
         "champ": (
             "Given the following hints:\n\n"
-            "{_input}\n\n"
+            "{input_}\n\n"
             "I want to solve the following math problem:\n\n"
             "{query}\n\n"
             "Please create a candidate step-by-step solution by borrowing useful information from "
@@ -151,10 +158,10 @@ class AAG(System):
         ),
     }
 
-    async def create_candidate(self, query: str, _input: str, docs: list[Doc]) -> list[str]:
+    async def create_candidate(self, query: str, input_: str, docs: list[Doc]) -> list[str]:
         prompt = self.model.build_prompt(
             self._prompt_candidate[self.dataset].format(
-                query=query, _input=_input, procedures=self.build_context(docs)
+                query=query, input_=input_, procedures=self.build_context(docs)
             )
         )
 
@@ -165,7 +172,7 @@ class AAG(System):
     _prompt_update_candidate: ClassVar[dict[str, str]] = {
         "lcstep": (
             "Please update this candidate step-by-step solution to use LangChain to create {query} "
-            "using these resources: {_input}:\n\n"
+            "using these resources: {input_}:\n\n"
             "[BEGIN CANDIDATE]\n"
             "{candidate}\n"
             "[END CANDIDATE]\n\n"
@@ -175,7 +182,7 @@ class AAG(System):
         ),
         "recipenlg": (
             "Please update this candidate step-by-step recipe for making {query} using these "
-            "ingredients: {_input}:\n\n"
+            "ingredients: {input_}:\n\n"
             "[BEGIN CANDIDATE]\n"
             "{candidate}\n"
             "[END CANDIDATE]\n\n"
@@ -185,7 +192,7 @@ class AAG(System):
         ),
         "champ": (
             "Given the following hints:\n\n"
-            "{_input}\n\n"
+            "{input_}\n\n"
             "I want to solve the following math problem:\n\n"
             "{query}\n\n"
             "Please update this candidate step-by-step solution to do so:\n\n"
@@ -202,7 +209,7 @@ class AAG(System):
         prompt = self.model.build_prompt(
             self._prompt_update_candidate[self.dataset].format(
                 query=candidate.output,
-                _input=candidate._input,
+                input_=candidate.input_,
                 candidate=candidate.format_steps(),
                 procedures=self.build_context(docs),
             )
