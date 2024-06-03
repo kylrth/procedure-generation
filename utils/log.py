@@ -1,71 +1,31 @@
 import csv
+import io
 import json
 import os
-import sys
-import textwrap
-import typing
 from dataclasses import dataclass
 from pathlib import Path
+from typing import ClassVar, TypeAlias
 
 from langchain.schema import BaseMessage
 
-from dataset import Doc, Procedure
+from dataset import Procedure
 
 
 @dataclass
 class Result:
-    """A structured object containing the information to log for a generated response to a query."""
+    """A structured object containing the results for a particular system generation."""
 
     ID: int
-    gold: Procedure
-    prompt: str | list[BaseMessage]
-    completion: list[str]
-    retrieved_docs: list[Doc] | None
-    context: str | None
     model: str
-    input_tokens: int
-    output_tokens: int
-
-
-class ResultsLogger:
-    """This object logs results to a CSV as well as a more human-readable log folder."""
-
-    def __init__(self, path: str | os.PathLike):
-        path = Path(path)
-        csv_path = path / "output.csv"
-        folder_path = path / "logs"
-
-        self.csv = CSVLogger(csv_path)
-        self.human = HumanLogger(folder_path)
-
-    def __enter__(self):
-        self.csv.__enter__()
-
-        return self
-
-    def result(self, r: Result):
-        """Log the response(s) generated for a particular item."""
-        self.csv.result(r)
-        self.human.result(r)
-
-    def exception(self, _id: int, msg: str):
-        """Log an exception encountered while working on a particular item."""
-        self.human.exception(_id, msg)
-
-    def evaluation(self, _id: int, scores: dict[str, typing.Any]):
-        """Log evaluation results for a particular item."""
-        self.human.evaluation(_id, scores)
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        return self.csv.__exit__(exc_type, exc_val, exc_tb)
+    gold: Procedure
+    completion: list[str]
 
 
 class CSVLogger:
-    """This object logs results to a CSV."""
+    """This object logs results to a CSV, for later evaluation."""
 
-    _field_names: typing.ClassVar[list[str]] = [
+    _field_names: ClassVar[list[str]] = [
         "question_id",
-        "model",
         "input",
         "output",
         "gold_steps",
@@ -89,8 +49,7 @@ class CSVLogger:
         self.w.writerow(
             {
                 "question_id": r.ID,
-                "model": r.model,
-                "input": r.gold._input,
+                "input": r.gold.input_,
                 "output": r.gold.output,
                 "gold_steps": json.dumps(r.gold.steps),
                 "completion": json.dumps(r.completion),
@@ -103,53 +62,34 @@ class CSVLogger:
         return False
 
 
-class HumanLogger:
-    """This object logs results to a human-readable log folder, along with any details of exceptions
-    encountered."""
+# for logging while generating results for a particular instance
+InstanceLogger: TypeAlias = io.TextIOWrapper
 
-    def __init__(self, path: str | os.PathLike):
-        self.path = Path(path)
+
+class HumanLogger:
+    """This object logs results to a human-readable log folder, with separate files for each
+    instance."""
+
+    def __init__(self, parent_path: str | os.PathLike):
+        self.path = Path(parent_path)
         try:
             self.path.mkdir(parents=True)
         except FileExistsError as e:
             raise FileExistsError(f"log folder '{self.path}' already exists") from e
 
-    def _get_log_path(self, _id: int) -> Path:
-        return self.path / f"{_id}.log"
+    def for_id(self, id_: int) -> InstanceLogger:
+        """Return a logger for the specified example ID."""
+        return (self.path / f"{id_}.log").open("w")
 
-    def result(self, r: Result):
-        with self._get_log_path(r.ID).open("w") as f:
-            prompt = r.prompt
-            if isinstance(prompt, list):
-                prompt = self._format_messages(prompt)
 
-            f.write(f"processing query '{r.gold.output} ({r.gold._input})'\n")
-            if r.retrieved_docs:
-                f.write(f"retrieved {len(r.retrieved_docs)} docs\n")
-            f.write(f"prompt to model {type(r.model).__name__}:\n")
-            f.write(textwrap.indent(prompt, "  ") + "\n")
+def messages_to_string(messages: str | list[BaseMessage]) -> str:
+    """Convert what might be a list of chat messages into a loggable string."""
+    if isinstance(messages, str):
+        return messages
 
-            generated = Procedure(r.gold._input, r.gold.output, r.completion)
-            f.write(f"BEGIN COMPLETION:\n{generated.format_steps()}\nEND COMPLETION\n")
-            f.write(f"BEGIN REFERENCE:\n{r.gold.format_steps()}\nEND REFERENCE\n")
+    def _format(msg: BaseMessage) -> str:
+        if "\n" not in msg.content:
+            return msg.__class__.__name__ + "(" + msg.content + ")"
+        return msg.__class__.__name__ + "(\n  " + msg.content.replace("\n", "\n  ") + "\n)"
 
-            f.write(f"used {r.input_tokens} input tokens and {r.output_tokens} output tokens\n")
-
-    @staticmethod
-    def _format_messages(messages: list[BaseMessage]) -> str:
-        def _format(msg: BaseMessage) -> str:
-            if "\n" not in msg.content:
-                return msg.__class__.__name__ + "(" + msg.content + ")"
-            return msg.__class__.__name__ + "(\n  " + msg.content.replace("\n", "\n  ") + "\n)"
-
-        return "\n".join(_format(msg) for msg in messages)
-
-    def exception(self, _id: int, msg: str):
-        with self._get_log_path(_id).open("a+") as f:
-            f.write(f"{msg}: {sys.exc_info()}\n")
-
-    def evaluation(self, _id: int, scores: dict[str, typing.Any]):
-        with self._get_log_path(_id).open("a+") as f:
-            f.write("EVALUATION:\n")
-            for metric in scores:
-                f.write(f"  {metric}: {scores[metric]}\n")
+    return "\n".join(_format(msg) for msg in messages)

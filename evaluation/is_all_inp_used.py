@@ -7,10 +7,10 @@ from systems import Model
 
 
 def lcstep_all_resources_used(gold: Procedure, generated: str):
-    if gold._input == "":
+    if gold.input_ == "":
         return 1
 
-    resource_str = gold._input
+    resource_str = gold.input_
     resource_str_list = resource_str.split(",")
 
     filtered_sentence = []
@@ -35,7 +35,7 @@ def lcstep_all_resources_used(gold: Procedure, generated: str):
 
 
 def recipenlg_all_ingredients_used(model: Model, gold: Procedure, generated: str):
-    ing_list = gold._input
+    ing_list = gold.input_
     prompt = [
         SystemMessage(
             content=(

@@ -12,7 +12,7 @@ from .base import Dataset, Doc, Procedure
 
 def recipe_to_procedure(d: dict[str, Any]) -> Procedure:
     return Procedure(
-        _input=", ".join(json.loads(d["ingredients"])),
+        input_=", ".join(json.loads(d["ingredients"])),
         output=d["title"],
         steps=json.loads(d["directions"]),
     )
