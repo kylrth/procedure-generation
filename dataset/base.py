@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from enum import Enum
 from os import PathLike
 from pathlib import Path
-
+from typing import Any
 
 @dataclass
 class Doc:
@@ -62,6 +62,18 @@ class Procedure:
             title=self.output + " using " + self.input_,
             contents=self.format_steps(),
         )
+    
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Returns the procedure as a dictionary
+        """
+        proc_dict = {
+            "input": self._input,
+            "output": self.output,
+            "steps": self.steps
+        }
+        
+        return proc_dict
 
 
 def train_val_test(data: list, val: float, test: float) -> tuple[list, list, list]:

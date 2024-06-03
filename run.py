@@ -103,6 +103,13 @@ if __name__ == "__main__":
         help="full name of service & model to use",
     )
     parser.add_argument(
+        "-em",
+        "--embedder",
+        type=str,
+        default="hf-all-mpnet-base-v2",
+        help="full name of service & model to use for embeddings",
+    )
+    parser.add_argument(
         "-n", type=int, default=sys.maxsize, help="limit the number of samples to test"
     )
     parser.add_argument(
@@ -155,12 +162,18 @@ if __name__ == "__main__":
             logger.debug(f"RAG: collected {len(docs)} docs for vector store")
 
             client.collections.delete("Docs")
-            docs_store = rag.setup_store(logger, client, name="Docs", desc="Supporting documents")
 
-            logger.info("RAG: uploading docs to Weaviate collection")
-            retrieval.populate(logger, system_name + "/" + dataset_name, docs_store, docs)
+            logger.info("RAG: Creating collection and uploading docs to Weaviate collection")
 
-            system = rag.RAG(model, docs_store, args.k, args.dataset)
+            store_obj = retrieval.Doc_store(
+                client,
+                "Docs",
+                "Supporting Documents",
+                system_name + "/" + dataset_name + "/" + args.embedder,
+                args.embedder,
+            )
+            _ = store_obj.populate(logger, docs)
+            system = rag.RAG(model, store_obj, args.k, args.dataset)
         elif system_name == "aag":
             # set up vector store for unchunked train procedures
             logger.debug("AAG: collecting train procedures")
@@ -169,19 +182,18 @@ if __name__ == "__main__":
 
             # TODO we're re-using the RAG vector store code for now, which does chunking and stuff
             client.collections.delete("Procedures")
-            proc_store = rag.setup_store(logger, client, name="Procedures", desc="Skill library")
-
-            logger.info("AAG: uploading docs to Weaviate collection")
-            retrieval.populate(
-                logger,
-                system_name + "/" + dataset_name,
-                proc_store,
-                [p.to_doc() for p in procedures],
+            store_obj = retrieval.Procedure_store(
+                client,
+                "Procedures",
+                "Supporting Procedures",
+                system_name + "/" + dataset_name + "/" + args.embedder,
+                args.embedder,
             )
 
-            # TODO vector store for supporting docs
+            logger.info("AAG: Creating collection and uploading docs to Weaviate collection")
+            _ = store_obj.populate(logger, procedures)
 
-            system = aag.AAG(model, proc_store, args.k, args.dataset)
+            system = aag.AAG(model, store_obj, args.k, args.dataset)
         else:
             raise NotImplementedError(args.system)
 

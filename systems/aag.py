@@ -6,6 +6,7 @@ import weaviate
 import yaml
 
 import retrieval
+from retrieval import Procedure_store
 from dataset import Doc, Procedure
 from utils import log
 
@@ -13,14 +14,13 @@ from .interface import Response, System
 from .model import Model
 from .rag import RAG
 
-
 class AAG(System):
     model: Model
-    skills: weaviate.collections.Collection
+    skills: Procedure_store
     k: int
     dataset: str
 
-    def __init__(self, model: Model, skills: weaviate.collections.Collection, k: int, dataset: str):
+    def __init__(self, model: Model, skills: Procedure_store, k: int, dataset: str):
         """Create a new AAG system that maintains the skill library in the Weaviate instance.
 
         The model will only return one result when calling generate or agenerate.
@@ -41,7 +41,7 @@ class AAG(System):
 
         docs: list[list[Doc]] = []
         for query in queries:
-            docs.append(self.get_docs(query))
+            docs.append(self.skills.get_docs(query))
 
         logger.write(f"got {len(queries)} search queries from {self.model.name}:\n")
         for i, q in enumerate(queries):
@@ -104,25 +104,6 @@ class AAG(System):
             raise ValueError("could not get good response from LLM after 3 tries")
 
         return out["queries"]
-
-    def get_docs(self, query: str) -> list[Doc]:
-        """Returns the skills relevant to the query as docs.
-
-        TODO this will be list[Procedures] once we build the AAG-specific vector store
-        """
-        embedded_query = retrieval.get_embeds([query])[0]
-
-        res = self.skills.query.near_vector(
-            near_vector=embedded_query.tolist(),
-            limit=self.k,
-            return_properties=["title", "contents"],
-        )
-
-        out = []
-        for obj in res.objects:
-            out.append(Doc(obj.properties["title"], obj.properties["contents"]))
-
-        return out
 
     def build_context(self, docs: list[Doc]) -> str:
         out = ""
