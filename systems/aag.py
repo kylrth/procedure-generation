@@ -1,26 +1,24 @@
-import asyncio
 import textwrap
 from typing import ClassVar
 
-import weaviate
 import yaml
 
-import retrieval
-from retrieval import Procedure_store
-from dataset import Doc, Procedure
+from dataset import Procedure
+from retrieval import ProcedureStore
 from utils import log
 
 from .interface import Response, System
 from .model import Model
 from .rag import RAG
 
+
 class AAG(System):
     model: Model
-    skills: Procedure_store
+    skills: ProcedureStore
     k: int
     dataset: str
 
-    def __init__(self, model: Model, skills: Procedure_store, k: int, dataset: str):
+    def __init__(self, model: Model, skills: ProcedureStore, k: int, dataset: str):
         """Create a new AAG system that maintains the skill library in the Weaviate instance.
 
         The model will only return one result when calling generate or agenerate.
@@ -33,33 +31,33 @@ class AAG(System):
         self.k = k
         self.dataset = dataset
 
-    def generate(self, logger: log.InstanceLogger, query: str, input_: str) -> Response:
-        return asyncio.run(self.agenerate(logger, query, input_))
-
-    async def agenerate(self, logger: log.InstanceLogger, query: str, input_: str) -> Response:
+    async def generate(self, logger: log.InstanceLogger, query: str, input_: str) -> Response:
         queries = await self.queries_relevant_to(query, input_)
 
-        docs: list[list[Doc]] = []
+        procs: list[list[Procedure]] = []
         for query in queries:
-            docs.append(self.skills.get_docs(query))
+            procs.append(await self.skills.search(query, self.k))
 
         logger.write(f"got {len(queries)} search queries from {self.model.name}:\n")
         for i, q in enumerate(queries):
             logger.write(f"- {q}\n")
-            for doc in docs[i]:
-                logger.write(f"  - {doc.title}\n")
+            for p in procs[i]:
+                logger.write(f"  - {p.output}\n")
 
         # TODO in the future try filtering
 
-        # iteratively prompt LLM with the first doc from each query, then the second ones, etc.
+        # iteratively prompt LLM with the first procedure from each query, then the second ones,
+        # etc.
         candidate: Procedure = Procedure(input_, query, [])
-        for i, doc_set in enumerate(zip(*docs, strict=True)):
+        for i, proc_set in enumerate(zip(*procs, strict=True)):
             if len(candidate.steps) == 0:
-                candidate.steps = await self.create_candidate(query, input_, doc_set)
+                candidate.steps = await self.create_candidate(query, input_, proc_set)
             else:
-                candidate.steps = await self.update_candidate(candidate, doc_set)
+                candidate.steps = await self.update_candidate(candidate, proc_set)
 
-            logger.write(f"candidate steps after looking at docs for query '{queries[i]}':\n")
+            logger.write(
+                f"candidate after looking at the {i + 1}th closest procedures for each query:\n"
+            )
             logger.write(textwrap.indent(candidate.format_steps(), "  ") + "\n")
 
         return Response(
@@ -105,10 +103,11 @@ class AAG(System):
 
         return out["queries"]
 
-    def build_context(self, docs: list[Doc]) -> str:
+    def build_context(self, procs: list[Procedure]) -> str:
         out = ""
-        for doc in docs:
-            out += f"\n\n{RAG._example_name[self.dataset]} '{doc.title}':\n\n{doc.contents}"
+        for p in procs:
+            out += f"\n\n{RAG._example_name[self.dataset]} '{p.output}' using {p.input_}:\n\n"
+            out += p.format_steps()
 
         return out[2:]  # skip first "\n\n"
 
@@ -139,10 +138,10 @@ class AAG(System):
         ),
     }
 
-    async def create_candidate(self, query: str, input_: str, docs: list[Doc]) -> list[str]:
+    async def create_candidate(self, query: str, input_: str, procs: list[Procedure]) -> list[str]:
         prompt = self.model.build_prompt(
             self._prompt_candidate[self.dataset].format(
-                query=query, input_=input_, procedures=self.build_context(docs)
+                query=query, input_=input_, procedures=self.build_context(procs)
             )
         )
 
@@ -186,13 +185,13 @@ class AAG(System):
         ),
     }
 
-    async def update_candidate(self, candidate: Procedure, docs: list[Doc]) -> list[str]:
+    async def update_candidate(self, candidate: Procedure, procs: list[Procedure]) -> list[str]:
         prompt = self.model.build_prompt(
             self._prompt_update_candidate[self.dataset].format(
                 query=candidate.output,
                 input_=candidate.input_,
                 candidate=candidate.format_steps(),
-                procedures=self.build_context(docs),
+                procedures=self.build_context(procs),
             )
         )
 

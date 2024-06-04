@@ -21,14 +21,8 @@ class FewShot(System):
         self.dataset = dataset
         self.shots = shots if shots is not None else []
 
-    def generate(self, logger: log.InstanceLogger, query: str, input_: str) -> Response:
-        prompt = self.build_prompt(logger, query, input_)
-        completion = self.model.generate(prompt)[0]
-
-        return self._make_result(prompt, completion)
-
-    async def agenerate(self, logger: log.InstanceLogger, query: str, input_: str) -> Response:
-        prompt = self.build_prompt(logger, query, input_)
+    async def generate(self, logger: log.InstanceLogger, query: str, input_: str) -> Response:
+        prompt = await self.build_prompt(logger, query, input_)
         completion = (await self.model.agenerate(prompt))[0]
 
         return self._make_result(prompt, completion)
@@ -56,7 +50,8 @@ class FewShot(System):
         ),
     }
 
-    def build_prompt(
+    # This function is async so that RAG can inherit and override it
+    async def build_prompt(
         self, logger: log.InstanceLogger, query: str, input_: str
     ) -> str | list[BaseMessage]:
         out = self.model.build_prompt(

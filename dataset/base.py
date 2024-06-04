@@ -5,6 +5,7 @@ from os import PathLike
 from pathlib import Path
 from typing import Any
 
+
 @dataclass
 class Doc:
     """The base definition of a supporting document, as used across all datasets."""
@@ -37,21 +38,6 @@ class Procedure:
     output: str
     steps: list[str]
 
-    def fmt(self, side_note: str = "") -> str:
-        """Format the text of a procedure.
-
-        `goal` and `side_note` are optional and ignored if empty.
-        """
-        # allow blank goal if formatting just steps
-        out = "Goal: " + self.output + "\n\n" if self.output else ""
-
-        out += self.format_steps()
-
-        if side_note:
-            out += "\nSide note: " + side_note + "\n"
-
-        return out
-
     def format_steps(self) -> str:
         """Format just the steps of the procedure."""
         return format_steps(self.steps)
@@ -62,18 +48,14 @@ class Procedure:
             title=self.output + " using " + self.input_,
             contents=self.format_steps(),
         )
-    
+
     def to_dict(self) -> dict[str, Any]:
-        """
-        Returns the procedure as a dictionary
-        """
-        proc_dict = {
-            "input": self._input,
+        """Return the procedure as a dictionary."""
+        return {
+            "input": self.input_,
             "output": self.output,
-            "steps": self.steps
+            "steps": self.steps,
         }
-        
-        return proc_dict
 
 
 def train_val_test(data: list, val: float, test: float) -> tuple[list, list, list]:

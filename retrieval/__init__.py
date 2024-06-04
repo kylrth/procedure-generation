@@ -1,7 +1,11 @@
+from .doc_store import DocStore
+from .procedure_store import ProcedureStore, procedure_formatter_for
 from .store import Store
-from .doc_store import Doc_store
-from .procedure_store import Procedure_store
 
-__all__ = ["Store",
-           "Doc_store",
-           "Procedure_store"]
+
+__all__ = [
+    "Store",
+    "DocStore",
+    "ProcedureStore",
+    "procedure_formatter_for",
+]

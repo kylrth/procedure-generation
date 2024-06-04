@@ -34,7 +34,7 @@ async def generate_and_record(
     with human.for_id(id_) as hlog:
         try:
             hlog.write(f"processing query '{p.output} ({p.input_})'\n")
-            res = await model.agenerate(hlog, p.output, p.input_)
+            res = await model.generate(hlog, p.output, p.input_)
             csv.result(
                 log.Result(
                     ID=id_,
@@ -133,8 +133,6 @@ if __name__ == "__main__":
     logger.addHandler(handler)
     logger.setLevel(logging.DEBUG)
 
-    cache_path = Path("cache")
-
     dataset_name = args.dataset.lower()
     if dataset_name == dataset_lcstep:
         ds = dataset.LCStep(args.data_dir)
@@ -148,11 +146,19 @@ if __name__ == "__main__":
     logger.info("creating system...")
     model = Model.from_full_name(args.model)
     system_name = args.system.lower()
+
+    cache_path = Path("cache") / system_name / dataset_name / args.embedder
+    outdir = Path("output") / system_name / dataset_name / args.embedder
+
     with weaviate.WeaviateClient(
         embedded_options=EmbeddedOptions(
             persistence_data_path=str(Path("./cache/weaviate") / dataset_name),
             version="1.25.1",
-            additional_env_vars={"AUTOSCHEMA_ENABLED": "false", "DISABLE_TELEMETRY": "true"},
+            additional_env_vars={
+                "AUTOSCHEMA_ENABLED": "false",
+                "DISABLE_TELEMETRY": "true",
+                "LOG_LEVEL": "warning",
+            },
         )
     ) as client:
         if system_name == "rag":
@@ -164,40 +170,33 @@ if __name__ == "__main__":
             client.collections.delete("Docs")
 
             logger.info("RAG: Creating collection and uploading docs to Weaviate collection")
-
-            store_obj = retrieval.Doc_store(
-                client,
-                "Docs",
-                "Supporting Documents",
-                system_name + "/" + dataset_name + "/" + args.embedder,
-                args.embedder,
+            store = retrieval.DocStore(
+                client, "Docs", "Documents for retrieval", args.embedder, cache_path
             )
-            _ = store_obj.populate(logger, docs)
-            system = rag.RAG(model, store_obj, args.k, args.dataset)
+            store.populate(logger, docs)
+
+            system = rag.RAG(model, store, args.k, args.dataset)
         elif system_name == "aag":
             # set up vector store for unchunked train procedures
             logger.debug("AAG: collecting train procedures")
             procedures = ds.procedures(dataset.Split.TRAIN)
             logger.debug(f"AAG: collected {len(procedures)} procedures for skill library")
 
-            # TODO we're re-using the RAG vector store code for now, which does chunking and stuff
             client.collections.delete("Procedures")
-            store_obj = retrieval.Procedure_store(
+            logger.info("AAG: Creating collection and uploading procedures to Weaviate collection")
+            store = retrieval.ProcedureStore(
                 client,
                 "Procedures",
-                "Supporting Procedures",
-                system_name + "/" + dataset_name + "/" + args.embedder,
+                "Skill library",
                 args.embedder,
+                cache_path,
+                retrieval.procedure_formatter_for(dataset_name),
             )
+            store.populate(logger, procedures)
 
-            logger.info("AAG: Creating collection and uploading docs to Weaviate collection")
-            _ = store_obj.populate(logger, procedures)
-
-            system = aag.AAG(model, store_obj, args.k, args.dataset)
+            system = aag.AAG(model, store, args.k, args.dataset)
         else:
             raise NotImplementedError(args.system)
-
-        outdir = Path("./output") / system_name / dataset_name
 
         # shorten eval set according to -n
         val_data = ds.procedures(dataset.Split.VAL)
@@ -209,11 +208,14 @@ if __name__ == "__main__":
         logger.info("starting generation...")
 
         with log.CSVLogger(outdir / "output.csv") as csv:
-            asyncio.run(
-                spread_gather(
-                    lambda item: generate_and_record(logger, csv, human, system, *item),
-                    enumerate(val_data),
-                    min(args.workers, n),
-                    len(val_data),
+            try:
+                asyncio.run(
+                    spread_gather(
+                        lambda item: generate_and_record(logger, csv, human, system, *item),
+                        enumerate(val_data),
+                        min(args.workers, n),
+                        len(val_data),
+                    )
                 )
-            )
+            finally:
+                store.embedder.flush()

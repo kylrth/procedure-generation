@@ -52,6 +52,7 @@ ignore = [
     "PLW2901",
     "PT009",
     "RET504",
+    "S301",  # we trust our own pickle files
     "S311",  # we're not doing any cryptography
     "S603",
     "S607",
