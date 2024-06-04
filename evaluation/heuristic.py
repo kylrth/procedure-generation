@@ -1,14 +1,21 @@
+import logging
 from abc import ABC, abstractmethod
+
 from dataset import Procedure
+
 
 class Heuristic(ABC):
     """This is the interface that all systems in this package will implement. It can be imported for
     type annotations."""
 
-    
-    def evaluate(self, gold: Procedure, generated: list[str]):
-        raise NotImplementedError
+    @abstractmethod
+    def evaluate(
+        self, logger: logging.Logger, gold: Procedure, generated: list[str]
+    ) -> int | float:
+        pass
 
-    
-    async def aevaluate(self, gold: Procedure, generated: list[str]):
-        raise NotImplementedError
+    @abstractmethod
+    async def aevaluate(
+        self, logger: logging.Logger, gold: Procedure, generated: list[str]
+    ) -> int | float:
+        pass

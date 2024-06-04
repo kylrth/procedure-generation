@@ -1,29 +1,33 @@
-from evaluation.heuristic import Heuristic
-from dataset import Procedure, format_steps
+import logging
 
-class Api_Overlap(Heuristic):
-    
+from dataset import Procedure, format_steps
+from evaluation.heuristic import Heuristic
+
+
+class ApiOverlap(Heuristic):
+
     def get_apis(self, response: str):
         token_list = response.split("`")
         start_idx = 1
         api_list = []
         while start_idx < len(token_list):
-            if '.' in token_list[start_idx]:
+            if "." in token_list[start_idx]:
                 api_list.append(token_list[start_idx])
             start_idx += 2
-        # import pdb; pdb.set_trace()
         return api_list
 
-
-    def evaluate(self, gold: Procedure, generated: list[str]):
+    def evaluate(self, logger: logging.Logger, gold: Procedure, generated: list[str]) -> float:
         gold_apis = self.get_apis(gold.format_steps())
-        print("Got gold apis")
+        logger.debug("Got gold apis")
         generated_apis = self.get_apis(format_steps(generated))
-        print("Got generated apis")
+        logger.debug("Got generated apis")
 
         num_present = 0
         for api in gold_apis:
             if api in generated_apis:
                 num_present += 1
-        print("Returning API overlap score")
+        logger.debug("Returning API overlap score")
         return num_present / len(gold_apis)
+
+    async def aevaluate(self, logger: logging.Logger, gold: Procedure, generated: list[str]):
+        raise NotImplementedError
