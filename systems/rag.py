@@ -16,10 +16,10 @@ class RAG(FewShot):
     searching a vector store for texts with similar embeddings to the query."""
 
     model: Model
-    docs: retrieval.Doc_store
+    docs: retrieval.DocStore
     k: int
 
-    def __init__(self, model: Model, docs: retrieval.Doc_store, k: int, dataset: str):
+    def __init__(self, model: Model, docs: retrieval.DocStore, k: int, dataset: str):
         super().__init__(model, dataset)
         self.docs = docs
         self.k = k
@@ -39,10 +39,10 @@ class RAG(FewShot):
         ),
     }
 
-    def build_prompt(
+    async def build_prompt(
         self, logger: log.InstanceLogger, query: str, input_: str
     ) -> str | list[BaseMessage]:
-        docs = self.docs.get_docs(f"{query} using {input_}")
+        docs = await self.docs.search(f"{query} using {input_}", self.k)
         logger.write(f"retrieved {len(docs)} docs\n")
 
         context = self.build_context(docs)

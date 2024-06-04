@@ -22,11 +22,7 @@ class System(ABC):
     type annotations."""
 
     @abstractmethod
-    def generate(self, logger: log.InstanceLogger, query: str, input_: str) -> Response:
-        pass
-
-    @abstractmethod
-    async def agenerate(self, logger: log.InstanceLogger, query: str, input_: str) -> Response:
+    async def generate(self, logger: log.InstanceLogger, query: str, input_: str) -> Response:
         pass
 
     _step_prefixes = re.compile(r"^\s*(?:\d+\.\s*|-)\s*(.*)$")
