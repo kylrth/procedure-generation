@@ -1,46 +1,49 @@
+import argparse
 import asyncio
-from typing import Any
+import json
+import logging
+import sys
+from pathlib import Path
+
+import pandas as pd
 
 from dataset import Procedure
-from utils import log
-import argparse
-from systems import *
-from pathlib import Path
-import sys
-import pandas as pd
-from utils import log, spread_gather
-from evaluation.api_overlap import *
-from evaluation.edit_distance import *
-from evaluation.is_all_inp_used import *
-from evaluation.number_comparison import *
-from evaluation.overall_score import *
-from evaluation.rouge_score import *
-from evaluation.tfidf import *
-import json
-from evaluation.heuristic import Heuristic
+from systems import Model
+from utils import spread_gather
+
+from .api_overlap import ApiOverlap
+from .edit_distance import EditDistance
+from .heuristic import Heuristic
+from .is_all_inp_used import AllInpUsed
+from .number_comparison import NumberComparison
+from .overall_score import OverallScore
+from .rouge_score import ScoreROUGE
+from .tfidf import TfIdf
+
 
 async def evaluate_all(
+    logger: logging.Logger,
+    evals: dict[str, Heuristic],
     sample_id: int,
     gold: Procedure,
     generated: list[str],
-    evals: list[Heuristic]
 ):
     """Evaluate a generated procedure by comparing with the gold procedure using various methods.
 
     The returned dictionary contains the evaluation result for each metric.
     """
-    results = {"_id": sample_id}
+    results: dict[str, int | float] = {"_id": sample_id}
     async_tasks = {}
-    
+
     for name, heuristic_obj in evals.items():
         try:
-            results[name] = heuristic_obj.evaluate(gold, generated)
+            results[name] = heuristic_obj.evaluate(logger, gold, generated)
         except NotImplementedError:
-            async_tasks[name] = heuristic_obj.aevaluate(gold, generated)
-        
-    print("Collecting the heuristics scores for the example")
+            async_tasks[name] = heuristic_obj.aevaluate(logger, gold, generated)
+
+    logger.debug("Collecting the heuristics scores for the example")
     resp = await asyncio.gather(*async_tasks.values())
-    print("Results of heuristics collected")
+    logger.info("Results of heuristics collected")
     # add async results to dict
     for name, result in zip(async_tasks.keys(), resp, strict=True):
         results[name] = result
@@ -49,19 +52,21 @@ async def evaluate_all(
 
 
 def read_outputs_csv(args):
-    output_dir = f'./output/{args.dataset}/output.csv'
-    out_csv = pd.read_csv(output_dir,header=0,usecols=["question_id", "input", "output", "gold_steps", "completion"])
+    output_dir = f"./output/{args.dataset}/output.csv"
+    out_csv = pd.read_csv(
+        output_dir, header=0, usecols=["question_id", "input", "output", "gold_steps", "completion"]
+    )
     out_list = []
     for i in range(len(out_csv)):
-        row = out_csv.values[i]
+        row = out_csv.to_numpy()[i]
         q_id = int(row[0])
         inputs = row[1]
-        outputs= row[2]
+        outputs = row[2]
         gold_steps = json.loads(row[3])
-        gold = Procedure(_input=inputs, output=outputs, steps=gold_steps)
+        gold = Procedure(input_=inputs, output=outputs, steps=gold_steps)
         gen_steps = json.loads(row[4])
         out_list.append((q_id, gold, gen_steps))
-        
+
     return out_list
 
 
@@ -77,42 +82,45 @@ def int_leq(v: int):
 
     return validate
 
+
 # constants
 dataset_lcstep = "lcstep"
 dataset_recipenlg = "recipenlg"
 dataset_champ = "champ"
 
-def get_evaluations(dataset, model):
+
+def get_evaluations(dataset: str, model: Model) -> dict[str, Heuristic]:
     evals = {}
     if dataset == dataset_recipenlg:
-        evals["Ing_Used"] = All_Inp_Used(model, dataset)
-        evals["ROUGE"] = ROUGE_Score()
+        evals["Ing_Used"] = AllInpUsed(model, dataset)
+        evals["ROUGE"] = ScoreROUGE()
         evals["TfIdf"] = TfIdf(dataset)
-        evals["Edit-Distance"] = Edit_Distance(model)
-        evals["Num-Compare"] = Number_Comparison(model)
-        evals["Overall"] = Overall_Score(model)
+        evals["Edit-Distance"] = EditDistance(model)
+        evals["Num-Compare"] = NumberComparison(model)
+        evals["Overall"] = OverallScore(model)
     elif dataset == dataset_lcstep:
-        evals["Api-Overlap"] = Api_Overlap()
-        evals["Inp-Used"] = All_Inp_Used(model, dataset)
-        evals["ROUGE"] = ROUGE_Score()
+        evals["Api-Overlap"] = ApiOverlap()
+        evals["Inp-Used"] = AllInpUsed(model, dataset)
+        evals["ROUGE"] = ScoreROUGE()
         evals["TfIdf"] = TfIdf(dataset)
-        evals["Overall"] = Overall_Score(model)
+        evals["Overall"] = OverallScore(model)
     elif dataset == dataset_champ:
-        evals["Overall"] = Overall_Score(model)
-    
+        evals["Overall"] = OverallScore(model)
+
     return evals
 
-async def get_results(out_list, dataset, model):
-    # out_evals = []
+
+async def get_results(logger, out_list, dataset, model):
     evals = get_evaluations(dataset, model)
-    
+
     out_evals = await spread_gather(
-            lambda sample_data: evaluate_all(*sample_data[1], evals),
-            enumerate(out_list),
-            5, #Num workers
-            len(out_list),
-        )
+        lambda sample_data: evaluate_all(logger, evals, *sample_data[1]),
+        enumerate(out_list),
+        5,  # Num workers
+        len(out_list),
+    )
     return out_evals
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -162,14 +170,21 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+
+    logger = logging.getLogger("main")
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+
     cache_path = Path("cache")
     model = Model.from_full_name(args.model)
-    print("Initialized model")
-    
-    #Read Outputs
-    out_list = read_outputs_csv(args)
-    print("Read the outputs csv file")
-    out_evals = asyncio.run(get_results(out_list, args.dataset, model))
+    logger.info("Initialized model")
 
-    df = pd.DataFrame(out_evals)
-    df.to_csv(f"./output/{args.dataset}/eval_results.csv", header=True, index=False)
+    # Read Outputs
+    out_list = read_outputs_csv(args)
+    logger.info("Read the outputs csv file")
+    out_evals = asyncio.run(get_results(logger, out_list, args.dataset, model))
+
+    to_record = pd.DataFrame(out_evals)
+    to_record.to_csv(f"./output/{args.dataset}/eval_results.csv", header=True, index=False)
