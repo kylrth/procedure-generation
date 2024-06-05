@@ -9,7 +9,9 @@ shutup.please()
 import argparse
 import asyncio
 import logging
+import random
 import sys
+import tempfile
 from pathlib import Path
 
 import weaviate
@@ -63,6 +65,45 @@ def int_leq(v: int):
         return i
 
     return validate
+
+
+class NiceWeaviate(weaviate.WeaviateClient):
+    """This Weaviate client keeps things in a temporary directory and deletes it when done.
+
+    It also sets nice defaults for using an embedded instance like this.
+    """
+
+    tdir: tempfile.TemporaryDirectory
+    port: int
+    grpc_port: int
+
+    def __init__(self, port: int, grpc_port: int):
+        self.tdir = tempfile.TemporaryDirectory()
+        self.port = port
+        self.grpc_port = grpc_port
+
+    def __enter__(self):
+        path = self.tdir.__enter__()
+        super().__init__(
+            embedded_options=EmbeddedOptions(
+                persistence_data_path=path,
+                version="1.25.1",
+                port=self.port,
+                additional_env_vars={
+                    "AUTOSCHEMA_ENABLED": "false",
+                    "DISABLE_TELEMETRY": "true",
+                    "LOG_LEVEL": "warning",
+                },
+                grpc_port=self.grpc_port,
+            )
+        )
+        super().__enter__()
+
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        super().__exit__(exc_type, exc_value, traceback)
+        self.tdir.__exit__(exc_type, exc_value, traceback)
 
 
 # constants
@@ -150,24 +191,13 @@ if __name__ == "__main__":
     cache_path = Path("cache") / system_name / dataset_name / args.embedder
     outdir = Path("output") / system_name / dataset_name / args.embedder
 
-    with weaviate.WeaviateClient(
-        embedded_options=EmbeddedOptions(
-            persistence_data_path=str(Path("./cache/weaviate") / dataset_name),
-            version="1.25.1",
-            additional_env_vars={
-                "AUTOSCHEMA_ENABLED": "false",
-                "DISABLE_TELEMETRY": "true",
-                "LOG_LEVEL": "warning",
-            },
-        )
-    ) as client:
+    port = random.randint(1000, 65534)
+    with NiceWeaviate(port, port + 1) as client:
         if system_name == "rag":
             # set up vector store with supporting docs + the train set of procedures
             logger.debug("RAG: collecting docs")
             docs = ds.docs(include_procedures=dataset.Split.TRAIN)
             logger.debug(f"RAG: collected {len(docs)} docs for vector store")
-
-            client.collections.delete("Docs")
 
             logger.info("RAG: Creating collection and uploading docs to Weaviate collection")
             store = retrieval.DocStore(
@@ -182,7 +212,6 @@ if __name__ == "__main__":
             procedures = ds.procedures(dataset.Split.TRAIN)
             logger.debug(f"AAG: collected {len(procedures)} procedures for skill library")
 
-            client.collections.delete("Procedures")
             logger.info("AAG: Creating collection and uploading procedures to Weaviate collection")
             store = retrieval.ProcedureStore(
                 client,
