@@ -6,6 +6,8 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from dataset import Procedure, format_steps
 from systems import Model
 
+from .heuristic import Heuristic
+
 
 class AllInpUsed(Heuristic):
     model: Model
