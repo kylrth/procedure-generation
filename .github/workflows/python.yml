@@ -12,22 +12,31 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-
     - name: set up Python
       uses: actions/setup-python@v4
+      id: setup-python
       with:
         python-version: '3.10'
-        cache: 'pip'  # cache dependencies
-        cache-dependency-path: |
-          requirements.txt
-          dataset/requirements.txt
-        # requirements_dev.txt is excluded, to not invalidate the cache if linters are updated
-    - name: install dependencies
-      run: |
-        pip install --upgrade pip
-        pip install -r requirements.txt -r requirements_dev.txt
 
-    - name: restore caches
+    - name: get exact Python version  # for busting the venv cache
+      run: |
+        echo "${{ steps.setup-python.outputs.python-version }}" > ".installed-python"
+    - name: cache venv
+      uses: actions/cache@v4
+      id: cache-venv
+      with:
+        key: "venv-${{ hashFiles('.installed-python', 'requirements.txt') }}"
+        # requirements_dev.txt is excluded, to not invalidate the cache if linters are updated
+        path: |
+          .venv/
+    - name: create venv
+      if: "steps.cache-venv.outputs.cache-hit == false"
+      run: |
+        python -m venv .venv
+        .venv/bin/pip install --upgrade pip setuptools wheel
+        .venv/bin/pip install -r requirements.txt -r requirements_dev.txt
+
+    - name: restore linter caches
       uses: actions/cache/restore@v3
       with:
         path: |
@@ -36,15 +45,13 @@ jobs:
         # We want the latest cache to hit and be updated every time.
         key: lint-test-${{ github.run_id }}
         restore-keys: lint-test
-
     - name: lint
       run: |
-        black --check .
-        ruff check .
+        .venv/bin/black --check .
+        .venv/bin/ruff check .
     - name: test
-      run: PYTHONPATH=$(pwd) pytest
-
-    - name: save caches
+      run: PYTHONPATH=$(pwd) .venv/bin/pytest
+    - name: save linter caches
       uses: actions/cache/save@v3
       if: always()
       with:

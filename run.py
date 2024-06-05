@@ -91,7 +91,7 @@ class NiceWeaviate(weaviate.WeaviateClient):
         super().__init__(
             embedded_options=EmbeddedOptions(
                 persistence_data_path=path,
-                version="1.25.1",
+                version="1.25.2",
                 port=self.port,
                 additional_env_vars={
                     "AUTOSCHEMA_ENABLED": "false",

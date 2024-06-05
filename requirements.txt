@@ -17,4 +17,4 @@ sentence-transformers==2.5.1
 spacy==3.7.4
 tiktoken==0.7.0
 torchmetrics==1.4.0
-weaviate-client==4.6.3
+weaviate-client==4.6.4
