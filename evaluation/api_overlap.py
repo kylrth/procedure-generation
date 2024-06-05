@@ -1,7 +1,8 @@
 import logging
 
 from dataset import Procedure, format_steps
-from evaluation.heuristic import Heuristic
+
+from .heuristic import Heuristic
 
 
 class ApiOverlap(Heuristic):

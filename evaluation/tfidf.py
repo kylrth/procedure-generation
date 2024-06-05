@@ -7,7 +7,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from spacy.lang.en import stop_words
 
 from dataset import CHAMP, LCStep, Procedure, RecipeNLG, Split, format_steps
-from evaluation.heuristic import Heuristic
+
+from .heuristic import Heuristic
 
 
 # constants

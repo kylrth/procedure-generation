@@ -8,9 +8,6 @@ from pathlib import Path
 import pandas as pd
 
 from dataset import Procedure
-from systems import Model
-from utils import spread_gather
-
 from evaluation.api_overlap import ApiOverlap
 from evaluation.edit_distance import EditDistance
 from evaluation.heuristic import Heuristic
@@ -19,6 +16,8 @@ from evaluation.number_comparison import NumberComparison
 from evaluation.overall_score import OverallScore
 from evaluation.rouge_score import ScoreROUGE
 from evaluation.tfidf import TfIdf
+from systems import Model
+from utils import spread_gather
 
 
 async def evaluate_all(
@@ -177,12 +176,12 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    print(f"Running for: {args}")
     logger = logging.getLogger("main")
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
     logger.addHandler(handler)
     logger.setLevel(logging.DEBUG)
+    logger.debug(f"Running for: {args}")
 
     cache_path = Path("cache")
     model = Model.from_full_name(args.model)
@@ -195,4 +194,8 @@ if __name__ == "__main__":
     out_evals = asyncio.run(get_results(logger, out_list, args.dataset, model))
 
     to_record = pd.DataFrame(out_evals)
-    to_record.to_csv(f"./output/{args.system}/{args.dataset}/{args.embedder}/eval_results.csv", header=True, index=False)
+    to_record.to_csv(
+        f"./output/{args.system}/{args.dataset}/{args.embedder}/eval_results.csv",
+        header=True,
+        index=False,
+    )

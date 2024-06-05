@@ -3,7 +3,8 @@ import logging
 from torchmetrics.text.rouge import ROUGEScore
 
 from dataset import Procedure, format_steps
-from evaluation.heuristic import Heuristic
+
+from .heuristic import Heuristic
 
 
 class ScoreROUGE(Heuristic):
