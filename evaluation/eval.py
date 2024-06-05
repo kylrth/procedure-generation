@@ -11,14 +11,14 @@ from dataset import Procedure
 from systems import Model
 from utils import spread_gather
 
-from .api_overlap import ApiOverlap
-from .edit_distance import EditDistance
-from .heuristic import Heuristic
-from .is_all_inp_used import AllInpUsed
-from .number_comparison import NumberComparison
-from .overall_score import OverallScore
-from .rouge_score import ScoreROUGE
-from .tfidf import TfIdf
+from evaluation.api_overlap import ApiOverlap
+from evaluation.edit_distance import EditDistance
+from evaluation.heuristic import Heuristic
+from evaluation.is_all_inp_used import AllInpUsed
+from evaluation.number_comparison import NumberComparison
+from evaluation.overall_score import OverallScore
+from evaluation.rouge_score import ScoreROUGE
+from evaluation.tfidf import TfIdf
 
 
 async def evaluate_all(
@@ -52,7 +52,7 @@ async def evaluate_all(
 
 
 def read_outputs_csv(args):
-    output_dir = f"./output/{args.dataset}/output.csv"
+    output_dir = f"./output/{args.system}/{args.dataset}/{args.embedder}/output.csv"
     out_csv = pd.read_csv(
         output_dir, header=0, usecols=["question_id", "input", "output", "gold_steps", "completion"]
     )
@@ -154,6 +154,13 @@ if __name__ == "__main__":
         help="full name of service & model to use",
     )
     parser.add_argument(
+        "-e",
+        "--embedder",
+        type=str,
+        default="hf-all-mpnet-base-v2",
+        help="full name of service & model to use for embeddings",
+    )
+    parser.add_argument(
         "-n", type=int, default=sys.maxsize, help="limit the number of samples to test"
     )
     parser.add_argument(
@@ -170,7 +177,7 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-
+    print(f"Running for: {args}")
     logger = logging.getLogger("main")
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
@@ -180,6 +187,7 @@ if __name__ == "__main__":
     cache_path = Path("cache")
     model = Model.from_full_name(args.model)
     logger.info("Initialized model")
+    args.system = args.system.lower()
 
     # Read Outputs
     out_list = read_outputs_csv(args)
@@ -187,4 +195,4 @@ if __name__ == "__main__":
     out_evals = asyncio.run(get_results(logger, out_list, args.dataset, model))
 
     to_record = pd.DataFrame(out_evals)
-    to_record.to_csv(f"./output/{args.dataset}/eval_results.csv", header=True, index=False)
+    to_record.to_csv(f"./output/{args.system}/{args.dataset}/{args.embedder}/eval_results.csv", header=True, index=False)
