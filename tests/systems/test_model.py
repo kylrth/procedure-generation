@@ -1,7 +1,8 @@
+import asyncio
 import unittest
 
-from langchain.llms.fake import FakeListLLM
-from langchain.schema import AIMessage, ChatGeneration, HumanMessage, LLMResult, SystemMessage
+from langchain_community.llms.fake import FakeListLLM
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 
 from dataset import Doc
 from systems.model import Model
@@ -11,10 +12,8 @@ class FakeChatModel:
     def __init__(self, text: str):
         self.text = text
 
-    def generate(self, _: str) -> LLMResult:
-        return LLMResult(
-            generations=[[ChatGeneration(text=self.text, message=AIMessage(content=self.text))]]
-        )
+    async def ainvoke(self, _: str | list[BaseMessage]) -> AIMessage:
+        return AIMessage(content=self.text)
 
 
 class TestModel(unittest.TestCase):
@@ -25,7 +24,7 @@ class TestModel(unittest.TestCase):
         response = "Hi there, I'm a fake completion model."
         model = Model(FakeListLLM(responses=[response]), False)
 
-        out = model("What could possibly go wrong?")[0]
+        out = asyncio.run(model.generate("What could possibly go wrong?"))
 
         self.assertEqual(response, out)
 
@@ -33,7 +32,7 @@ class TestModel(unittest.TestCase):
         response = "Hi there, I'm a fake chat model."
         model = Model(FakeChatModel(response), True)
 
-        out = model("What could possibly go wrong?")[0]
+        out = asyncio.run(model.generate("What could possibly go wrong?"))
 
         self.assertEqual(response, out)
 

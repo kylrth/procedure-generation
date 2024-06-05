@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar, TypeAlias
 
-from langchain.schema import BaseMessage
+from langchain_core.messages import BaseMessage
 
 from dataset import Procedure
 

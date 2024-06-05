@@ -1,7 +1,7 @@
 import logging
 import re
 
-from langchain.schema import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from dataset import Procedure, format_steps
 from evaluation.heuristic import Heuristic
@@ -31,7 +31,7 @@ class NumberComparison(Heuristic):
             ),
         ]
 
-        number_list = (await self.model.agenerate(prompt))[0]
+        number_list = await self.model.generate(prompt)
         number_list = number_list.replace("'", "")
         list_items = re.sub(r"\[]", "", number_list)[1:-1].split(",")
         return list_items

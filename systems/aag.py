@@ -110,7 +110,7 @@ class AAG(System):
         # Have the model generate an output, and check that it contains the query list. If it
         # doesn't, ask again.
         for _ in range(3):
-            completion = (await self.model.agenerate(prompt))[0]
+            completion = await self.model.generate(prompt)
             logger.write(f"asked {self.model.name} for relevant queries; model said:\n")
             logger.write(textwrap.indent(completion, "  ") + "\n")
 
@@ -173,7 +173,7 @@ class AAG(System):
             )
         )
 
-        completion = (await self.model.agenerate(prompt))[0]
+        completion = await self.model.generate(prompt)
 
         return self.parse_completion(completion)
 
@@ -223,6 +223,6 @@ class AAG(System):
             )
         )
 
-        completion = (await self.model.agenerate(prompt))[0]
+        completion = await self.model.generate(prompt)
 
         return self.parse_completion(completion)

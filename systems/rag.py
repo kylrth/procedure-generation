@@ -1,7 +1,7 @@
 import textwrap
 from typing import ClassVar
 
-from langchain.schema import BaseMessage
+from langchain_core.messages import BaseMessage
 
 import retrieval
 from dataset import Doc

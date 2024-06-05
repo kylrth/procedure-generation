@@ -1,10 +1,9 @@
 import logging
 import re
 
-from langchain.schema import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from dataset import Procedure, format_steps
-from evaluation.heuristic import Heuristic
 from systems import Model
 
 
@@ -48,7 +47,7 @@ class AllInpUsed(Heuristic):
                     "Remove the text enclosed in ()."
                 ),
             ]
-            trim_ing_list = (await self.model.agenerate(prompt))[0]
+            trim_ing_list = await self.model.generate(prompt)
             trim_ing_list = trim_ing_list.replace("'", "")
             filtered_sentence = re.sub(r"\[]", "", trim_ing_list)[1:-1].split(",")
         return filtered_sentence

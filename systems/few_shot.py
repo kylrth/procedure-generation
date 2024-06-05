@@ -1,7 +1,7 @@
 import textwrap
 from typing import ClassVar
 
-from langchain.schema import BaseMessage
+from langchain_core.messages import BaseMessage
 
 from dataset import Doc
 from utils import log
@@ -23,7 +23,7 @@ class FewShot(System):
 
     async def generate(self, logger: log.InstanceLogger, query: str, input_: str) -> Response:
         prompt = await self.build_prompt(logger, query, input_)
-        completion = (await self.model.agenerate(prompt))[0]
+        completion = await self.model.generate(prompt)
 
         return self._make_result(prompt, completion)
 

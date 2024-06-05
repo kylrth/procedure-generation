@@ -1,7 +1,7 @@
 import logging
 import re
 
-from langchain.schema import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from dataset import Procedure, format_steps
 from evaluation.heuristic import Heuristic
@@ -91,10 +91,10 @@ class OverallScore(Heuristic):
     async def aevaluate(self, logger: logging.Logger, gold: Procedure, generated: list[str]) -> int:
         prompt = self.prepare_prompt(gold.format_steps(), format_steps(generated), gold.output)
         logger.debug("Prompt prepared")
-        answer = (await self.model.agenerate(prompt))[0]
+        answer = await self.model.generate(prompt)
         if answer.find("[") == -1:
             logger.debug("Generating the response again")
-            answer = (await self.model.agenerate(prompt))[0]
+            answer = await self.model.generate(prompt)
         logger.debug("Got model response for overall score")
         score = self.result_parser(answer)
         logger.debug("Returning the achieved score!")

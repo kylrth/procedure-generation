@@ -1,10 +1,9 @@
-from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Callable
 
-from langchain.base_language import BaseLanguageModel
-from langchain.chat_models import ChatOpenAI
-from langchain.llms import OpenAI
-from langchain.schema import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.language_models import BaseLanguageModel
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_openai import ChatOpenAI, OpenAI
 
 from dataset import Doc
 
@@ -64,7 +63,7 @@ class Model:
         except KeyError:
             raise NotImplementedError(full_name) from None
 
-        model = details.langchain_model(model=model, **kwargs)
+        model = details.langchain_model(model_name=model, **kwargs)
 
         out = cls(model, details.is_chat)
         out.max_tokens = details.max_tokens
@@ -72,13 +71,14 @@ class Model:
 
         return out
 
-    def __call__(
+    def build_prompt(
         self,
         prompt: str,
         context: str | None = None,
         examples: list[Doc] | None = None,
-    ) -> list[str]:
-        """Generate calls the model with the prompt and returns the response text.
+    ) -> str | list[BaseMessage]:
+        """Builds the full input to the LLM as either a string prompt or a list of messages for a
+        chat model.
 
         If context is provided, it is added before the prompt. If example are provided, they are
         added between the context and the prompt. For a text completion model, the full prompt looks
@@ -111,36 +111,9 @@ class Model:
             Model: {examples[1][1]}
             ...
             Human: {prompt}
+
+        The type of the output depends on whether this is a chat or completion model.
         """
-        full_prompt = self.build_prompt(prompt, context, examples)
-        return self.generate(full_prompt)
-
-    def generate(self, final_prompt: str | list[BaseMessage]) -> list[str]:
-        """Calls the model on the already-constructed prompt. Can be used in conjunction with
-        build_prompt to re-use constructed prompts."""
-        out = self.model.generate([final_prompt])
-
-        # In the future we may surface other information from the results, but for now we just need
-        # the strings.
-        return [r.text for r in out.generations[0]]
-
-    async def agenerate(self, final_prompt: str | list[BaseMessage]) -> list[str]:
-        out = await self.model.agenerate([final_prompt])
-
-        # In the future we may surface other information from the results, but for now we just need
-        # the strings.
-        return [r.text for r in out.generations[0]]
-
-    def build_prompt(
-        self,
-        prompt: str,
-        context: str | None = None,
-        examples: list[Doc] | None = None,
-    ) -> str | list[BaseMessage]:
-        """Builds the final prompt as described in documentation for __call__, but returns the
-        constructed prompt instead of running the model.
-
-        The type of the output depends on whether this is a chat or completion model."""
         if self.chat:
             return self.build_chat_prompt(prompt, context, examples)
 
@@ -184,6 +157,14 @@ class Model:
         out += prompt + "\n"
 
         return out
+
+    async def generate(self, final_prompt: str | list[BaseMessage]) -> str:
+        """Call the model with the prepared prompt and return the response text."""
+        message = await self.model.ainvoke(final_prompt)
+        if self.chat:
+            return message.content
+
+        return message
 
     def get_num_tokens(self, msg: str | list[BaseMessage]) -> int:
         """Get the number of tokens that would be used for this example, including all necessary
