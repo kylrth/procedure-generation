@@ -1,7 +1,8 @@
 import sys
 import unittest
 
-from langchain.llms.fake import FakeListLLM
+from langchain_community.llms.fake import FakeListLLM
+from langchain_core.messages import BaseMessage
 
 from systems import Model
 
@@ -14,7 +15,7 @@ class MockModel(Model):
         self.tc = tc
         self.expect = expect
 
-    def generate(self, s: str) -> list[str]:
+    async def generate(self, final_prompt: str | list[BaseMessage]) -> str:
         # Here we're reaching inside the FakeListLLM to get the step number, so we know which string
         # to compare with.
         i = self.model.i
@@ -22,9 +23,9 @@ class MockModel(Model):
         self.tc.assertTrue(
             i < len(self.expect), f"received call {i+1}; expected only {len(self.expect)}"
         )
-        self.tc.assertEqual(self.expect[i], s)
+        self.tc.assertEqual(self.expect[i], final_prompt)
 
-        return super().generate(s)
+        return await super().generate(final_prompt)
 
     def agenerate(self, s: str) -> list[str]:
         raise NotImplementedError

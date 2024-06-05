@@ -7,9 +7,8 @@ import sys
 from os import PathLike
 from pathlib import Path
 
-from langchain.chat_models import ChatOpenAI
-from langchain.chat_models.base import BaseChatModel
 from langchain.schema import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_openai import ChatOpenAI
 
 from utils import spread_gather
 
@@ -282,7 +281,7 @@ def format_output(s: str) -> str:
 
 
 async def format_procedure(
-    model: BaseChatModel,
+    model: ChatOpenAI,
     prompt: list[BaseMessage],
     filepath: str | PathLike,
     logger: logging.Logger,
@@ -320,7 +319,7 @@ async def format_procedure(
     logger.debug("stored '%s'", dest)
 
 
-def count_tokens(model: BaseChatModel, path: str) -> int:
+def count_tokens(model: ChatOpenAI, path: str) -> int:
     """Counts the tokens of all markdown files in a directory"""
     total_tokens = 0
     for file in Path(path).glob("**/*.md"):
@@ -330,7 +329,7 @@ def count_tokens(model: BaseChatModel, path: str) -> int:
     return total_tokens
 
 
-def count_markdown_files(model: BaseChatModel, path: str, limit: int = 0) -> int:
+def count_markdown_files(model: ChatOpenAI, path: str, limit: int = 0) -> int:
     """Counts markdown files in a directory that have more than `limit` tokens"""
     out = 0
     for file in Path(path).glob("**/*.md"):

@@ -3,7 +3,7 @@ import re
 
 import editdistance as edt
 import spacy
-from langchain.schema import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from dataset import Procedure, format_steps
 from evaluation.heuristic import Heuristic
@@ -32,7 +32,7 @@ class EditDistance(Heuristic):
             ),
         ]
 
-        one_word_list = (await self.model.agenerate(prompt))[0]
+        one_word_list = await self.model.generate(prompt)
         one_word_list = one_word_list.replace("'", "")
         list_items = re.sub(r"[\s]", "", one_word_list)[1:-1].split(",")
         sentence = self.nlp(" ".join(list_items))
