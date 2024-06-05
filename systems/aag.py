@@ -1,5 +1,5 @@
 import textwrap
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import yaml
 
@@ -10,6 +10,20 @@ from utils import log
 from .interface import Response, System
 from .model import Model
 from .rag import RAG
+
+
+def limited_yaml(obj: dict[str, list[Any]]) -> dict[str, list[str]]:
+    """Update an object parsed from YAML so that we know all the list elements are strings.
+
+    Models often make mistakes with the edge cases of YAML, but asking for YAML output makes
+    parsing easier. So we'll parse the YAML but then reconvert all list elements back to strings.
+    """
+    for list_value in obj.values():
+        for i in range(len(list_value)):
+            if not isinstance(list_value[i], str):
+                list_value[i] = yaml.dump(list_value[i])
+
+    return obj
 
 
 class AAG(System):
@@ -32,7 +46,7 @@ class AAG(System):
         self.dataset = dataset
 
     async def generate(self, logger: log.InstanceLogger, query: str, input_: str) -> Response:
-        queries = await self.queries_relevant_to(query, input_)
+        queries = await self.queries_relevant_to(logger, query, input_)
 
         procs: list[list[Procedure]] = []
         for query in queries:
@@ -56,7 +70,8 @@ class AAG(System):
                 candidate.steps = await self.update_candidate(candidate, proc_set)
 
             logger.write(
-                f"candidate after looking at the {i + 1}th closest procedures for each query:\n"
+                f"candidate after looking at the {i + 1}th closest procedures for all "
+                f"{len(proc_set)} queries:\n"
             )
             logger.write(textwrap.indent(candidate.format_steps(), "  ") + "\n")
 
@@ -68,7 +83,7 @@ class AAG(System):
 
     _prompt_query_gen_inst: ClassVar[str] = (
         "Please output high-level steps to complete the task below.\n\n"
-        "Then, given this high-level solution, think carefully step by step and provide search "
+        "Then, given this high-level solution, think carefully step by step and provide 3-5 search "
         "engine queries for knowledge that you need to refine the solution to the question.\n\n"
         "The output should be in YAML format, with the steps listed under `steps:` and the queries "
         "under `queries:`."
@@ -84,7 +99,9 @@ class AAG(System):
         ),
     }
 
-    async def queries_relevant_to(self, query: str, input_: str) -> list[str]:
+    async def queries_relevant_to(
+        self, logger: log.InstanceLogger, query: str, input_: str
+    ) -> list[str]:
         prompt = self.model.build_prompt(
             self._prompt_query_gen[self.dataset].format(query=query, input_=input_),
             context=self._prompt_query_gen_inst,
@@ -94,10 +111,21 @@ class AAG(System):
         # doesn't, ask again.
         for _ in range(3):
             completion = (await self.model.agenerate(prompt))[0]
+            logger.write(f"asked {self.model.name} for relevant queries; model said:\n")
+            logger.write(textwrap.indent(completion, "  ") + "\n")
+
             out = yaml.safe_load(completion)
 
-            if "queries" in out and isinstance(out["queries"], list):
-                break
+            if "queries" not in out or not isinstance(out["queries"], list):
+                logger.write(f"queries were wrong: {out}\n")
+                continue
+            try:
+                out = limited_yaml(out)
+            except (KeyError, TypeError) as e:
+                logger.write(f"bad YAML: {e!s}\n")
+                continue
+
+            break
         else:
             raise ValueError("could not get good response from LLM after 3 tries")
 
