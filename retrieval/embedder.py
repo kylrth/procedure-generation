@@ -1,13 +1,18 @@
+import os
 import pickle
 from abc import ABC, abstractmethod
 from os import PathLike
 from pathlib import Path
-from typing import Type
+from typing import Generator, Iterable, Type, TypeVar
 
 import mmh3
 import numpy as np
+import tiktoken
+import tqdm
 from openai import AsyncOpenAI
 from sentence_transformers import SentenceTransformer
+
+from utils import spread_gather
 
 
 class Embedder(ABC):
@@ -26,18 +31,86 @@ class NamedEmbedder(Embedder):
         pass
 
 
+_openai_max_input: dict[str, int] = {
+    # https://platform.openai.com/docs/guides/embeddings/embedding-models
+    "text-embedding-3-small": 8191,
+    "text-embedding-3-large": 8191,
+    "text-embedding-ada-002": 8191,
+}
+
+
+T = TypeVar("T")
+
+
+def batch(tokens: Iterable[list[T]], max_tok: int) -> Generator[list[list[T]], None, None]:
+    """Yield batches of sublists which in total are not longer than max_tok."""
+    current_batch = []
+    current_length = 0
+
+    for seq in tokens:
+        if len(seq) > max_tok:
+            raise ValueError(f"sequence of length {len(seq)} is too long (> {max_tok})")
+
+        if current_length + len(seq) > max_tok:
+            yield current_batch
+
+            current_batch = [seq]
+            current_length = len(seq)
+        else:
+            current_batch.append(seq)
+            current_length += len(seq)
+
+    if current_batch:
+        # yield the remaining batch
+        yield current_batch
+
+
 class OpenAIEmbedder(NamedEmbedder):
     model: str
     client: AsyncOpenAI
+    tok: tiktoken.Encoding
+    _tok_threads: int
+    max_input: int
 
     def __init__(self, model: str):
         self.model = model
         self.client = AsyncOpenAI()
+        self.tok = tiktoken.encoding_for_model(model)
+        self._tok_threads = min(32, os.cpu_count() or 1)
+        self._max_input = _openai_max_input[model]
+
+    def _tokenize(self, text: list[str]) -> Generator[list[int], None, None]:
+        """Tokenize the strings.
+
+        For short lists of texts, this generates token sequences on demand. For long lists of texts,
+        tokenization happens all at once with a thread pool before the first item is yielded."""
+        if len(text) < self._tok_threads * 4:
+            # It's probably not worth using threads for so few texts
+            for s in text:
+                yield self.tok.encode(s)
+        else:
+            yield from self.tok.encode_batch(text, num_threads=self._tok_threads)
 
     async def embed(self, text: list[str]) -> list[np.ndarray]:
-        response = await self.client.embeddings.create(input=text, model=self.model)
+        tokens = self._tokenize(text)
+        batches = batch(tokens, self._max_input)
 
-        return [np.array(embed.embedding) for embed in response.data]
+        results = {}
+
+        with tqdm.tqdm(total=len(text), disable=len(text) <= 1) as pbar:
+            # the async task is to fetch the embeddings for a batch of token sequences, update the
+            # status bar, and return embeddings as arrays
+            async def task(args: tuple[int, list[list[int]]]):
+                idx, b = args
+
+                res = await self.client.embeddings.create(input=b, model=self.model)
+                pbar.update(len(b))
+
+                results[idx] = [np.array(embed.embedding) for embed in res.data]
+
+            await spread_gather(task, enumerate(batches), n=5)  # 5 concurrent HTTP connections
+
+        return [item for i in range(len(results)) for item in results[i]]
 
 
 class HFEmbedder(NamedEmbedder):
@@ -64,8 +137,8 @@ def embedder_from_name(name: str) -> NamedEmbedder:
 
     try:
         return embedder_dict[service](model)
-    except KeyError:
-        raise NotImplementedError(name) from None
+    except KeyError as e:
+        raise NotImplementedError(name) from e
 
 
 class CachingEmbedder(Embedder):

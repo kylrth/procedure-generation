@@ -1,6 +1,6 @@
 import asyncio
 from collections.abc import Iterable
-from typing import Any
+from typing import Awaitable, Callable, TypeVar
 
 from tqdm import tqdm
 
@@ -9,9 +9,13 @@ class _Canceled:
     """Shows up in the queue to tell a worker to shut down."""
 
 
+T = TypeVar("T")
+U = TypeVar("U")
+
+
 async def spread_gather(
-    func: callable, data: Iterable, n: int, length: int | None = None
-) -> list[Any]:
+    func: Callable[[T], Awaitable[U]], data: Iterable[T], n: int, length: int | None = None
+) -> list[U]:
     """Apply func to all items in data using n concurrent workers, and then return the list of
     results. The results won't necessarily be in order.
 
