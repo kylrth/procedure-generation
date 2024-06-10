@@ -1,4 +1,5 @@
 import difflib
+import re
 import textwrap
 from itertools import islice
 from typing import Any, ClassVar
@@ -103,10 +104,10 @@ class AAG(System):
 
     _prompt_query_gen_inst: ClassVar[str] = (
         "Please output high-level steps to complete the task below.\n\n"
-        "Then, given this high-level solution, think carefully step by step and provide 3-5 search "
+        "Then, given this high-level solution, think carefully step by step and provide 4 search "
         "engine queries for knowledge that you need to refine the solution to the question.\n\n"
-        "The output should be in YAML format, with the steps listed under `steps:` and the queries "
-        "under `queries:`."
+        "The output should be 'steps:' followed by a bulleted list with elements starting with "
+        "'- ', and then 'queries:' followed by another bulleted list."
     )
     _prompt_query_gen: ClassVar[dict[str, str]] = {
         "lcstep": "I want to create {query} using these resources: {input_}. ",
@@ -118,6 +119,9 @@ class AAG(System):
             "{query}\n\n"
         ),
     }
+    _query_gen_out_prefix: ClassVar[re.Pattern] = re.compile(
+        r"(\*\*)?queries:(\*\*)?", flags=re.IGNORECASE
+    )
 
     async def queries_relevant_to(
         self, logger: log.InstanceLogger, query: str, input_: str
@@ -134,22 +138,23 @@ class AAG(System):
             logger.write(f"asked {self.model.name} for relevant queries; model said:\n")
             logger.write(textwrap.indent(completion, "  ") + "\n")
 
-            out = yaml.safe_load(completion)
-
-            if "queries" not in out or not isinstance(out["queries"], list):
-                logger.write(f"queries were wrong: {out}\n")
-                continue
             try:
-                out = limited_yaml(out)
-            except (KeyError, TypeError) as e:
-                logger.write(f"bad YAML: {e!s}\n")
+                # find the first match
+                match = next(iter(self._query_gen_out_prefix.finditer(completion)))
+
+                lines = completion[match.end() :].strip().split("\n")
+            except StopIteration:
+                logger.write("ERROR: 'queries:' not found in the above completion; trying again\n")
                 continue
 
-            break
-        else:
-            raise ValueError("could not get good response from LLM after 3 tries")
+            for line in lines:
+                if not line.startswith("- "):
+                    logger.write("ERROR: the query list was badly formatted\n")
+                    continue
 
-        return out["queries"]
+            return [line[2:] for line in lines]
+
+        raise ValueError("could not get good response from LLM after 3 tries")
 
     def format_procedures(self, procs: list[Procedure]) -> str:
         out = ""
