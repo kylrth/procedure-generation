@@ -93,8 +93,8 @@ async def aevaluate(
             score = 2
         elif score == 2:
             score = 1
-    logger.debug("Returning the LLM choice!")
-    res_dict = {"question_id": q_id, "choice": score}
+    logger.debug(f"LLM choice was {score}")
+    res_dict = {"question_id": q_id, "choice": score, "raw": answer}
     return res_dict
 
 
@@ -113,6 +113,8 @@ def read_outputs_csv(args, system_name):
     out_csv = pd.read_csv(
         output_dir, header=0, usecols=["question_id", "input", "output", "gold_steps", "completion"]
     )
+    out_csv = out_csv.sort_values(by=["question_id"])
+
     out_list = []
     for i in range(len(out_csv)):
         row = out_csv.to_numpy()[i]
