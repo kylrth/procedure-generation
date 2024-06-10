@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import json
 import logging
+import random
 import re
 import sys
 from pathlib import Path
@@ -61,7 +62,7 @@ def result_parser(sentence: str) -> int:
             match = re.search(r"\s*(N\/A)\s*$", sentence)
             if not match:
                 return -3
-            return 1
+            return -1
 
     return int(match[-1])
 
@@ -74,6 +75,11 @@ async def aevaluate(
     sys1_generated: list[str],
     sys2_generated: list[str],
 ) -> dict[str, int]:
+    # randomize order
+    inverted = random.random() > 0.5
+    if inverted:
+        sys1_generated, sys2_generated = sys2_generated, sys1_generated
+
     prompt = prepare_prompt(format_steps(sys1_generated), format_steps(sys2_generated), gold)
     logger.debug("Prompt prepared")
     answer = await model.generate(prompt)
@@ -82,6 +88,11 @@ async def aevaluate(
         answer = await model.generate(prompt)
     logger.debug("Got model response for the choice")
     score = result_parser(answer)
+    if inverted:
+        if score == 1:
+            score = 2
+        elif score == 2:
+            score = 1
     logger.debug("Returning the LLM choice!")
     res_dict = {"question_id": q_id, "choice": score}
     return res_dict
