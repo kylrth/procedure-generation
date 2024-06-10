@@ -3,6 +3,7 @@ import itertools
 import json
 import math
 import random
+import re
 import sys
 from os import PathLike
 from typing import Any, Iterable
@@ -10,11 +11,32 @@ from typing import Any, Iterable
 from .base import Dataset, Doc, Procedure
 
 
+_step_prefixes = re.compile(r"^\s*(?:\d+(?:\.|\))\s*|-)\s*(.*)$")
+
+
+def parse_steps(s: str) -> list[str]:
+    # should be list of steps
+    steps = json.loads(s)
+
+    out = []
+    for step in steps:
+        if step == "":
+            continue
+
+        match = _step_prefixes.match(step)
+        if match:
+            out.append(match.group(1))
+        else:
+            out.append(step.strip())
+
+    return out
+
+
 def recipe_to_procedure(d: dict[str, Any]) -> Procedure:
     return Procedure(
         input_=", ".join(json.loads(d["ingredients"])),
         output=d["title"],
-        steps=json.loads(d["directions"]),
+        steps=parse_steps(d["directions"]),
     )
 
 
