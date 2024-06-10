@@ -129,17 +129,20 @@ class AAG(System):
         "lcstep": (
             "Please update the list of steps to accomplish '{query}' using the knowledge "
             "above. Create and use these resources in your response: {input_}. "
-            "Please output only the updated steps. Your response should start with '1.'."
+            "Please output only the updated steps. Your response should start with '1.'. "
+            "The final response should not contain direct references to the knowledge above."
         ),
         "recipenlg": (
             "Please update the list of steps to accomplish '{query}' using the knowledge "
             "above. Use these ingredients in your response: {input_}. "
-            "Please output only the updated steps. Your response should start with '1.'."
+            "Please output only the updated steps. Your response should start with '1.'. "
+            "The final response should not contain direct references to the knowledge above."
         ),
         "champ": (
             "Please update the list of steps to solve '{query}' using the knowledge above. "
             "Use this additional information in preparing your response: {input_}. "
-            "Please output only the updated steps. Your response should start with '1.'."
+            "Please output only the updated steps. Your response should start with '1.'. "
+            "The final response should not contain direct references to the knowledge above."
         ),
     }
 
@@ -247,8 +250,10 @@ class AAG(System):
             "You are a human expert whose job is to summarise the retrieved "
             "information below to answer the question. Please include the "
             "information only from the provided knowledge and make sure "
-            "that the summary is complete, short and concise. Avoid introductory and"
-            "closing lines at the start and end of your response."
+            "that the summary is complete, short and concise. Avoid introductory and "
+            "closing lines at the start and end of your response. "
+            "Don't directly refer to the titles in the provided knowledge when generating the "
+            "summary."
         )
         msg_prompt = (
             f"[BEGIN QUESTION]\n{query}\n[END QUESTION]\n\n"
