@@ -1,4 +1,6 @@
+import difflib
 import textwrap
+from itertools import islice
 from typing import Any, ClassVar
 
 import yaml
@@ -49,8 +51,9 @@ class AAG(System):
         queries = await self.queries_relevant_to(logger, query, input_)
 
         procs: list[list[Procedure]] = []
-        for query in queries:
-            procs.append(await self.skills.search(query, self.k))
+        queries.append(f"{query} using {input_}")
+        for q in queries:
+            procs.append(await self.skills.search(q, self.k))
 
         logger.write(f"got {len(queries)} search queries from {self.model.name}:\n")
         for i, q in enumerate(queries):
@@ -60,20 +63,37 @@ class AAG(System):
 
         # TODO in the future try filtering
 
-        # iteratively prompt LLM with the first procedure from each query, then the second ones,
-        # etc.
-        candidate: Procedure = Procedure(input_, query, [])
-        for i, proc_set in enumerate(zip(*procs, strict=True)):
-            if len(candidate.steps) == 0:
-                candidate.steps = await self.create_candidate(query, input_, proc_set)
-            else:
-                candidate.steps = await self.update_candidate(candidate, proc_set)
+        # prompt the LLM to produce a candidate based on the top procedure retrieved for each query
+        steps = await self.create_candidate(logger, query, input_, [ret[0] for ret in procs])
+        candidate: Procedure = Procedure(input_, query, steps)
+
+        logger.write(
+            f"BEGIN CANDIDATE after looking at the closest procedures for all {len(procs)} "
+            "queries:\n"
+        )
+        logger.write(textwrap.indent(candidate.format_steps(), "  ") + "\n")
+        logger.write("END CANDIDATE\n")
+
+        # iteratively prompt LLM with the next procedures retrieved for each query
+        for i, proc_set in islice(enumerate(zip(*procs, strict=True)), 1, None):  # skip top
+            new_steps = await self.update_candidate(logger, candidate, proc_set)
 
             logger.write(
-                f"candidate after looking at the {i + 1}th closest procedures for all "
+                f"BEGIN DIFF after looking at the {i + 1}th closest procedures for all "
                 f"{len(proc_set)} queries:\n"
             )
-            logger.write(textwrap.indent(candidate.format_steps(), "  ") + "\n")
+            diff = difflib.context_diff(
+                [f"{n+1}. {step}\n" for n, step in enumerate(candidate.steps)],
+                [f"{n+1}. {step}\n" for n, step in enumerate(new_steps)],
+            )
+            logger.writelines(
+                "  " + line
+                for line in diff
+                if not line.startswith("***") and not line.startswith("---")
+            )
+            logger.write("END DIFF\n")
+
+            candidate.steps = new_steps
 
         return Response(
             answer=candidate.steps,
@@ -131,7 +151,7 @@ class AAG(System):
 
         return out["queries"]
 
-    def build_context(self, procs: list[Procedure]) -> str:
+    def format_procedures(self, procs: list[Procedure]) -> str:
         out = ""
         for p in procs:
             out += f"\n\n{RAG._example_name[self.dataset]} '{p.output}' using {p.input_}:\n\n"
@@ -139,19 +159,15 @@ class AAG(System):
 
         return out[2:]  # skip first "\n\n"
 
-    _prompt_candidate: ClassVar[dict[str, str]] = {
+    _create_candidate_instructions: ClassVar[dict[str, str]] = {
         "lcstep": (
-            "Please create a candidate step-by-step solution to use LangChain to create {query} "
-            "using these resources: {input_}. Borrow useful information from the following similar "
-            "solutions:\n\n"
-            "{procedures}\n\n"
-            "Your response should begin with '1.'."
+            "Please write high-level steps to use LangChain to {query} "
+            "using these resources: {input_}. Refer to the similar procedures below for any "
+            "useful information. Your response should begin with '1.'."
         ),
         "recipenlg": (
-            "Please create a candidate step-by-step recipe for making {query} using these "
-            "ingredients: {input_}. Borrow useful information from the following similar "
-            "recipes:\n\n"
-            "{procedures}\n\n"
+            "Please create recipe instructions for making {query} using these "
+            "ingredients: {input_}. Refer to similar recipes below for any useful information. "
             "Your response should begin with '1.'."
         ),
         "champ": (
@@ -159,69 +175,60 @@ class AAG(System):
             "{input_}\n\n"
             "I want to solve the following math problem:\n\n"
             "{query}\n\n"
-            "Please create a candidate step-by-step solution by borrowing useful information from "
-            "the following similar solutions:\n\n"
-            "{procedures}\n\n"
-            "Your response should begin with '1.'."
+            "Please create a candidate step-by-step solution by referring to useful information "
+            "from the similar solutions below. Your response should begin with '1.'."
         ),
     }
 
-    async def create_candidate(self, query: str, input_: str, procs: list[Procedure]) -> list[str]:
-        prompt = self.model.build_prompt(
-            self._prompt_candidate[self.dataset].format(
-                query=query, input_=input_, procedures=self.build_context(procs)
-            )
+    async def create_candidate(
+        self, logger: log.InstanceLogger, query: str, input_: str, procs: list[Procedure]
+    ) -> list[str]:
+        context = self.format_procedures(procs)
+        msg_prompt = (
+            context + "\n\n" + RAG._prompt_inst[self.dataset].format(query=query, input_=input_)
         )
+        prompt = self.model.build_prompt(
+            prompt=msg_prompt,  # self.format_procedures(procs),
+            context=RAG._instructions[self.dataset],
+        )
+        logger.log_prompt(prompt)
 
         completion = await self.model.generate(prompt)
 
         return self.parse_completion(completion)
 
-    _prompt_update_candidate: ClassVar[dict[str, str]] = {
+    _update_candidate_instructions: ClassVar[dict[str, str]] = {
         "lcstep": (
-            "Please update this candidate step-by-step solution to use LangChain to create {query} "
-            "using these resources: {input_}:\n\n"
-            "[BEGIN CANDIDATE]\n"
-            "{candidate}\n"
-            "[END CANDIDATE]\n\n"
-            "Borrow useful information from the following similar solutions:\n\n"
-            "{procedures}\n\n"
-            "Your response should begin with '1.'."
+            "We have a draft procedure to {query} using these resources: {input_}, "
+            "but it may not yet have all the information needed to complete the task."
         ),
         "recipenlg": (
-            "Please update this candidate step-by-step recipe for making {query} using these "
-            "ingredients: {input_}:\n\n"
-            "[BEGIN CANDIDATE]\n"
-            "{candidate}\n"
-            "[END CANDIDATE]\n\n"
-            "Borrow useful information from the following similar recipes:\n\n"
-            "{procedures}\n\n"
-            "Your response should begin with '1.'."
+            "We have a draft recipe to make {query} using these ingredients: {input_}.\n\n"
+            "But it may not yet be completely correct."
         ),
         "champ": (
             "Given the following hints:\n\n"
             "{input_}\n\n"
             "I want to solve the following math problem:\n\n"
             "{query}\n\n"
-            "Please update this candidate step-by-step solution to do so:\n\n"
-            "[BEGIN CANDIDATE]\n"
-            "{candidate}\n"
-            "[END CANDIDATE]\n\n"
-            "Borrow useful information from the following similar solutions:\n\n"
-            "{procedures}\n\n"
-            "Your response should begin with '1.'."
+            "We have a draft solution, but it may not be complete or correct yet."
         ),
     }
 
-    async def update_candidate(self, candidate: Procedure, procs: list[Procedure]) -> list[str]:
+    async def update_candidate(
+        self, logger: log.InstanceLogger, candidate: Procedure, procs: list[Procedure]
+    ) -> list[str]:
         prompt = self.model.build_prompt(
-            self._prompt_update_candidate[self.dataset].format(
+            prompt=f"BEGIN DRAFT\n{candidate.format_steps()}\nEND DRAFT\n\n"
+            + self.format_procedures(procs)
+            + "\n\nBased on the additional information above, update the draft if required. "
+            "Please output only the updated draft. Your response should start with '1.'.",
+            context=self._update_candidate_instructions[self.dataset].format(
                 query=candidate.output,
                 input_=candidate.input_,
-                candidate=candidate.format_steps(),
-                procedures=self.build_context(procs),
-            )
+            ),
         )
+        logger.log_prompt(prompt)
 
         completion = await self.model.generate(prompt)
 

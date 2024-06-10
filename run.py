@@ -39,6 +39,7 @@ async def generate_and_record(
             hlog.write(f"processing query '{p.output}'\n")
             hlog.write(f"  input: '{p.input_}')'\n")
             res = await model.generate(hlog, p.output, p.input_)
+            hlog.write("\nFINISHED GENERATING\n\n")
             csv.result(
                 log.Result(
                     ID=id_,
@@ -47,7 +48,7 @@ async def generate_and_record(
                     completion=res.answer,
                 )
             )
-            hlog.write(f"BEGIN COMPLETION:\n{dataset.format_steps(res.answer)}\nEND COMPLETION\n")
+            hlog.write(f"BEGIN GENERATED:\n{dataset.format_steps(res.answer)}\nEND GENERATED\n")
             hlog.write(f"BEGIN REFERENCE:\n{p.format_steps()}\nEND REFERENCE\n")
             if res.input_tokens != -1 or res.output_tokens != -1:
                 hlog.write(f"used {res.input_tokens} input and {res.output_tokens} output tokens\n")
