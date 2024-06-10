@@ -1,7 +1,5 @@
-import difflib
 import re
 import textwrap
-from itertools import islice
 from typing import Any, ClassVar
 
 import yaml
@@ -57,64 +55,31 @@ class AAG(System):
             proc_list = await self.skills.search(q, self.k)
             procs.append(proc_list)
             summaries.append(await self.create_summary(logger, q, proc_list))
-            
+
         logger.write(f"got {len(queries)} search queries from {self.model.name}:\n")
         for i, q in enumerate(queries):
             logger.write(f"- {q}\n")
             for p in procs[i]:
                 logger.write(f"  - {p.output}\n")
 
-        init_steps = await self.get_RAG_response(logger, query, input_)
+        init_steps = await self.get_rag_response(logger, query, input_)
         candidate = Procedure(input_, query, init_steps)
-        
-        logger.write(
-            f"BEGIN RAG CANDIDATE\n"
-        )
+
+        logger.write("BEGIN RAG CANDIDATE\n")
         logger.write(textwrap.indent(candidate.format_steps(), "  ") + "\n")
         logger.write("END RAG CANDIDATE\n")
-        
+
         candidate.steps = await self.update_steps(logger, candidate, queries, summaries)
-        # TODO in the future try filtering
-
-        # prompt the LLM to produce a candidate based on the top procedure retrieved for each query
-        # steps = await self.create_candidate(logger, query, input_, [ret[0] for ret in procs])
-        # candidate: Procedure = Procedure(input_, query, steps)
-
-        # logger.write(
-        #     f"BEGIN CANDIDATE after looking at the closest procedures for all {len(procs)} "
-        #     "queries:\n"
-        # )
-        # logger.write(textwrap.indent(candidate.format_steps(), "  ") + "\n")
-        # logger.write("END CANDIDATE\n")
-
-        # # iteratively prompt LLM with the next procedures retrieved for each query
-        # for i, proc_set in islice(enumerate(zip(*procs, strict=True)), 1, None):  # skip top
-        #     new_steps = await self.update_candidate(logger, candidate, proc_set)
-
-        #     logger.write(
-        #         f"BEGIN DIFF after looking at the {i + 1}th closest procedures for all "
-        #         f"{len(proc_set)} queries:\n"
-        #     )
-        #     diff = difflib.context_diff(
-        #         [f"{n+1}. {step}\n" for n, step in enumerate(candidate.steps)],
-        #         [f"{n+1}. {step}\n" for n, step in enumerate(new_steps)],
-        #     )
-        #     logger.writelines(
-        #         "  " + line
-        #         for line in diff
-        #         if not line.startswith("***") and not line.startswith("---")
-        #     )
-        #     logger.write("END DIFF\n")
-
-        #     candidate.steps = new_steps
 
         return Response(
             answer=candidate.steps,
             model=self.model.name,
             # TODO token counts
         )
-    
-    async def get_RAG_response(self ,logger: log.InstanceLogger, query: str, input_: str)-> list[str]:
+
+    async def get_rag_response(
+        self, logger: log.InstanceLogger, query: str, input_: str
+    ) -> list[str]:
         q = f"{query} using {input_}"
         procs = await self.skills.search(q, self.k)
         context = self.format_procedures(procs)
@@ -122,41 +87,44 @@ class AAG(System):
             context + "\n\n" + RAG._prompt_inst[self.dataset].format(query=query, input_=input_)
         )
         sys_prompt = RAG._instructions[self.dataset]
-        sys_prompt += " Think carefully about your steps and enclose any steps you are uncertain about in the format like '[[ <step> ]]'" 
-        out = self.model.build_prompt(msg_prompt, RAG._instructions[self.dataset])
+        sys_prompt += (
+            " Think carefully about your steps and enclose any steps you are uncertain about in "
+            "the format like '[[ <step> ]]'"
+        )
+        out = self.model.build_prompt(msg_prompt, sys_prompt)
 
         logger.write(f"prompt to model {self.model.name}:\n")
         logger.log_prompt(out)
         completion = self.parse_completion(await self.model.generate(out))
         return completion
-    
 
     _instructions: ClassVar[dict[str, str]] = {
-            "lcstep": (
-                "Please update the provided high-level steps to accomplish the specified goal using the LangChain "
-                "Python library. Focus more on improving the uncertain steps enclosed in '[[]]'. Don't include code," 
-                " extraneous commentary, or examples, but do refer "
-                "to the specific LangChain APIs (or other APIs) used in each step. Don't produce any "
-                "text other than the list of steps. Use any of the provided reference answers to "
-                "relevant questions on the steps to achieve the specified goal."
-            ),
-            "recipenlg": (
-                "Please update the provided high-level steps to create a recipe for the specified food. Focus more on improving "
-                "the uncertain steps enclosed in '[[]]'. Don't "
-                "include extraneous commentary, or examples, but do refer to the special "
-                "characteristics and state of the ingredients used in each step. Don't produce any "
-                "text other than the list of steps. Use any of the provided reference answers to "
-                "relevant questions on the steps to achieve the specified goal."
-            ),
-            "champ": (
-                "Please update the provided high-level steps to solve the given math problem. Focus more on improving the "
-                "uncertain steps enclosed in '[[]]'. Don't include code, "
-                "extraneous commentary, or examples, but do refer to the concepts and hints used in "
-                "each step. Don't produce any text other than the list of steps. Use any of the provided reference answers to "
-                "relevant questions on the steps to achieve the specified goal."
-            ),
-        }
-    
+        "lcstep": (
+            "Please update the provided high-level steps to accomplish the specified goal using "
+            "the LangChain Python library. Focus more on improving the uncertain steps enclosed in "
+            "'[[]]'. Don't include code, extraneous commentary, or examples, but do refer "
+            "to the specific LangChain APIs (or other APIs) used in each step. Don't produce any "
+            "text other than the list of steps. Use any of the provided reference answers to "
+            "relevant questions on the steps to achieve the specified goal."
+        ),
+        "recipenlg": (
+            "Please update the provided high-level steps to create a recipe for the specified "
+            "food. Focus more on improving the uncertain steps enclosed in '[[]]'. Don't "
+            "include extraneous commentary, or examples, but do refer to the special "
+            "characteristics and state of the ingredients used in each step. Don't produce any "
+            "text other than the list of steps. Use any of the provided reference answers to "
+            "relevant questions on the steps to achieve the specified goal."
+        ),
+        "champ": (
+            "Please update the provided high-level steps to solve the given math problem. Focus "
+            "more on improving the uncertain steps enclosed in '[[]]'. Don't include code, "
+            "extraneous commentary, or examples, but do refer to the concepts and hints used in "
+            "each step. Don't produce any text other than the list of steps. Use any of the "
+            "provided reference answers to relevant questions on the steps to achieve the "
+            "specified goal."
+        ),
+    }
+
     _prompt_inst: ClassVar[dict[str, str]] = {
         "lcstep": (
             "Please update the list of steps to accomplish '{query}' using the knowledge "
@@ -175,23 +143,35 @@ class AAG(System):
         ),
     }
 
-    def format_summaries(self, queries: list[str], summaries: list[str])->str:
+    def format_summaries(self, queries: list[str], summaries: list[str]) -> str:
         sum_str = ""
-        for q, sum in zip(queries, summaries):
-            sum_str += f"Q: {q}\nA: {sum}\n\n"
+        for q, summary in zip(queries, summaries):
+            sum_str += f"Q: {q}\nA: {summary}\n\n"
 
         return sum_str.rstrip()
-        
-    async def update_steps(self, logger: log.InstanceLogger, candidate: Procedure, queries: list[str], summaries: list[str]) -> list[str]:
+
+    async def update_steps(
+        self,
+        logger: log.InstanceLogger,
+        candidate: Procedure,
+        queries: list[str],
+        summaries: list[str],
+    ) -> list[str]:
         summary_str = self.format_summaries(queries, summaries)
-        msg_prompt = (f"[BEGIN KNOWLEDGE]\n{summary_str}\n[END KNOWLEDGE]" 
-                      + "\n\n" 
-                      + f"[BEGIN STEPS]\n{candidate.format_steps()}\n[END STEPS]" 
-                      + "\n\n"
-                      + self._prompt_inst[self.dataset].format(query=candidate.output, input_ = candidate.input_))
-        
-        prompt = self.model.build_prompt(prompt=msg_prompt, context=self._instructions[self.dataset])
-        logger.write(f"Prompt to update RAG response:\n")
+        msg_prompt = (
+            f"[BEGIN KNOWLEDGE]\n{summary_str}\n[END KNOWLEDGE]"
+            "\n\n"
+            f"[BEGIN STEPS]\n{candidate.format_steps()}\n[END STEPS]"
+            "\n\n"
+            + self._prompt_inst[self.dataset].format(
+                query=candidate.output, input_=candidate.input_
+            )
+        )
+
+        prompt = self.model.build_prompt(
+            prompt=msg_prompt, context=self._instructions[self.dataset]
+        )
+        logger.write("Prompt to update RAG response:\n")
         logger.log_prompt(prompt)
         completion = await self.model.generate(prompt)
         return self.parse_completion(completion)
@@ -257,32 +237,32 @@ class AAG(System):
             out += p.format_steps()
 
         return out[2:]  # skip first "\n\n"
-    
-    
+
     async def create_summary(
         self, logger: log.InstanceLogger, query: str, procs: list[Procedure]
     ) -> str:
         context = self.format_procedures(procs)
-        sys_instruction = ("[Instruction]\n"
-                            "You are a human expert whose job is to summarise the retrieved "
-                            "information below to answer the question. Please include the "
-                            "information only from the provided knowledge and make sure "
-                            "that the summary is complete, short and concise. Avoid introductory and"
-                            "closing lines at the start and end of your response.")
+        sys_instruction = (
+            "[Instruction]\n"
+            "You are a human expert whose job is to summarise the retrieved "
+            "information below to answer the question. Please include the "
+            "information only from the provided knowledge and make sure "
+            "that the summary is complete, short and concise. Avoid introductory and"
+            "closing lines at the start and end of your response."
+        )
         msg_prompt = (
             f"[BEGIN QUESTION]\n{query}\n[END QUESTION]\n\n"
             f"[BEGIN INFORMATION]\n{context}\n[END INFORMATION]"
         )
         prompt = self.model.build_prompt(
-            prompt=msg_prompt, #Human Message
-            context=sys_instruction, #System Message
+            prompt=msg_prompt,  # Human Message
+            context=sys_instruction,  # System Message
         )
         logger.log_prompt(prompt)
 
         completion = await self.model.generate(prompt)
 
         return completion
-    
 
     _create_candidate_instructions: ClassVar[dict[str, str]] = {
         "lcstep": (
