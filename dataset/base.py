@@ -27,7 +27,7 @@ def format_steps(steps: list[str]) -> str:
     for i, step in enumerate(steps):
         out += f"{i+1}. {step}\n"
 
-    return out
+    return out[:-1]  # remove final newline
 
 
 @dataclass

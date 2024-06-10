@@ -1,4 +1,3 @@
-import textwrap
 from typing import ClassVar
 
 from langchain_core.messages import BaseMessage
@@ -53,7 +52,7 @@ class RAG(FewShot):
         out = self.model.build_prompt(msg_prompt, self._instructions[self.dataset])
 
         logger.write(f"prompt to model {self.model.name}:\n")
-        logger.write(textwrap.indent(log.messages_to_string(out), "  ") + "\n")
+        logger.log_prompt(out)
 
         return out
 
