@@ -145,7 +145,7 @@ if __name__ == "__main__":
         "-m",
         "--model",
         type=str,
-        default="openai-gpt-3.5-turbo-0613",
+        default="openai-gpt-3.5-turbo-0125",
         help="full name of service & model to use",
     )
     parser.add_argument(
