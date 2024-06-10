@@ -1,33 +1,39 @@
+import argparse
+import asyncio
+import json
 import logging
 import re
-import argparse
-from langchain.schema import HumanMessage, SystemMessage
-import os
 import sys
+from pathlib import Path
+
+import pandas as pd
+from langchain.schema import HumanMessage, SystemMessage
+
 from dataset import Procedure, format_steps
 from systems import Model
-from pathlib import Path
-import pandas as pd
 from utils import spread_gather
-import json
-import asyncio
+
 
 def prepare_prompt(proc1_steps: str, proc2_steps: str, gold: Procedure):
     prompt = [
         SystemMessage(
             content=(
                 "[Instruction]\n"
-                "Please act as an impartial judge and evaluate the quality of the two answer procedures "
-                "provided below to achieve the same user goal and choose one out of the two as the preferred procedure.\n"
-                "For this evaluation, you should primarily evaluate if the procedure achieves the user goal adequately "
-                "or not and whether it uses all the resources mentioned in user goal or not. Do not penalize a procedure "
-                "based on its sentences' structure, grammar and wording, but focus on the facts and suggestions being made "
-                "by the procedure; if the procedure leads to the specified user goal with sufficient details and is easy to "
-                "understand on each intermediate step, then that procedure should be chosen.\n\n"
-                "Compare the two procedures below and then provide a short explanation of your reason for the choice "
-                "between the two. Be as objective as possible. Based on your explanation, you must choose one "
-                "procedure following this format: \"[[choice]]\" where choice can be 1 or 2 only, for example: "
-                "\"Choice: [[2]]\". Print this choice at the END only.\n\n"
+                "Please act as an impartial judge and evaluate the quality of the two answer "
+                "proceduresprovided below to achieve the same user goal and choose one out of the "
+                "two as the preferred procedure.\n"
+                "For this evaluation, you should primarily evaluate if the procedure achieves the "
+                "user goal adequately or not and whether it uses all the resources mentioned in "
+                "user goal or not. Do not penalize a procedure based on its sentences' structure, "
+                "grammar and wording, but focus on the facts and suggestions being made by the "
+                "procedure; if the procedure leads to the specified user goal with sufficient "
+                "details and is easy to understand on each intermediate step, then that procedure "
+                "should be chosen.\n\n"
+                "Compare the two procedures below and then provide a short explanation of your "
+                "reason for the choice between the two. Be as objective as possible. Based on your "
+                'explanation, you must choose one procedure following this format: "[[choice]]" '
+                'where choice can be 1 or 2 only, for example: "Choice: [[2]]". Print this choice '
+                "at the END only.\n\n"
             )
         ),
         HumanMessage(
@@ -36,12 +42,14 @@ def prepare_prompt(proc1_steps: str, proc2_steps: str, gold: Procedure):
                 f"{gold.output} using {gold.input_}\n\n"
                 f"[BEGIN PROCEDURE 1]\n{proc1_steps}\n[END OF PROCEDURE 1]\n\n"
                 f"[BEGIN PROCEDURE 2]\n{proc2_steps}\n[END OF PROCEDURE 2]\n\n"
-                f"Your answer should begin with \"Here is my analysis of the comparison between the two procedures:\n1."
+                f'Your answer should begin with "Here is my analysis of the comparison between the '
+                "two procedures:\n1."
             )
         ),
     ]
 
     return prompt
+
 
 def result_parser(sentence: str) -> int:
     if not sentence:
@@ -57,18 +65,27 @@ def result_parser(sentence: str) -> int:
 
     return int(match[-1])
 
-async def aevaluate(logger: logging.Logger, model: Model, q_id:int, gold: Procedure, sys1_generated: list[str], sys2_generated: list[str]) -> dict[str,int]:
+
+async def aevaluate(
+    logger: logging.Logger,
+    model: Model,
+    q_id: int,
+    gold: Procedure,
+    sys1_generated: list[str],
+    sys2_generated: list[str],
+) -> dict[str, int]:
     prompt = prepare_prompt(format_steps(sys1_generated), format_steps(sys2_generated), gold)
     logger.debug("Prompt prepared")
-    answer = (await model.agenerate(prompt))[0]
+    answer = await model.generate(prompt)
     if answer.find("[") == -1:
         logger.debug("Generating the response again")
-        answer = (await model.agenerate(prompt))[0]
+        answer = await model.generate(prompt)
     logger.debug("Got model response for the choice")
     score = result_parser(answer)
     logger.debug("Returning the LLM choice!")
     res_dict = {"question_id": q_id, "choice": score}
     return res_dict
+
 
 async def get_results(logger, sys1_out_list, sys2_out_list, model):
     out_evals = await spread_gather(
@@ -105,7 +122,7 @@ dataset_recipenlg = "recipenlg"
 dataset_champ = "champ"
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-d",
@@ -158,23 +175,28 @@ if __name__=="__main__":
     )
 
     args = parser.parse_args()
-    print(f"Running for: {args}")
+
     logger = logging.getLogger("main")
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
     logger.addHandler(handler)
     logger.setLevel(logging.DEBUG)
+    logger.debug(f"Running for: {args}")
 
     cache_path = Path("cache")
     model = Model.from_full_name(args.model)
     logger.info("Initialized model")
     args.system1 = args.system1.lower()
     args.system2 = args.system2.lower()
-    
+
     sys1_out_list = read_outputs_csv(args, args.system1)
     sys2_out_list = read_outputs_csv(args, args.system2)
-    
+
     out_evals = asyncio.run(get_results(logger, sys1_out_list, sys2_out_list, model))
 
     to_record = pd.DataFrame(out_evals)
-    to_record.to_csv(f"./output/{args.system1}_{args.system2}_{args.dataset}_{args.embedder}_pair_eval.csv", header=True, index=False)
+    to_record.to_csv(
+        f"./output/{args.system1}_{args.system2}_{args.dataset}_{args.embedder}_pair_eval.csv",
+        header=True,
+        index=False,
+    )
