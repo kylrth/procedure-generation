@@ -159,9 +159,9 @@ class Model:
 
         return out
 
-    async def generate(self, final_prompt: str | list[BaseMessage]) -> str:
+    async def generate(self, final_prompt: str | list[BaseMessage], **kwargs) -> str:
         """Call the model with the prepared prompt and return the response text."""
-        message = await self.model.ainvoke(final_prompt)
+        message = await self.model.ainvoke(final_prompt, **kwargs)
         if self.chat:
             return message.content
 
