@@ -48,7 +48,7 @@ def procedure_from_text(text: str) -> tuple[Procedure, str]:
 
     The procedure is returned along with the side note."""
     chunks = text.split("\n\n")
-    if len(chunks) < 2 or len(chunks) > 3:  # goal + steps + optional side note  # noqa: PLR2004
+    if len(chunks) < 2 or len(chunks) > 3:  # goal + steps + optional side note
         raise ValueError("procedure does not contain 2-3 chunks")
 
     goal, resources = _goal_and_resources_from_text(chunks[0])
@@ -71,7 +71,7 @@ def procedure_from_text(text: str) -> tuple[Procedure, str]:
 
     # parse the side note
     side_note = ""
-    if len(chunks) == 3:  # noqa: PLR2004  # side note appears as 3rd chunk, if any
+    if len(chunks) == 3:  # side note appears as 3rd chunk, if any
         side_note = chunks[2].strip()
         _prefixes = ["Side note: ", "Note: "]
         for p in _prefixes:

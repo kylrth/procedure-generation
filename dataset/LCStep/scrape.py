@@ -89,7 +89,7 @@ def should_skip_page(body: bs4.Tag | bs4.NavigableString | None) -> bool:
         return True
 
     if (
-        len(body.contents) == 2  # noqa: PLR2004  # only used once
+        len(body.contents) == 2
         and body.contents[0].name == "h1"
         and body.contents[1].name == "section"
         and body.contents[1].get("class") == ["row"]
@@ -236,7 +236,7 @@ def is_procedure(url: str) -> bool:
         after = url.split("use_cases/", 2)[1]
         parts = after.split("/", 2)
 
-        if len(parts) == 2 and parts[1] != "":  # noqa: PLR2004
+        if len(parts) == 2 and parts[1] != "":
             return True
 
     url = url.rstrip("/")
