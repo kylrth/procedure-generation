@@ -12,7 +12,7 @@ for dataset in "${datasets[@]}"
 do
     for embedder in "${embedders[@]}"
     do
-        python evaluation/pairwise_eval.py --system1 RAG --system2 AAG \
-            --dataset $dataset --embedder $embedder
+        python evaluation/pairwise_eval.py --system1 AAG --system2 AAG \
+            --dataset $dataset --embedder $embedder --nruns 5
     done
 done

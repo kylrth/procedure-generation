@@ -1,11 +1,11 @@
 import argparse
 import asyncio
+import csv
 import json
 import logging
 import sys
 from pathlib import Path
-
-import pandas as pd
+from typing import Awaitable
 
 from dataset import Procedure
 from evaluation.api_overlap import ApiOverlap
@@ -26,7 +26,7 @@ async def evaluate_all(
     sample_id: int,
     gold: Procedure,
     generated: list[str],
-):
+) -> dict[str, int | float]:
     """Evaluate a generated procedure by comparing with the gold procedure using various methods.
 
     The returned dictionary contains the evaluation result for each metric.
@@ -40,9 +40,7 @@ async def evaluate_all(
         except NotImplementedError:
             async_tasks[name] = heuristic_obj.aevaluate(logger, gold, generated)
 
-    logger.debug("Collecting the heuristics scores for the example")
     resp = await asyncio.gather(*async_tasks.values())
-    logger.info("Results of heuristics collected")
     # add async results to dict
     for name, result in zip(async_tasks.keys(), resp, strict=True):
         results[name] = result
@@ -50,23 +48,26 @@ async def evaluate_all(
     return results
 
 
-def read_outputs_csv(args):
-    output_dir = f"./output/{args.system}/{args.dataset}/{args.embedder}/output.csv"
-    out_csv = pd.read_csv(
-        output_dir, header=0, usecols=["question_id", "input", "output", "gold_steps", "completion"]
-    )
-    out_list = []
-    for i in range(len(out_csv)):
-        row = out_csv.to_numpy()[i]
-        q_id = int(row[0])
-        inputs = row[1]
-        outputs = row[2]
-        gold_steps = json.loads(row[3])
-        gold = Procedure(input_=inputs, output=outputs, steps=gold_steps)
-        gen_steps = json.loads(row[4])
-        out_list.append((q_id, gold, gen_steps))
+async def write_results(w: csv.DictWriter, d: Awaitable[dict[str, int | float]]):
+    w.writerow(await d)
 
-    return out_list
+
+def read_outputs_csv(path: Path) -> list[tuple[int, Procedure, list[str]]]:
+    out = []
+
+    with path.open(newline="") as f:
+        r = csv.DictReader(f)
+
+        for row in r:
+            out.append(
+                (
+                    int(row["question_id"]),
+                    Procedure(row["input"], row["output"], json.loads(row["gold_steps"])),
+                    json.loads(row["completion"]),
+                )
+            )
+
+    return out
 
 
 def int_leq(v: int):
@@ -109,18 +110,6 @@ def get_evaluations(dataset: str, model: Model) -> dict[str, Heuristic]:
     return evals
 
 
-async def get_results(logger, out_list, dataset, model):
-    evals = get_evaluations(dataset, model)
-
-    out_evals = await spread_gather(
-        lambda sample_data: evaluate_all(logger, evals, *sample_data[1]),
-        enumerate(out_list),
-        5,  # Num workers
-        len(out_list),
-    )
-    return out_evals
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -160,42 +149,48 @@ if __name__ == "__main__":
         help="full name of service & model to use for embeddings",
     )
     parser.add_argument(
-        "-n", type=int, default=sys.maxsize, help="limit the number of samples to test"
+        "-n",
+        type=int,
+        default=sys.maxsize,
+        help="ignored; allowed so scripts can make the dataset be 'recipenlg -n 100'",
     )
     parser.add_argument(
         "--workers", type=int, default=10, help="number of concurrent requests to make to the LLM"
     )
-    parser.add_argument(
-        "-k",
-        type=int_leq(5),
-        default=3,
-        help=(
-            "maximum number of examples to provide for FewShot and RAG (fewer are provided if they "
-            "don't fit)"
-        ),
-    )
 
     args = parser.parse_args()
+    args.system = args.system.lower()
+
     logger = logging.getLogger("main")
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
     logger.addHandler(handler)
-    logger.setLevel(logging.DEBUG)
-    logger.debug(f"Running for: {args}")
+    logger.setLevel(logging.INFO)
+    logger.info(f"Running for: {args}")
 
-    cache_path = Path("cache")
     model = Model.from_full_name(args.model)
-    logger.info("Initialized model")
-    args.system = args.system.lower()
 
-    # Read Outputs
-    out_list = read_outputs_csv(args)
-    logger.info("Read the outputs csv file")
-    out_evals = asyncio.run(get_results(logger, out_list, args.dataset, model))
+    logger.info("preparing the evaluations")
+    evals = get_evaluations(args.dataset, model)
 
-    to_record = pd.DataFrame(out_evals)
-    to_record.to_csv(
-        f"./output/{args.system}/{args.dataset}/{args.embedder}/eval_results.csv",
-        header=True,
-        index=False,
-    )
+    in_path = Path("output") / args.system / args.dataset / args.embedder / "output.csv"
+    out_path = in_path.parent / "eval_results.csv"
+
+    logger.info("reading the outputs csv file")
+    to_process = read_outputs_csv(in_path)
+
+    async def _write_results(w: csv.DictWriter, d: Awaitable[dict[str, int | float]]):
+        w.writerow(await d)
+
+    with out_path.open("w", newline="") as f:
+        w = csv.DictWriter(f, ["_id", *evals.keys()])
+        w.writeheader()
+
+        asyncio.run(
+            spread_gather(
+                lambda sample_data: _write_results(w, evaluate_all(logger, evals, *sample_data)),
+                to_process,
+                args.workers,
+                len(to_process),
+            )
+        )
