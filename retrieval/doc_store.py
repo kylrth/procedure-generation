@@ -83,7 +83,7 @@ class DocStore(Store):
 
     async def search(self, query: str, k: int = 5) -> list[Doc]:
         """Returns the k docs with vector representation closes to that of the query."""
-        embedded_query = (await self.embedder.embed([query]))[0]
+        embedded_query = (await self.embedder.embed([query], is_query=True))[0]
 
         res = self.collection.query.near_vector(
             near_vector=embedded_query.tolist(),

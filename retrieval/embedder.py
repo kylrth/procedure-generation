@@ -3,7 +3,7 @@ import pickle
 from abc import ABC, abstractmethod
 from os import PathLike
 from pathlib import Path
-from typing import Generator, Iterable, Type, TypeVar
+from typing import Callable, ClassVar, Generator, Iterable, Type, TypeVar
 
 import mmh3
 import numpy as np
@@ -19,7 +19,7 @@ class Embedder(ABC):
     """Something that produces embeddings."""
 
     @abstractmethod
-    async def embed(self, text: list[str]) -> list[np.ndarray]:
+    async def embed(self, text: list[str], *, is_query: bool = False) -> list[np.ndarray]:
         pass
 
 
@@ -91,7 +91,9 @@ class OpenAIEmbedder(NamedEmbedder):
         else:
             yield from self.tok.encode_batch(text, num_threads=self._tok_threads)
 
-    async def embed(self, text: list[str]) -> list[np.ndarray]:
+    async def embed(
+        self, text: list[str], *, is_query: bool = False  # noqa: ARG002
+    ) -> list[np.ndarray]:
         tokens = self._tokenize(text)
         batches = batch(tokens, self._max_input)
 
@@ -116,14 +118,44 @@ class OpenAIEmbedder(NamedEmbedder):
 class HFEmbedder(NamedEmbedder):
     model: SentenceTransformer
 
-    def __init__(self, model: str):
-        if model == "all-mpnet-base-v2":
-            self.model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
-        else:
-            raise NotImplementedError(model)
+    # used for selecting prompt prefixes when embedding
+    _is_query: ClassVar[str] = "q"
+    _is_doc: ClassVar[str] = "d"
 
-    async def embed(self, text: list[str]) -> list[np.ndarray]:
-        return self.model.encode(text, show_progress_bar=len(text) > 1, convert_to_numpy=True)
+    inits: ClassVar[dict[str, Callable[[], SentenceTransformer]]] = {
+        "all-mpnet-base-v2": lambda: SentenceTransformer(
+            "sentence-transformers/all-mpnet-base-v2",
+            prompts={HFEmbedder._is_query: "", HFEmbedder._is_doc: ""},
+        ),
+        "nomic-embed-text-v1.5": lambda: SentenceTransformer(
+            "nomic-ai/nomic-embed-text-v1.5",
+            prompts={
+                HFEmbedder._is_query: "search_query: ",
+                HFEmbedder._is_doc: "search_document: ",
+            },
+            trust_remote_code=True,
+        ),
+        "gte-large-en-v1.5": lambda: SentenceTransformer(
+            "Alibaba-NLP/gte-large-en-v1.5",
+            prompts={HFEmbedder._is_query: "", HFEmbedder._is_doc: ""},
+            trust_remote_code=True,
+        ),
+    }
+
+    def __init__(self, model: str):
+        try:
+            self.model = self.inits[model]()
+        except KeyError:
+            raise NotImplementedError(model) from None
+
+    async def embed(self, text: list[str], *, is_query: bool = False) -> list[np.ndarray]:
+        return self.model.encode(
+            text,
+            prompt_name=self._is_query if is_query else self._is_doc,
+            batch_size=16,
+            show_progress_bar=len(text) > 1,
+            convert_to_numpy=True,
+        )
 
 
 embedder_dict: dict[str, Type[NamedEmbedder]] = {
@@ -153,8 +185,10 @@ class CachingEmbedder(Embedder):
         self.path = Path(path)
         self.cache = {}
 
-    async def embed(self, text: list[str]) -> list[np.ndarray]:
+    async def embed(self, text: list[str], *, is_query: bool = False) -> list[np.ndarray]:
         """First searches the in-memory cache, then the disk cache, and otherwise calls e.embed."""
+        # TODO here in the cache we assume the same exact text will never be embedded as a query AND
+        # as a doc
         out = []
         to_embed: list[str] = []
         for s in text:
@@ -176,7 +210,7 @@ class CachingEmbedder(Embedder):
 
         # generate any embeddings not cached
         if len(to_embed) > 0:
-            embeds = await self.e.embed(to_embed)
+            embeds = await self.e.embed(to_embed, is_query=is_query)
             for i in range(len(out)):
                 if isinstance(out[i], int):
                     embed = embeds[out[i]]

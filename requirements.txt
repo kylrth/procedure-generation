@@ -3,6 +3,7 @@ asyncio==3.4.3
 champ-dataset==1.0.0
 datasets==2.15.0
 editdistance==0.8.1
+einops==0.8.0
 evaluate==0.4.1
 langchain==0.2.2
 langchain-community==0.2.2
