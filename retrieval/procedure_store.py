@@ -93,7 +93,7 @@ class ProcedureStore(Store):
 
     async def search(self, query: str, k: int = 5) -> list[Procedure]:
         """Returns the procedures that will be inserted into the prompt."""
-        embedded_query = (await self.embedder.embed([query]))[0]
+        embedded_query = (await self.embedder.embed([query], is_query=True))[0]
 
         res = self.collection.query.near_vector(
             near_vector=embedded_query.tolist(),
