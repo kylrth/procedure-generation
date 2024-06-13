@@ -37,7 +37,7 @@ async def generate_and_record(
     with human.for_id(id_) as hlog:
         try:
             hlog.write(f"processing query '{p.output}'\n")
-            hlog.write(f"  input: '{p.input_}')'\n")
+            hlog.write(f"  input: '{p.input_}'\n")
             res = await model.generate(hlog, p.output, p.input_)
             hlog.write("\nFINISHED GENERATING\n\n")
             csv.result(
