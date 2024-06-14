@@ -188,15 +188,15 @@ def check_ids(one: Sequence[int], two: Sequence[int]):
     only_in_one = in_one.difference(in_two)
     only_in_two = in_two.difference(in_one)
 
-    if only_in_one or only_in_two:
+    if only_in_one and only_in_two:
         raise ValueError(
-            f"first CSV is missing {' '.join(sorted(only_in_two))}, "
-            f"second is missing {' '.join(sorted(only_in_one))}"
+            f"first CSV is missing {' '.join(str(i) for i in sorted(only_in_two))}, "
+            f"second is missing {' '.join(str(i) for i in sorted(only_in_one))}"
         )
     if only_in_two:
-        raise ValueError(f"first CSV is missing {' '.join(sorted(only_in_two))}")
+        raise ValueError(f"first CSV is missing {' '.join(str(i) for i in sorted(only_in_two))}")
     if only_in_one:
-        raise ValueError(f"second CSV is missing {' '.join(sorted(only_in_one))}")
+        raise ValueError(f"second CSV is missing {' '.join(str(i) for i in sorted(only_in_one))}")
 
 
 # constants
