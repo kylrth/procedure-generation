@@ -203,7 +203,8 @@ if __name__ == "__main__":
         if system_name == "rag":
             # set up vector store with supporting docs + the train set of procedures
             logger.debug("RAG: collecting docs")
-            docs = ds.docs(include_procedures=dataset.Split.TRAIN)
+            procedures = ds.procedures(dataset.Split.TRAIN)
+            docs = [p.to_doc() for p in procedures]
             logger.debug(f"RAG: collected {len(docs)} docs for vector store")
 
             logger.info("RAG: Creating collection and uploading docs to Weaviate collection")
