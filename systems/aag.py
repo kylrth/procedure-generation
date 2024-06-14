@@ -70,11 +70,13 @@ class AAG(System):
         logger.write("END RAG CANDIDATE\n")
 
         candidate.steps = await self.update_steps(logger, candidate, queries, summaries)
+        
+        candidate.steps = await self.check_with_validator_and_modify(logger, candidate, self.format_summaries(queries, summaries), max_updates=3)
 
         return Response(
             answer=candidate.steps,
             model=self.model.name,
-            # TODO token counts
+            # TODO token couns
         )
 
     async def get_rag_response(
@@ -268,78 +270,156 @@ class AAG(System):
         completion = await self.model.generate(prompt)
 
         return completion
-
-    _create_candidate_instructions: ClassVar[dict[str, str]] = {
-        "lcstep": (
-            "Please write high-level steps to use LangChain to {query} "
-            "using these resources: {input_}. Refer to the similar procedures below for any "
-            "useful information. Your response should begin with '1.'."
-        ),
+    
+    '''
+    Validator checks for:
+    1) If all inputs are used or not: Accept extra 
+    ingredients in the serving part but not while 
+    making components of the dish
+    2) Completes the user goal or not: any change in flow of steps or 
+    adding some details.
+    
+    Suggest edits as a bulleted list. If no update required, 
+    respond 'NO UPDATE REQUIRED'
+    '''
+    
+    _validator_opt_inst: ClassVar[dict[str, str]] = {
+        "lcstep": "",
         "recipenlg": (
-            "Please create recipe instructions for making {query} using these "
-            "ingredients: {input_}. Refer to similar recipes below for any useful information. "
-            "Your response should begin with '1.'."
-        ),
-        "champ": (
-            "Given the following hints:\n\n"
-            "{input_}\n\n"
-            "I want to solve the following math problem:\n\n"
-            "{query}\n\n"
-            "Please create a candidate step-by-step solution by referring to useful information "
-            "from the similar solutions below. Your response should begin with '1.'."
-        ),
-    }
-
-    async def create_candidate(
-        self, logger: log.InstanceLogger, query: str, input_: str, procs: list[Procedure]
-    ) -> list[str]:
-        context = self.format_procedures(procs)
-        msg_prompt = (
-            context + "\n\n" + RAG._prompt_inst[self.dataset].format(query=query, input_=input_)
-        )
-        prompt = self.model.build_prompt(
-            prompt=msg_prompt,  # self.format_procedures(procs),
-            context=RAG._instructions[self.dataset],
-        )
-        logger.log_prompt(prompt)
-
-        completion = await self.model.generate(prompt)
-
-        return self.parse_completion(completion)
-
-    _update_candidate_instructions: ClassVar[dict[str, str]] = {
-        "lcstep": (
-            "We have a draft procedure to {query} using these resources: {input_}, "
-            "but it may not yet have all the information needed to complete the task."
-        ),
-        "recipenlg": (
-            "We have a draft recipe to make {query} using these ingredients: {input_}.\n\n"
-            "But it may not yet be completely correct."
-        ),
-        "champ": (
-            "Given the following hints:\n\n"
-            "{input_}\n\n"
-            "I want to solve the following math problem:\n\n"
-            "{query}\n\n"
-            "We have a draft solution, but it may not be complete or correct yet."
-        ),
-    }
-
-    async def update_candidate(
-        self, logger: log.InstanceLogger, candidate: Procedure, procs: list[Procedure]
-    ) -> list[str]:
-        prompt = self.model.build_prompt(
-            prompt=f"BEGIN DRAFT\n{candidate.format_steps()}\nEND DRAFT\n\n"
-            + self.format_procedures(procs)
-            + "\n\nBased on the additional information above, update the draft if required. "
-            "Please output only the updated draft. Your response should start with '1.'.",
-            context=self._update_candidate_instructions[self.dataset].format(
-                query=candidate.output,
-                input_=candidate.input_,
+            "For the provided recipe, do not penalize additional ingredients "
+            "used for better serving or decorating and the utensils. However, "
+            "there should not be extra ingredients used in making the components "
+            "of the food."
             ),
+        "champ": "",
+    }
+    
+    async def validate_update(self, logger: log.InstanceLogger, candidate: Procedure) -> str:
+        sys_instruction = (
+            "[INSTRUCTION]\nYou are a human critic whose job is to validate the "
+            "provided procedure, propose the changes to be made and evaluate if "
+            "the steps lead to the mentioned "
+            "user goal or not. You should also assess if the quality of the steps "
+            "can be improved by modifying the flow of the steps or adding "
+            "more details to make it more clear and doable.\n\n"
+            "Furthermore, it is very important for the procedure to use all the "
+            "mentioned input resources. Carefully judge if the procedure uses "
+            "all the resources and point out in your response if it misses "
+            "something. {opt_inst}\n\n"
+            "You should always suggest only your edits in a bulleted list. If there "
+            "are no edits to be made, please only respond 'NO UPDATE REQUIRED'. You are "
+            "required to strictly follow the mentioned output format."
         )
-        logger.log_prompt(prompt)
-
+        msg_prompt = (
+            f"[USER GOAL]\n{candidate.output}\n\n"
+            f"[INPUT RESOURCES]\n{candidate.input_}\n\n"
+            f"[BEGIN PROCEDURE]\n{candidate.format_steps()}\n[END PROCEDURE]"
+        )
+        prompt = self.model.build_prompt(
+            prompt=msg_prompt,  # Human Message
+            context=sys_instruction.format(opt_inst=self._validator_opt_inst[self.dataset]),  # System Message
+        )
         completion = await self.model.generate(prompt)
+        
+        logger.write("VALIDATOR PROMPT\n")
+        logger.log_prompt(prompt)
+        logger.write("BEGIN VALIDATOR ANSWER\n")
+        logger.write(textwrap.indent(completion, "  ") + "\n")
+        logger.write("END VALIDATOR ANSWER\n")
+        return completion
+    
+    
+    _perform_edits_instructions: ClassVar[dict[str, str]] = {
+        "lcstep": (
+            "Please update the provided high-level steps in accordance with the suggested edits "
+            "to accomplish the specified goal using "
+            "the LangChain Python library. Make sure all the other details remain unaltered. "
+            "Don't include code, extraneous commentary, or examples, but do refer "
+            "to the specific LangChain APIs (or other APIs) used in each step. Don't produce any "
+            "text other than the list of steps. Use any of the provided reference answers to "
+            "relevant questions on the steps to achieve the specified goal."
+        ),
+        "recipenlg": (
+            "Please update the provided high-level steps in accordance with the suggested edits "
+            "to create a recipe for the specified "
+            "food. Make sure all the other details remain unaltered. Don't "
+            "include extraneous commentary, or examples, but do refer to the special "
+            "characteristics and state of the ingredients used in each step. Don't produce any "
+            "text other than the list of steps. Use any of the provided reference answers to "
+            "relevant questions on the steps to achieve the specified goal."
+        ),
+        "champ": (
+            "Please update the provided high-level steps in accordance with the suggested edits "
+            "to solve the given math problem. Make sure all the other details remain unaltered. "
+            "Don't include code, extraneous commentary, or examples, but do refer to the "
+            "concepts and hints used in "
+            "each step. Don't produce any text other than the list of steps. Use any of the "
+            "provided reference answers to relevant questions on the steps to achieve the "
+            "specified goal."
+        ),
+    }
 
+    _perf_edit_inst: ClassVar[dict[str, str]] = {
+        "lcstep": (
+            "Please perform all the edits and update the list of steps to "
+            "accomplish '{query}' using the knowledge "
+            "above. Create and use these resources in your response: {input_}. "
+            "Please output only the updated steps. Your response should start with '1.'. "
+            "The final response should not contain direct references to the knowledge above."
+        ),
+        "recipenlg": (
+            "Please perform all the edits and update the list of steps to "
+            "accomplish '{query}' using the knowledge "
+            "above. Use these ingredients in your response: {input_}. "
+            "Please output only the updated steps. Your response should start with '1.'. "
+            "The final response should not contain direct references to the knowledge above."
+        ),
+        "champ": (
+            "Please perform all the edits and update the list of steps to "
+            "solve '{query}' using the knowledge above. "
+            "Use this additional information in preparing your response: {input_}. "
+            "Please output only the updated steps. Your response should start with '1.'. "
+            "The final response should not contain direct references to the knowledge above."
+        ),
+    }
+    
+    
+    async def perform_validator_edits(self, logger: log.InstanceLogger, candidate: Procedure, knowledge_str: str, edits: str)->list[str]:
+        msg_prompt = (
+            f"[BEGIN KNOWLEDGE]\n{knowledge_str}\n[END KNOWLEDGE]"
+            "\n\n"
+            f"[BEGIN STEPS]\n{candidate.format_steps()}\n[END STEPS]"
+            "\n\n"
+            f"[BEGIN EDITS]\n{edits}\n[END EDITS]"
+            "\n\n"
+            + self._perf_edit_inst[self.dataset].format(
+                query=candidate.output, input_=candidate.input_
+            )
+        )
+
+        prompt = self.model.build_prompt(
+            prompt=msg_prompt, context=self._perform_edits_instructions[self.dataset]
+        )
+        logger.write("Prompt to update candidate based on edits:\n")
+        logger.log_prompt(prompt)
+        completion = await self.model.generate(prompt)
+        
         return self.parse_completion(completion)
+    
+    
+    async def check_with_validator_and_modify(self, logger: log.InstanceLogger, candidate: Procedure, knowledge_str: str, max_updates: int=3)->list[str]:
+        break_phrase = 'NO UPDATE REQUIRED'
+        updates_done = 0
+        
+        while updates_done < max_updates:
+            validator_edits = await self.validate_update(logger, candidate)
+            if break_phrase in validator_edits:
+                logger.write(f"EXITING EDIT LOOP EARLY AFTER {updates_done} updates")
+                break
+            candidate.steps = await self.perform_validator_edits(logger, candidate, knowledge_str, validator_edits)
+            logger.write("BEGIN EDITED STEPS\n")
+            logger.write(textwrap.indent(candidate.format_steps(), "  ") + "\n")
+            logger.write("END EDITED STEPS\n")
+            updates_done += 1
+        
+        return candidate.steps
