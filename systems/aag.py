@@ -70,8 +70,10 @@ class AAG(System):
         logger.write("END RAG CANDIDATE\n")
 
         candidate.steps = await self.update_steps(logger, candidate, queries, summaries)
-        
-        candidate.steps = await self.check_with_validator_and_modify(logger, candidate, self.format_summaries(queries, summaries), max_updates=3)
+
+        candidate.steps = await self.check_with_validator_and_modify(
+            logger, candidate, self.format_summaries(queries, summaries), max_updates=3
+        )
 
         return Response(
             answer=candidate.steps,
@@ -270,19 +272,19 @@ class AAG(System):
         completion = await self.model.generate(prompt)
 
         return completion
-    
-    '''
+
+    """
     Validator checks for:
-    1) If all inputs are used or not: Accept extra 
-    ingredients in the serving part but not while 
+    1) If all inputs are used or not: Accept extra
+    ingredients in the serving part but not while
     making components of the dish
-    2) Completes the user goal or not: any change in flow of steps or 
+    2) Completes the user goal or not: any change in flow of steps or
     adding some details.
-    
-    Suggest edits as a bulleted list. If no update required, 
+
+    Suggest edits as a bulleted list. If no update required,
     respond 'NO UPDATE REQUIRED'
-    '''
-    
+    """
+
     _validator_opt_inst: ClassVar[dict[str, str]] = {
         "lcstep": "",
         "recipenlg": (
@@ -290,10 +292,10 @@ class AAG(System):
             "used for better serving or decorating and the utensils. However, "
             "there should not be extra ingredients used in making the components "
             "of the food."
-            ),
+        ),
         "champ": "",
     }
-    
+
     async def validate_update(self, logger: log.InstanceLogger, candidate: Procedure) -> str:
         sys_instruction = (
             "[INSTRUCTION]\nYou are a human critic whose job is to validate the "
@@ -317,18 +319,19 @@ class AAG(System):
         )
         prompt = self.model.build_prompt(
             prompt=msg_prompt,  # Human Message
-            context=sys_instruction.format(opt_inst=self._validator_opt_inst[self.dataset]),  # System Message
+            context=sys_instruction.format(
+                opt_inst=self._validator_opt_inst[self.dataset]
+            ),  # System Message
         )
         completion = await self.model.generate(prompt)
-        
+
         logger.write("VALIDATOR PROMPT\n")
         logger.log_prompt(prompt)
         logger.write("BEGIN VALIDATOR ANSWER\n")
         logger.write(textwrap.indent(completion, "  ") + "\n")
         logger.write("END VALIDATOR ANSWER\n")
         return completion
-    
-    
+
     _perform_edits_instructions: ClassVar[dict[str, str]] = {
         "lcstep": (
             "Please update the provided high-level steps in accordance with the suggested edits "
@@ -382,9 +385,10 @@ class AAG(System):
             "The final response should not contain direct references to the knowledge above."
         ),
     }
-    
-    
-    async def perform_validator_edits(self, logger: log.InstanceLogger, candidate: Procedure, knowledge_str: str, edits: str)->list[str]:
+
+    async def perform_validator_edits(
+        self, logger: log.InstanceLogger, candidate: Procedure, knowledge_str: str, edits: str
+    ) -> list[str]:
         msg_prompt = (
             f"[BEGIN KNOWLEDGE]\n{knowledge_str}\n[END KNOWLEDGE]"
             "\n\n"
@@ -403,23 +407,30 @@ class AAG(System):
         logger.write("Prompt to update candidate based on edits:\n")
         logger.log_prompt(prompt)
         completion = await self.model.generate(prompt)
-        
+
         return self.parse_completion(completion)
-    
-    
-    async def check_with_validator_and_modify(self, logger: log.InstanceLogger, candidate: Procedure, knowledge_str: str, max_updates: int=3)->list[str]:
-        break_phrase = 'NO UPDATE REQUIRED'
+
+    async def check_with_validator_and_modify(
+        self,
+        logger: log.InstanceLogger,
+        candidate: Procedure,
+        knowledge_str: str,
+        max_updates: int = 3,
+    ) -> list[str]:
+        break_phrase = "NO UPDATE REQUIRED"
         updates_done = 0
-        
+
         while updates_done < max_updates:
             validator_edits = await self.validate_update(logger, candidate)
             if break_phrase in validator_edits:
                 logger.write(f"EXITING EDIT LOOP EARLY AFTER {updates_done} updates")
                 break
-            candidate.steps = await self.perform_validator_edits(logger, candidate, knowledge_str, validator_edits)
+            candidate.steps = await self.perform_validator_edits(
+                logger, candidate, knowledge_str, validator_edits
+            )
             logger.write("BEGIN EDITED STEPS\n")
             logger.write(textwrap.indent(candidate.format_steps(), "  ") + "\n")
             logger.write("END EDITED STEPS\n")
             updates_done += 1
-        
+
         return candidate.steps
