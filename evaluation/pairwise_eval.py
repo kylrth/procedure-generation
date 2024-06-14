@@ -284,7 +284,9 @@ if __name__ == "__main__":
 
     prefix = "with-gt" if args.gt else "without-gt-validator-test"
     out_path = (
-        Path("output") / prefix / f"{args.system1}_{args.system2}_{args.dataset}_{embed1}_pair_eval.csv"
+        Path("output")
+        / prefix
+        / f"{args.system1}_{args.system2}_{args.dataset}_{embed1}_pair_eval.csv"
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
