@@ -6,7 +6,7 @@ import random
 import re
 import sys
 from pathlib import Path
-from typing import Awaitable
+from typing import Awaitable, Sequence
 
 from langchain.schema import HumanMessage, SystemMessage
 
@@ -178,6 +178,27 @@ async def aevaluate(
     return {"question_id": q_id, "choice": final_choice}
 
 
+def check_ids(one: Sequence[int], two: Sequence[int]):
+    if abs(len(one) - len(two) > 10):
+        raise ValueError(f"first CSV has {len(one)} elements, second has {len(two)}")
+
+    in_one = set(one)
+    in_two = set(two)
+
+    only_in_one = in_one.difference(in_two)
+    only_in_two = in_two.difference(in_one)
+
+    if only_in_one or only_in_two:
+        raise ValueError(
+            f"first CSV is missing {' '.join(sorted(only_in_two))}, "
+            f"second is missing {' '.join(sorted(only_in_one))}"
+        )
+    if only_in_two:
+        raise ValueError(f"first CSV is missing {' '.join(sorted(only_in_two))}")
+    if only_in_one:
+        raise ValueError(f"second CSV is missing {' '.join(sorted(only_in_one))}")
+
+
 # constants
 dataset_lcstep = "lcstep"
 dataset_recipenlg = "recipenlg"
@@ -259,6 +280,7 @@ if __name__ == "__main__":
     sys2_path = Path("output") / args.system2 / args.dataset / embed2 / "output.csv"
     sys1_out_list = sorted(read_outputs_csv(sys1_path), key=lambda t: t[0])
     sys2_out_list = sorted(read_outputs_csv(sys2_path), key=lambda t: t[0])
+    check_ids([i for i, _, _ in sys1_out_list], [i for i, _, _ in sys2_out_list])
 
     prefix = "with-gt" if args.gt else "without-gt-between-embeds"
     out_path = (
