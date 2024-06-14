@@ -275,16 +275,16 @@ if __name__ == "__main__":
     model = Model.from_full_name(args.model)
 
     embed1 = "hf-all-mpnet-base-v2"
-    embed2 = "hf-gte-large-en-v1.5"
+    embed2 = "hf-all-mpnet-base-v2"
     sys1_path = Path("output") / args.system1 / args.dataset / embed1 / "output.csv"
     sys2_path = Path("output") / args.system2 / args.dataset / embed2 / "output.csv"
     sys1_out_list = sorted(read_outputs_csv(sys1_path), key=lambda t: t[0])
     sys2_out_list = sorted(read_outputs_csv(sys2_path), key=lambda t: t[0])
     check_ids([i for i, _, _ in sys1_out_list], [i for i, _, _ in sys2_out_list])
 
-    prefix = "with-gt" if args.gt else "without-gt-between-embeds"
+    prefix = "with-gt" if args.gt else "without-gt-validator-test"
     out_path = (
-        Path("output") / prefix / f"{args.system1}_{args.dataset}_{embed1}_{embed2}_pair_eval.csv"
+        Path("output") / prefix / f"{args.system1}_{args.system2}_{args.dataset}_{embed1}_pair_eval.csv"
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
