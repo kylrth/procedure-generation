@@ -236,10 +236,10 @@ if __name__ == "__main__":
             raise NotImplementedError(args.system)
 
         # shorten eval set according to -n
-        val_data = ds.procedures(dataset.Split.VAL)
-        n = min(args.n, len(val_data))
-        val_data = val_data[:n]
-        logger.info(f"loaded {len(val_data)} eval examples")
+        eval_data = ds.procedures(dataset.Split.VAL)
+        n = min(args.n, len(eval_data))
+        eval_data = eval_data[:n]
+        logger.info(f"loaded {len(eval_data)} eval examples")
 
         logger.info("starting generation...")
 
@@ -248,9 +248,9 @@ if __name__ == "__main__":
                 asyncio.run(
                     spread_gather(
                         lambda item: generate_and_record(logger, csv, human, system, *item),
-                        enumerate(val_data),
+                        enumerate(eval_data),
                         min(args.workers, n),
-                        len(val_data),
+                        len(eval_data),
                     )
                 )
                 logger.info(f"see results in in ./{outdir}")
