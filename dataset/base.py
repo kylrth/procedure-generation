@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import Enum
+from enum import Flag, auto
 from os import PathLike
 from pathlib import Path
 from typing import Any
@@ -77,26 +77,30 @@ def train_val_test(data: list, val: float, test: float) -> tuple[list, list, lis
     return train_set, val_set, test_set
 
 
-class Split(Enum):
+class Split(Flag):
     """Enum classes for specifying and selecting subsets of the data."""
 
-    TRAIN = 1
-    VAL = 2
-    TEST = 3
+    TRAIN = auto()
+    VAL = auto()
+    TEST = auto()
 
     def get(self, data: list, val: float = 0.1, test: float = 0.2) -> list:
         """Get the specified split of the given data."""
         d_train, d_val, d_test = train_val_test(data, val, test)
 
-        match self:
-            case Split.TRAIN:
-                return d_train
-            case Split.VAL:
-                return d_val
-            case Split.TEST:
-                return d_test
+        out = []
+        for subset in self:
+            match subset:
+                case Split.TRAIN:
+                    out.extend(d_train)
+                case Split.VAL:
+                    out.extend(d_val)
+                case Split.TEST:
+                    out.extend(d_test)
+                case _:
+                    raise ValueError(f"unknown data split {self}")
 
-        raise ValueError(f"unknown data split {self}")
+        return out
 
 
 class Dataset(ABC):
