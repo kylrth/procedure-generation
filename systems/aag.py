@@ -35,7 +35,15 @@ class AAG(System):
     summarize: bool
     use_critic: bool
 
-    def __init__(self, model: Model, skills: ProcedureStore, k: int, dataset: str, summarize: bool, critic:bool):
+    def __init__(
+        self,
+        model: Model,
+        skills: ProcedureStore,
+        k: int,
+        dataset: str,
+        summarize: bool,
+        critic: bool,
+    ):
         """Create a new AAG system that maintains the skill library in the Weaviate instance.
 
         The model will only return one result when calling generate or agenerate.
@@ -73,17 +81,19 @@ class AAG(System):
         logger.write("BEGIN RAG CANDIDATE\n")
         logger.write(textwrap.indent(candidate.format_steps(), "  ") + "\n")
         logger.write("END RAG CANDIDATE\n")
-        
+
         if self.summarize:
             knowledge_str = self.format_summaries(queries, summaries)
         else:
             flat_proc_list = [p for p_list in procs for p in p_list]
             knowledge_str = self.format_procedures(flat_proc_list)
-        
+
         candidate.steps = await self.update_steps(logger, candidate, knowledge_str)
-        
+
         if self.use_critic:
-            candidate.steps = await self.check_with_validator_and_modify(logger, candidate, knowledge_str, max_updates=3)
+            candidate.steps = await self.check_with_validator_and_modify(
+                logger, candidate, knowledge_str, max_updates=3
+            )
 
         return Response(
             answer=candidate.steps,
@@ -138,7 +148,7 @@ class AAG(System):
             "specified goal."
         ),
     }
-    
+
     _no_summ_instructions: ClassVar[dict[str, str]] = {
         "lcstep": (
             "Please update the provided high-level steps to accomplish the specified goal using "
@@ -195,10 +205,7 @@ class AAG(System):
         return sum_str.rstrip()
 
     async def update_steps(
-        self,
-        logger: log.InstanceLogger,
-        candidate: Procedure,
-        knowledge_str: str
+        self, logger: log.InstanceLogger, candidate: Procedure, knowledge_str: str
     ) -> list[str]:
         msg_prompt = (
             f"[BEGIN KNOWLEDGE]\n{knowledge_str}\n[END KNOWLEDGE]"
@@ -213,9 +220,7 @@ class AAG(System):
             sys_instruction = self._instructions[self.dataset]
         else:
             sys_instruction = self._no_summ_instructions[self.dataset]
-        prompt = self.model.build_prompt(
-            prompt=msg_prompt, context=sys_instruction
-        )
+        prompt = self.model.build_prompt(prompt=msg_prompt, context=sys_instruction)
         logger.write("Prompt to update RAG response:\n")
         logger.log_prompt(prompt)
         completion = await self.model.generate(prompt)
@@ -477,9 +482,7 @@ class AAG(System):
             sys_instruction = self._perform_edits_instructions[self.dataset]
         else:
             sys_instruction = self._no_summ_perform_edits_instructions[self.dataset]
-        prompt = self.model.build_prompt(
-            prompt=msg_prompt, context=sys_instruction
-        )
+        prompt = self.model.build_prompt(prompt=msg_prompt, context=sys_instruction)
         logger.write("Prompt to update candidate based on edits:\n")
         logger.log_prompt(prompt)
         completion = await self.model.generate(prompt)
