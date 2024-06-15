@@ -4,8 +4,8 @@
 
 set -e
 
-datasets=("champ" "lcstep" "recipenlg -n 1000")
-embedders=("hf-all-mpnet-base-v2" "openai-text-embedding-3-large")
+datasets=("champ" "lcstep" "recipenlg")
+embedders=("hf-nomic-embed-text-v1.5")
 systems=("RAG" "AAG")
 
 for dataset in "${datasets[@]}"
@@ -17,6 +17,7 @@ do
             flags="--dataset $dataset --embedder $embedder --system $system"
             echo "running with flags: $flags"
             $@ $flags
+            
         done
     done
 done

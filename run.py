@@ -207,7 +207,7 @@ if __name__ == "__main__":
         if system_name == "rag":
             # set up vector store with supporting docs + the train set of procedures
             logger.debug("RAG: collecting docs")
-            procedures = ds.procedures(dataset.Split.TRAIN)
+            procedures = ds.procedures(dataset.Split.TRAIN | dataset.Split.VAL)
             docs = [p.to_doc() for p in procedures]
             logger.debug(f"RAG: collected {len(docs)} docs for vector store")
 
@@ -221,7 +221,7 @@ if __name__ == "__main__":
         elif system_name == "aag":
             # set up vector store for unchunked train procedures
             logger.debug("AAG: collecting train procedures")
-            procedures = ds.procedures(dataset.Split.TRAIN)
+            procedures = ds.procedures(dataset.Split.TRAIN | dataset.Split.VAL)
             logger.debug(f"AAG: collected {len(procedures)} procedures for skill library")
 
             logger.info("AAG: Creating collection and uploading procedures to Weaviate collection")
@@ -240,7 +240,7 @@ if __name__ == "__main__":
             raise NotImplementedError(args.system)
 
         # shorten eval set according to -n
-        eval_data = ds.procedures(dataset.Split.VAL)
+        eval_data = ds.procedures(dataset.Split.TEST)
         n = min(args.n, len(eval_data))
         eval_data = eval_data[:n]
         logger.info(f"loaded {len(eval_data)} eval examples")
