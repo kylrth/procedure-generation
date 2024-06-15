@@ -56,6 +56,9 @@ class Procedure:
             "output": self.output,
             "steps": self.steps,
         }
+    
+    def __hash__(self):
+        return hash(self.input_) ^ hash(self.output) ^ hash(tuple(self.steps))
 
 
 def train_val_test(data: list, val: float, test: float) -> tuple[list, list, list]:
