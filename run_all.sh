@@ -6,7 +6,7 @@ set -e
 
 datasets=("champ" "lcstep" "recipenlg")
 embedders=("hf-nomic-embed-text-v1.5")
-systems=("RAG" "AAG")
+systems=("rag" "aag")
 
 for dataset in "${datasets[@]}"
 do
@@ -17,7 +17,21 @@ do
             flags="--dataset $dataset --embedder $embedder --system $system"
             echo "running with flags: $flags"
             $@ $flags
-            
+
+            if [ "$system" == "aag" ]
+            then
+                flags="--dataset $dataset --embedder $embedder --system $system --summarize --critic"
+                echo "running with flags: $flags"
+                $@ $flags
+
+                flags="--dataset $dataset --embedder $embedder --system $system --summarize"
+                echo "running with flags: $flags"
+                $@ $flags
+
+                flags="--dataset $dataset --embedder $embedder --system $system --critic"
+                echo "running with flags: $flags"
+                $@ $flags
+            fi
         done
     done
 done
