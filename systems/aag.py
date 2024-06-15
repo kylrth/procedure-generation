@@ -1,4 +1,6 @@
+import random
 import re
+import sys
 import textwrap
 from typing import Any, ClassVar
 
@@ -256,9 +258,14 @@ class AAG(System):
         )
 
         # Have the model generate an output, and check that it contains the query list. If it
-        # doesn't, ask again.
-        for _ in range(3):
-            completion = await self.model.generate(prompt)
+        # doesn't, ask again. To ensure different responses even when using a caching proxy, we set
+        # a different seed each time.
+        rng = random.Random(28)
+        for i in range(3):
+            if i == 0:
+                completion = await self.model.generate(prompt)
+            else:
+                completion = await self.model.generate(prompt, seed=rng.randint(0, sys.maxsize))
             logger.write(f"asked {self.model.name} for relevant queries; model said:\n")
             logger.write(textwrap.indent(completion, "  ") + "\n")
 
