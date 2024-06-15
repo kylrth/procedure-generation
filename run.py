@@ -170,6 +170,8 @@ if __name__ == "__main__":
             "don't fit)"
         ),
     )
+    parser.add_argument("--summarize", action="store_true", help="Whether to use summarization in the AAG")
+    parser.add_argument("--critic", action="store_true", help="Whether to use critic in the system or not")
 
     args = parser.parse_args()
 
@@ -194,7 +196,9 @@ if __name__ == "__main__":
     system_name = args.system.lower()
 
     cache_path = Path("cache") / system_name / dataset_name / args.embedder
-    outdir = Path("output") / system_name / dataset_name / args.embedder
+    
+    out_name = system_name + ("_no-summ" if not args.summarize else "") + ("_no-critic" if not args.critic else "")
+    outdir = Path("output") / out_name / dataset_name / args.embedder
 
     human = log.HumanLogger(outdir)
 
@@ -231,7 +235,7 @@ if __name__ == "__main__":
             )
             store.populate(logger, procedures)
 
-            system = aag.AAG(model, store, args.k, args.dataset)
+            system = aag.AAG(model, store, args.k, args.dataset, args.summarize, args.critic)
         else:
             raise NotImplementedError(args.system)
 

@@ -32,8 +32,10 @@ class AAG(System):
     skills: ProcedureStore
     k: int
     dataset: str
+    summarize: bool
+    use_critic: bool
 
-    def __init__(self, model: Model, skills: ProcedureStore, k: int, dataset: str):
+    def __init__(self, model: Model, skills: ProcedureStore, k: int, dataset: str, summarize: bool, critic:bool):
         """Create a new AAG system that maintains the skill library in the Weaviate instance.
 
         The model will only return one result when calling generate or agenerate.
@@ -45,6 +47,8 @@ class AAG(System):
         self.skills = skills
         self.k = k
         self.dataset = dataset
+        self.summarize = summarize
+        self.use_critic = critic
 
     async def generate(self, logger: log.InstanceLogger, query: str, input_: str) -> Response:
         queries = await self.queries_relevant_to(logger, query, input_)
@@ -54,7 +58,8 @@ class AAG(System):
         for q in queries:
             proc_list = await self.skills.search(q, self.k)
             procs.append(proc_list)
-            summaries.append(await self.create_summary(logger, q, proc_list))
+            if self.summarize:
+                summaries.append(await self.create_summary(logger, q, proc_list))
 
         logger.write(f"got {len(queries)} search queries from {self.model.name}:\n")
         for i, q in enumerate(queries):
@@ -68,12 +73,17 @@ class AAG(System):
         logger.write("BEGIN RAG CANDIDATE\n")
         logger.write(textwrap.indent(candidate.format_steps(), "  ") + "\n")
         logger.write("END RAG CANDIDATE\n")
-
-        candidate.steps = await self.update_steps(logger, candidate, queries, summaries)
-
-        candidate.steps = await self.check_with_validator_and_modify(
-            logger, candidate, self.format_summaries(queries, summaries), max_updates=3
-        )
+        
+        if self.summarize:
+            knowledge_str = self.format_summaries(queries, summaries)
+        else:
+            flat_proc_list = [p for p_list in procs for p in p_list]
+            knowledge_str = self.format_procedures(flat_proc_list)
+        
+        candidate.steps = await self.update_steps(logger, candidate, knowledge_str)
+        
+        if self.use_critic:
+            candidate.steps = await self.check_with_validator_and_modify(logger, candidate, knowledge_str, max_updates=3)
 
         return Response(
             answer=candidate.steps,
@@ -128,6 +138,33 @@ class AAG(System):
             "specified goal."
         ),
     }
+    
+    _no_summ_instructions: ClassVar[dict[str, str]] = {
+        "lcstep": (
+            "Please update the provided high-level steps to accomplish the specified goal using "
+            "the LangChain Python library. Focus more on improving the uncertain steps enclosed in "
+            "'[[]]'. Don't include code, extraneous commentary, or examples, but do refer "
+            "to the specific LangChain APIs (or other APIs) used in each step. Don't produce any "
+            "text other than the list of steps. Use any of the provided reference documentation to "
+            "achieve the specified goal."
+        ),
+        "recipenlg": (
+            "Please update the provided high-level steps to create a recipe for the specified "
+            "food. Focus more on improving the uncertain steps enclosed in '[[]]'. Don't "
+            "include extraneous commentary, or examples, but do refer to the special "
+            "characteristics and state of the ingredients used in each step. Don't produce any "
+            "text other than the list of steps. Use any of the provided reference recipes to "
+            "achieve the specified goal."
+        ),
+        "champ": (
+            "Please update the provided high-level steps to solve the given math problem. Focus "
+            "more on improving the uncertain steps enclosed in '[[]]'. Don't include code, "
+            "extraneous commentary, or examples, but do refer to the concepts and hints used in "
+            "each step. Don't produce any text other than the list of steps. Use any of the "
+            "provided reference problems and their solutions to achieve the "
+            "specified goal."
+        ),
+    }
 
     _prompt_inst: ClassVar[dict[str, str]] = {
         "lcstep": (
@@ -161,12 +198,10 @@ class AAG(System):
         self,
         logger: log.InstanceLogger,
         candidate: Procedure,
-        queries: list[str],
-        summaries: list[str],
+        knowledge_str: str
     ) -> list[str]:
-        summary_str = self.format_summaries(queries, summaries)
         msg_prompt = (
-            f"[BEGIN KNOWLEDGE]\n{summary_str}\n[END KNOWLEDGE]"
+            f"[BEGIN KNOWLEDGE]\n{knowledge_str}\n[END KNOWLEDGE]"
             "\n\n"
             f"[BEGIN STEPS]\n{candidate.format_steps()}\n[END STEPS]"
             "\n\n"
@@ -174,9 +209,12 @@ class AAG(System):
                 query=candidate.output, input_=candidate.input_
             )
         )
-
+        if self.summarize:
+            sys_instruction = self._instructions[self.dataset]
+        else:
+            sys_instruction = self._no_summ_instructions[self.dataset]
         prompt = self.model.build_prompt(
-            prompt=msg_prompt, context=self._instructions[self.dataset]
+            prompt=msg_prompt, context=sys_instruction
         )
         logger.write("Prompt to update RAG response:\n")
         logger.log_prompt(prompt)
@@ -238,10 +276,14 @@ class AAG(System):
         raise ValueError("could not get good response from LLM after 3 tries")
 
     def format_procedures(self, procs: list[Procedure]) -> str:
+        seen = set()
         out = ""
         for p in procs:
+            if p in seen:
+                continue
             out += f"\n\n{RAG._example_name[self.dataset]} '{p.output}' using {p.input_}:\n\n"
             out += p.format_steps()
+            seen.add(p)
 
         return out[2:]  # skip first "\n\n"
 
@@ -362,6 +404,36 @@ class AAG(System):
         ),
     }
 
+    _no_summ_perform_edits_instructions: ClassVar[dict[str, str]] = {
+        "lcstep": (
+            "Please update the provided high-level steps in accordance with the suggested edits "
+            "to accomplish the specified goal using "
+            "the LangChain Python library. Make sure all the other details remain unaltered. "
+            "Don't include code, extraneous commentary, or examples, but do refer "
+            "to the specific LangChain APIs (or other APIs) used in each step. Don't produce any "
+            "text other than the list of steps. Use any of the provided reference documentation to "
+            "achieve the specified goal."
+        ),
+        "recipenlg": (
+            "Please update the provided high-level steps in accordance with the suggested edits "
+            "to create a recipe for the specified "
+            "food. Make sure all the other details remain unaltered. Don't "
+            "include extraneous commentary, or examples, but do refer to the special "
+            "characteristics and state of the ingredients used in each step. Don't produce any "
+            "text other than the list of steps. Use any of the provided reference recipes to "
+            "achieve the specified goal."
+        ),
+        "champ": (
+            "Please update the provided high-level steps in accordance with the suggested edits "
+            "to solve the given math problem. Make sure all the other details remain unaltered. "
+            "Don't include code, extraneous commentary, or examples, but do refer to the "
+            "concepts and hints used in "
+            "each step. Don't produce any text other than the list of steps. Use any of the "
+            "provided reference problems and their solutions to achieve the "
+            "specified goal."
+        ),
+    }
+
     _perf_edit_inst: ClassVar[dict[str, str]] = {
         "lcstep": (
             "Please perform all the edits and update the list of steps to "
@@ -401,8 +473,12 @@ class AAG(System):
             )
         )
 
+        if self.summarize:
+            sys_instruction = self._perform_edits_instructions[self.dataset]
+        else:
+            sys_instruction = self._no_summ_perform_edits_instructions[self.dataset]
         prompt = self.model.build_prompt(
-            prompt=msg_prompt, context=self._perform_edits_instructions[self.dataset]
+            prompt=msg_prompt, context=sys_instruction
         )
         logger.write("Prompt to update candidate based on edits:\n")
         logger.log_prompt(prompt)
