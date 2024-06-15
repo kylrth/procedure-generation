@@ -6,8 +6,9 @@ import random
 import re
 import sys
 from pathlib import Path
-from typing import Awaitable, Sequence
+from typing import Sequence
 
+import tqdm
 from langchain.schema import HumanMessage, SystemMessage
 
 from dataset import Procedure, format_steps
@@ -199,6 +200,86 @@ def check_ids(one: Sequence[int], two: Sequence[int]):
         raise ValueError(f"second CSV is missing {' '.join(str(i) for i in sorted(only_in_one))}")
 
 
+async def pairwise_eval(
+    logger: logging.Logger,
+    model: Model,
+    csv1: Path,
+    csv2: Path,
+    out: Path,
+    tqdm_desc: str | None = None,
+):
+    csv1_list = sorted(read_outputs_csv(csv1), key=lambda t: t[0])
+    csv2_list = sorted(read_outputs_csv(csv2), key=lambda t: t[0])
+    check_ids([i for i, _, _ in csv1_list], [i for i, _, _ in csv2_list])
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+
+    with tqdm.tqdm(total=len(csv1_list), desc=tqdm_desc) as pbar, out.open("w", newline="") as f:
+        w = csv.DictWriter(f, ["question_id", "choice"])
+        w.writeheader()
+
+        async def _task(s1: tuple[int, Procedure, list[str]], s2: tuple[int, Procedure, list[str]]):
+            d = await aevaluate(logger, model, args.gt, args.nruns, *s1, s2[2])
+            w.writerow(d)
+            pbar.update(1)
+
+        await spread_gather(
+            lambda s1_s2: _task(s1_s2[0], s1_s2[1]),
+            zip(csv1_list, csv2_list, strict=True),
+            args.workers,
+        )
+
+
+def build_combinations(
+    logger: logging.Logger,
+    datasets: list[str],
+    systems: list[str],
+    embeddings: list[str],
+    *,
+    base_system: str | None = None,
+    base_embedding: str | None = None,
+) -> list[tuple[Path, Path, Path]]:
+    if base_system is None and base_embedding is None:
+        raise ValueError("neither system- nor embedding-based pair-up specified")
+
+    if base_system is not None:
+        if base_embedding is not None:
+            raise ValueError("both a system- and an embedding-based pair-up were specified")
+
+        base = base_system
+        pivot = systems
+    else:
+        base = base_embedding
+        pivot = embeddings
+
+    if base in pivot:
+        logger.warn(f"removing base '{base}' from comparison list '{pivot}'")
+        pivot.remove(base)
+
+    base = str(base)
+    p = Path("output")
+
+    out = []
+    for dataset in datasets:
+        for system in systems:
+            for embedding in embeddings:
+                if base_system is not None:
+                    sys1 = p / base / dataset / embedding / "output.csv"
+                else:
+                    sys1 = p / system / dataset / base / "output.csv"
+                sys2 = p / system / dataset / embedding / "output.csv"
+
+                if base_system is not None:
+                    system = base + "_" + system
+                else:
+                    embedding = base + "_" + embedding
+                output = p / (f"{system}_{dataset}_{embedding}_pair_eval.csv")
+
+                out.append((sys1, sys2, output))
+
+    return out
+
+
 # constants
 dataset_lcstep = "lcstep"
 dataset_recipenlg = "recipenlg"
@@ -208,52 +289,13 @@ dataset_champ = "champ"
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-d",
-        "--data-dir",
-        type=str,
-        default="./dataset",
-        help="path to the dataset dir",
-    )
-    parser.add_argument(
-        "--dataset",
-        type=str,
-        default=dataset_lcstep,
-        choices=[dataset_lcstep, dataset_recipenlg, dataset_champ],
-        help="Dataset to run the system on",
-    )
-
-    parser.add_argument(
-        "-s1",
-        "--system1",
-        type=str,
-        default="RAG",
-        help="system to perform generation",
-    )
-    parser.add_argument(
-        "-s2",
-        "--system2",
-        type=str,
-        default="AAG",
-        help="system to perform generation",
-    )
-    parser.add_argument(
         "-m",
         "--model",
         type=str,
         default="openai-gpt-3.5-turbo-0125",
         help="full name of service & model to use",
     )
-    parser.add_argument(
-        "-e",
-        "--embedder",
-        type=str,
-        default="hf-all-mpnet-base-v2",
-        help="full name of service & model to use for embeddings",
-    )
-    parser.add_argument(
-        "-n", type=int, default=sys.maxsize, help="limit the number of samples to test"
-    )
-    parser.add_argument("--gt", action="store_true", help="limit the number of samples to test")
+    parser.add_argument("--gt", action="store_true", help="provide the gold steps in the prompt")
     parser.add_argument(
         "--nruns", type=int, default=3, help="number of times to run each of the two type"
     )
@@ -262,49 +304,29 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    args.system1 = args.system1.lower()
-    args.system2 = args.system2.lower()
 
     logger = logging.getLogger("main")
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
-    logger.info(f"Running for: {args}")
 
     model = Model.from_full_name(args.model)
 
-    embed1 = "hf-all-mpnet-base-v2"
-    embed2 = "hf-all-mpnet-base-v2"
-    sys1_path = Path("output") / args.system1 / args.dataset / embed1 / "output.csv"
-    sys2_path = Path("output") / args.system2 / args.dataset / embed2 / "output.csv"
-    sys1_out_list = sorted(read_outputs_csv(sys1_path), key=lambda t: t[0])
-    sys2_out_list = sorted(read_outputs_csv(sys2_path), key=lambda t: t[0])
-    check_ids([i for i, _, _ in sys1_out_list], [i for i, _, _ in sys2_out_list])
+    datasets = ["champ", "lcstep", "recipenlg"]
+    systems = ["aag"]
+    embeddings = [
+        "hf-nomic-embed-text-v1.5",
+        "hf-gte-large-en-v1.5",
+        "openai-text-embedding-3-large",
+    ]
 
-    prefix = "with-gt" if args.gt else "without-gt-validator-test"
-    out_path = (
-        Path("output")
-        / prefix
-        / f"{args.system1}_{args.system2}_{args.dataset}_{embed1}_pair_eval.csv"
+    combos = build_combinations(
+        logger, datasets, systems, embeddings, base_embedding="hf-all-mpnet-base-v2"
     )
-    out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    async def _write_results(w: csv.DictWriter, d: Awaitable[dict[str, int]]):
-        w.writerow(await d)
+    async def eval_all():
+        for i, (sys1, sys2, output) in enumerate(combos):
+            await pairwise_eval(logger, model, sys1, sys2, output, tqdm_desc=f"{i+1}/{len(combos)}")
 
-    with out_path.open("w", newline="") as f:
-        w = csv.DictWriter(f, ["question_id", "choice"])
-        w.writeheader()
-
-        asyncio.run(
-            spread_gather(
-                lambda sys1_sys2: _write_results(
-                    w,
-                    aevaluate(logger, model, args.gt, args.nruns, *sys1_sys2[0], sys1_sys2[1][2]),
-                ),
-                zip(sys1_out_list, sys2_out_list, strict=True),
-                args.workers,
-                len(sys1_out_list),
-            )
-        )
+    asyncio.run(eval_all())
