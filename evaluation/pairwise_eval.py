@@ -321,9 +321,7 @@ if __name__ == "__main__":
         # "openai-text-embedding-3-large",
     ]
 
-    combos = build_combinations(
-        logger, datasets, systems, embeddings, base_system="rag"
-    )
+    combos = build_combinations(logger, datasets, systems, embeddings, base_system="rag")
 
     async def eval_all():
         for i, (sys1, sys2, output) in enumerate(combos):
