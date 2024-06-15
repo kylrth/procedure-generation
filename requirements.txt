@@ -5,7 +5,7 @@ datasets==2.15.0
 editdistance==0.8.1
 einops==0.8.0
 evaluate==0.4.1
-langchain==0.2.2
+langchain==0.2.4
 langchain-community==0.2.2
 langchain-openai==0.1.8
 langchain-text-splitters==0.2.1

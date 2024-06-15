@@ -1,6 +1,6 @@
 #!/bin/bash
 # call a command for all datasets, systems, and embedding models
-# e.g. ./run_all.sh OPENAI_API_KEY=$(cat openai.key) python run.py
+# e.g. OPENAI_API_KEY=$(cat openai.key) ./run_all.sh python run.py
 
 set -e
 

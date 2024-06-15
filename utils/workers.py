@@ -21,7 +21,7 @@ async def spread_gather(
 
     If length is provided, it is used to provide a tqdm progress bar.
     """
-    queue = asyncio.Queue(maxsize=n)  # buffer equal to number of workers
+    queue = asyncio.Queue()
     results = []
 
     progress = tqdm(total=length) if length else None
