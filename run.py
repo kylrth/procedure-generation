@@ -21,7 +21,7 @@ from weaviate.embedded import EmbeddedOptions
 import dataset
 import retrieval
 from dataset import Procedure
-from systems import Model, System, aag, rag
+from systems import Model, System, AAG, FewShot, RAG
 from utils import log, spread_gather
 
 
@@ -165,10 +165,7 @@ if __name__ == "__main__":
         "-k",
         type=int_leq(5),
         default=3,
-        help=(
-            "maximum number of examples to provide for FewShot and RAG (fewer are provided if they "
-            "don't fit)"
-        ),
+        help="max # examples to provide for FewShot, or max to retrieve for RAG/AAG",
     )
     parser.add_argument(
         "--summarize", action="store_true", help="Whether to use summarization in the AAG"
@@ -204,15 +201,25 @@ if __name__ == "__main__":
     out_name = (
         system_name
         + ("_no-summ" if system_name == "aag" and not args.summarize else "")
-        + ("_no-critic" if system_name == "aag" and not args.critic else "")
+        + ("_no-critic" if system_name in ("rag", "aag") and not args.critic else "")
     )
     outdir = Path("output") / out_name / dataset_name / args.embedder
 
     human = log.HumanLogger(outdir)
+    store = None
 
     port = random.randint(1000, 65534)
     with NiceWeaviate(port, port + 1) as client:
-        if system_name == "rag":
+        if system_name == "zeroshot":
+            system = FewShot(model, args.dataset, shots=None)
+        elif system_name == "fewshot":
+            logger.debug(f"FewShot: selecting {args.k} docs")
+            procedures = ds.procedures(dataset.Split.TRAIN)
+            rng = random.Random(27)
+            shots = [shot.to_doc() for shot in rng.sample(procedures, args.k)]
+
+            system = FewShot(model, args.dataset, shots)
+        elif system_name == "rag":
             # set up vector store with supporting docs + the train set of procedures
             logger.debug("RAG: collecting docs")
             procedures = ds.procedures(dataset.Split.TRAIN | dataset.Split.VAL)
@@ -225,7 +232,7 @@ if __name__ == "__main__":
             )
             store.populate(logger, docs)
 
-            system = rag.RAG(model, store, args.k, args.dataset)
+            system = RAG(model, store, args.k, args.dataset, args.critic)
         elif system_name == "aag":
             # set up vector store for unchunked train procedures
             logger.debug("AAG: collecting train procedures")
@@ -243,7 +250,7 @@ if __name__ == "__main__":
             )
             store.populate(logger, procedures)
 
-            system = aag.AAG(model, store, args.k, args.dataset, args.summarize, args.critic)
+            system = AAG(model, store, args.k, args.dataset, args.summarize, args.critic)
         else:
             raise NotImplementedError(args.system)
 
@@ -267,4 +274,5 @@ if __name__ == "__main__":
                 )
                 logger.info(f"see results in in ./{outdir}")
             finally:
-                store.embedder.flush()
+                if store is not None:
+                    store.embedder.flush()

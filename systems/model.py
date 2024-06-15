@@ -106,10 +106,10 @@ class Model:
         For a chat model, the messages look like this:
 
             System: {context}
-            Human: {examples[0][0]}
-            Model: {examples[0][1]}
-            Human: {examples[1][0]}
-            Model: {examples[1][1]}
+            Human: {examples[0].title}
+            Model: {examples[0].contents}
+            Human: {examples[1].title}
+            Model: {examples[1].contents}
             ...
             Human: {prompt}
 

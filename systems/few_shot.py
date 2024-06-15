@@ -18,7 +18,20 @@ class FewShot(System):
     def __init__(self, model: Model, dataset: str, shots: list[Doc] | None = None):
         self.model = model
         self.dataset = dataset
-        self.shots = shots if shots is not None else []
+        self.shots = self.build_context(shots if shots is not None else [])
+
+    _example_name: ClassVar[dict[str, str]] = {
+        "lcstep": "DOCUMENTATION",
+        "recipenlg": "RECIPE",
+        "champ": "EXAMPLE",
+    }
+
+    def build_context(self, docs: list[Doc]) -> str:
+        out = ""
+        for doc in docs:
+            out += f"\n\n{self._example_name[self.dataset]} '{doc.title}':\n\n{doc.contents}"
+
+        return out[2:]  # skip first "\n\n"
 
     async def generate(self, logger: log.InstanceLogger, query: str, input_: str) -> Response:
         prompt = await self.build_prompt(logger, query, input_)
@@ -49,13 +62,31 @@ class FewShot(System):
         ),
     }
 
+    _prompt_inst: ClassVar[dict[str, str]] = {
+        "lcstep": (
+            "Please generate a list of instructions to accomplish '{query}' using the procedures "
+            "above. Create and use these resources in your response: {input_}."
+        ),
+        "recipenlg": (
+            "Please generate a list of instructions to accomplish '{query}' using the recipes "
+            "above. Use these ingredients in your response: {input_}."
+        ),
+        "champ": (
+            "Please generate a list of instructions to solve '{query}' using the examples above. "
+            "Use this additional information in preparing your response: {input_}."
+        ),
+    }
+
     # This function is async so that RAG can inherit and override it
     async def build_prompt(
         self, logger: log.InstanceLogger, query: str, input_: str
     ) -> str | list[BaseMessage]:
-        out = self.model.build_prompt(
-            f"{query} using {input_}", self._instructions[self.dataset], self.shots
+        context = self.shots
+        msg_prompt = (
+            context + "\n\n" + self._prompt_inst[self.dataset].format(query=query, input_=input_)
         )
+
+        out = self.model.build_prompt(msg_prompt, self._instructions[self.dataset])
 
         logger.write(f"prompt to model {self.model.name}:\n")
         logger.log_prompt(out)

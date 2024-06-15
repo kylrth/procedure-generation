@@ -6,7 +6,7 @@ set -e
 
 datasets=("champ" "lcstep" "recipenlg")
 embedders=("hf-nomic-embed-text-v1.5")
-systems=("rag" "aag")
+systems=("zeroshot" "fewshot" "rag" "aag")
 
 for dataset in "${datasets[@]}"
 do
@@ -18,6 +18,15 @@ do
             echo "running with flags: $flags"
             $@ $flags
 
+            # RAG has an optional critic
+            if [ "$system" == "rag" ]
+            then
+                flags="--dataset $dataset --embedder $embedder --system $system --critic"
+                echo "running with flags: $flags"
+                $@ $flags
+            fi
+
+            # AAG has optional summarization and critic
             if [ "$system" == "aag" ]
             then
                 flags="--dataset $dataset --embedder $embedder --system $system --summarize --critic"
