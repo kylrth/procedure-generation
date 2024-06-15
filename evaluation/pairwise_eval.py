@@ -314,14 +314,18 @@ if __name__ == "__main__":
     model = Model.from_full_name(args.model)
 
     datasets = ["champ", "lcstep", "recipenlg"]
-    systems = ["aag", "aag_no-critic", "aag_no-summ", "aag_no-summ_no-critic"]
-    embeddings = [
-        "hf-nomic-embed-text-v1.5"
-        # "hf-gte-large-en-v1.5",
-        # "openai-text-embedding-3-large",
+    systems = [
+        "zeroshot",
+        "fewshot",
+        "rag",
+        "aag",
+        "aag_no-critic",
+        "aag_no-summ",
+        "aag_no-summ_no-critic",
     ]
+    embeddings = ["hf-nomic-embed-text-v1.5"]
 
-    combos = build_combinations(logger, datasets, systems, embeddings, base_system="rag")
+    combos = build_combinations(logger, datasets, systems, embeddings, base_system="rag_no-critic")
 
     async def eval_all():
         for i, (sys1, sys2, output) in enumerate(combos):
