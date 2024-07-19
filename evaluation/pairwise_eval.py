@@ -318,14 +318,14 @@ if __name__ == "__main__":
         "zeroshot",
         "fewshot",
         "rag",
-        "aag",
+        "rag_no-critic",
         "aag_no-critic",
         "aag_no-summ",
         "aag_no-summ_no-critic",
     ]
-    embeddings = ["hf-nomic-embed-text-v1.5"]
+    embeddings = ["hf-all-mpnet-base-v2"]
 
-    combos = build_combinations(logger, datasets, systems, embeddings, base_system="rag_no-critic")
+    combos = build_combinations(logger, datasets, systems, embeddings, base_system="aag")
 
     async def eval_all():
         for i, (sys1, sys2, output) in enumerate(combos):

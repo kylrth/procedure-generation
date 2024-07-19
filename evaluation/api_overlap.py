@@ -19,6 +19,8 @@ class ApiOverlap(Heuristic):
 
     def evaluate(self, logger: logging.Logger, gold: Procedure, generated: list[str]) -> float:
         gold_apis = self.get_apis(gold.format_steps())
+        if not gold_apis:
+            return 1  # nothing to check for
         logger.debug("Got gold apis")
         generated_apis = self.get_apis(format_steps(generated))
         logger.debug("Got generated apis")
