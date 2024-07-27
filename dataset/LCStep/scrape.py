@@ -77,10 +77,7 @@ def should_skip_link(url: str) -> bool:
         if sub in url:
             return True
 
-    if url in _specific_skip:
-        return True
-
-    return False
+    return url in _specific_skip
 
 
 def should_skip_page(body: bs4.Tag | bs4.NavigableString | None) -> bool:
@@ -88,16 +85,12 @@ def should_skip_page(body: bs4.Tag | bs4.NavigableString | None) -> bool:
         # This page does not have the right div.
         return True
 
-    if (
+    return (
         len(body.contents) == 2
         and body.contents[0].name == "h1"
         and body.contents[1].name == "section"
         and body.contents[1].get("class") == ["row"]
-    ):
-        # This page is just a navigation page.
-        return True
-
-    return False
+    )
 
 
 # for postprocessing
