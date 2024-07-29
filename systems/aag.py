@@ -45,6 +45,7 @@ class AAG(System):
         dataset: str,
         summarize: bool,
         critic: bool,
+        n_queries: int,
     ):
         """Create a new AAG system that maintains the skill library in the Weaviate instance.
 
@@ -59,6 +60,7 @@ class AAG(System):
         self.dataset = dataset
         self.summarize = summarize
         self.use_critic = critic
+        self.n_queries = n_queries
 
     async def generate(self, logger: log.InstanceLogger, query: str, input_: str) -> Response:
         queries = await self.queries_relevant_to(logger, query, input_)
@@ -230,8 +232,9 @@ class AAG(System):
 
     _prompt_query_gen_inst: ClassVar[str] = (
         "Please output high-level steps to complete the task below.\n\n"
-        "Then, given this high-level solution, think carefully step by step and provide 4 search "
-        "engine queries for knowledge that you need to refine the solution to the question.\n\n"
+        "Then, given this high-level solution, think carefully step by step and provide "
+        "{n_queries} search engine queries for knowledge that you need to refine the solution to "
+        "the question.\n\n"
         "The output should be 'steps:' followed by a bulleted list with elements starting with "
         "'- ', and then 'queries:' followed by another bulleted list."
     )
@@ -254,7 +257,7 @@ class AAG(System):
     ) -> list[str]:
         prompt = self.model.build_prompt(
             self._prompt_query_gen[self.dataset].format(query=query, input_=input_),
-            context=self._prompt_query_gen_inst,
+            context=self._prompt_query_gen_inst.format(n_queries=self.n_queries),
         )
 
         # Have the model generate an output, and check that it contains the query list. If it
@@ -362,9 +365,9 @@ class AAG(System):
             "mentioned input resources. Carefully judge if the procedure uses "
             "all the resources and point out in your response if it misses "
             "something. {opt_inst}\n\n"
-            "You should always suggest only your edits in a bulleted list. If there "
-            "are no edits to be made, please only respond 'NO UPDATE REQUIRED'. You are "
-            "required to strictly follow the mentioned output format."
+            "Please output only your edits in a bulleted list or if there "
+            "are absolutely no edits, please strictly output only 'NO UPDATE REQUIRED'. "
+            "You are required to strictly follow the mentioned output format."
         )
         msg_prompt = (
             f"[USER GOAL]\n{candidate.output}\n\n"
@@ -496,6 +499,10 @@ class AAG(System):
 
         return self.parse_completion(completion)
 
+    def any_edits_suggested(self, completion):
+        resp_lines = completion.split("\n")
+        return any(line.startswith("- ") for line in resp_lines)
+
     async def check_with_validator_and_modify(
         self,
         logger: log.InstanceLogger,
@@ -508,7 +515,7 @@ class AAG(System):
 
         while updates_done < max_updates:
             validator_edits = await self.validate_update(logger, candidate)
-            if break_phrase in validator_edits:
+            if break_phrase in validator_edits and not self.any_edits_suggested(validator_edits):
                 logger.write(f"EXITING EDIT LOOP EARLY AFTER {updates_done} updates")
                 break
             candidate.steps = await self.perform_validator_edits(
