@@ -2,9 +2,7 @@ import random
 import re
 import sys
 import textwrap
-from typing import Any, ClassVar
-
-import yaml
+from typing import ClassVar
 
 from dataset import Procedure
 from retrieval import ProcedureStore
@@ -13,20 +11,6 @@ from utils import log
 from .interface import Response, System
 from .model import Model
 from .rag import RAG
-
-
-def limited_yaml(obj: dict[str, list[Any]]) -> dict[str, list[str]]:
-    """Update an object parsed from YAML so that we know all the list elements are strings.
-
-    Models often make mistakes with the edge cases of YAML, but asking for YAML output makes
-    parsing easier. So we'll parse the YAML but then reconvert all list elements back to strings.
-    """
-    for list_value in obj.values():
-        for i in range(len(list_value)):
-            if not isinstance(list_value[i], str):
-                list_value[i] = yaml.dump(list_value[i])
-
-    return obj
 
 
 class AAG(System):
@@ -102,7 +86,7 @@ class AAG(System):
         return Response(
             answer=candidate.steps,
             model=self.model.name,
-            # TODO token couns
+            # TODO token counts
         )
 
     async def get_rag_response(
