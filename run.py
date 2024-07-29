@@ -23,6 +23,7 @@ import retrieval
 from dataset import Procedure
 from systems import Model, System, AAG, FewShot, RAG
 from utils import log, spread_gather
+import time
 
 
 async def generate_and_record(
@@ -168,6 +169,12 @@ if __name__ == "__main__":
         help="max # examples to provide for FewShot, or max to retrieve for RAG/AAG",
     )
     parser.add_argument(
+        "--n-queries",
+        type=int,
+        default=4,
+        help="Number of re-written queries",
+    )
+    parser.add_argument(
         "--summarize", action="store_true", help="Whether to use summarization in the AAG"
     )
     parser.add_argument(
@@ -202,6 +209,7 @@ if __name__ == "__main__":
         system_name
         + ("_no-summ" if system_name == "aag" and not args.summarize else "")
         + ("_no-critic" if system_name in ("rag", "aag") and not args.critic else "")
+        + (f"_{args.n_queries}" if system_name == "aag" and args.n_queries != 4 else "")
     )
     outdir = Path("output") / out_name / dataset_name / args.embedder
 
@@ -250,7 +258,9 @@ if __name__ == "__main__":
             )
             store.populate(logger, procedures)
 
-            system = AAG(model, store, args.k, args.dataset, args.summarize, args.critic)
+            system = AAG(
+                model, store, args.k, args.dataset, args.summarize, args.critic, args.n_queries
+            )
         else:
             raise NotImplementedError(args.system)
 
@@ -264,6 +274,7 @@ if __name__ == "__main__":
 
         with log.CSVLogger(outdir / "output.csv") as csv:
             try:
+                start = time.time_ns()
                 asyncio.run(
                     spread_gather(
                         lambda item: generate_and_record(logger, csv, human, system, *item),
@@ -272,7 +283,12 @@ if __name__ == "__main__":
                         len(eval_data),
                     )
                 )
+                tot_time = time.time_ns() - start
                 logger.info(f"see results in in ./{outdir}")
+                logger.info(
+                    f"runtime for {args.system} with critic {args.critic} on {args.dataset}: "
+                    f"{tot_time / 1e9:.1f}s"
+                )
             finally:
                 if store is not None:
                     store.embedder.flush()
