@@ -6,6 +6,7 @@ from .few_shot import FewShot
 from .interface import Response, System
 from .model import Model
 from .rag import RAG
+from .react import ReAct
 
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     # systems
     "FewShot",
     "RAG",
+    "ReAct",
     "AAG",
 ]

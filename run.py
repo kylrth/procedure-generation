@@ -21,7 +21,7 @@ from weaviate.embedded import EmbeddedOptions
 import dataset
 import retrieval
 from dataset import Procedure
-from systems import Model, System, AAG, FewShot, RAG
+from systems import Model, System, AAG, FewShot, ReAct, RAG
 from utils import log, spread_gather
 import time
 
@@ -241,13 +241,17 @@ if __name__ == "__main__":
             store.populate(logger, docs)
 
             system = RAG(model, store, args.k, args.dataset, args.critic)
-        elif system_name == "aag":
-            # set up vector store for unchunked train procedures
-            logger.debug("AAG: collecting train procedures")
-            procedures = ds.procedures(dataset.Split.TRAIN | dataset.Split.VAL)
-            logger.debug(f"AAG: collected {len(procedures)} procedures for skill library")
+        elif system_name in {"react", "aag"}:
+            fancy = "AAG" if system_name == "aag" else "ReAct"
 
-            logger.info("AAG: Creating collection and uploading procedures to Weaviate collection")
+            # set up vector store for unchunked train procedures
+            logger.debug(f"{fancy}: collecting train procedures")
+            procedures = ds.procedures(dataset.Split.TRAIN | dataset.Split.VAL)
+            logger.debug(f"{fancy}: collected {len(procedures)} procedures for skill library")
+
+            logger.info(
+                f"{fancy}: Creating collection and uploading procedures to Weaviate collection"
+            )
             store = retrieval.ProcedureStore(
                 client,
                 "Procedures",
@@ -258,9 +262,12 @@ if __name__ == "__main__":
             )
             store.populate(logger, procedures)
 
-            system = AAG(
-                model, store, args.k, args.dataset, args.summarize, args.critic, args.n_queries
-            )
+            if system_name == "aag":
+                system = AAG(
+                    model, store, args.k, args.dataset, args.summarize, args.critic, args.n_queries
+                )
+            else:  # "react"
+                system = ReAct(model.model, args.dataset, store, args.k)
         else:
             raise NotImplementedError(args.system)
 

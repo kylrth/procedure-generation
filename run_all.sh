@@ -5,8 +5,8 @@
 set -e
 
 datasets=("champ" "lcstep" "recipenlg")
-embedders=("hf-nomic-embed-text-v1.5")
-systems=("zeroshot" "fewshot" "rag" "aag")
+embedders=("hf-all-mpnet-base-v2")
+systems=("zeroshot" "fewshot" "rag" "react" "aag")
 
 for dataset in "${datasets[@]}"
 do
