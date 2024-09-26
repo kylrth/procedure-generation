@@ -3,6 +3,7 @@ import unittest
 
 import numpy as np
 
+from retrieval.embedder import Embedder
 from retrieval.graph_procedure_store import GraphProcedureStore, Node, Recipe, Step
 from utils.weaviate import NiceWeaviate
 
@@ -48,6 +49,12 @@ def _example_recipe() -> Recipe:
 example_recipe = _example_recipe()
 
 
+class TestEmbedder(Embedder):
+    async def embed(self, text: list[str], *, is_query: bool = False) -> list[np.ndarray]:
+        _ = is_query
+        return [np.zeros(10) for _ in text]
+
+
 class TestGraphProcedureStore(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.logger = logging.getLogger("test")
@@ -63,17 +70,19 @@ class TestGraphProcedureStore(unittest.IsolatedAsyncioTestCase):
         await self.client.__aexit__(None, None, None)
 
     async def test_one(self):
-        store = GraphProcedureStore(
-            self.client, "hf-all-mpnet-base-v2", "cache/aag/recipenlg/hf-all-mpnet-base-v2"
-        )
+        store = GraphProcedureStore(self.client, TestEmbedder(), Recipe)
 
         await store.setup_collection(prefix=unittest.TestCase.id(self).split(".")[-1])
 
-        uuid = await store.add_graph(self.logger, example_recipe, np.zeros(10))
+        want_g = example_recipe
+        want_v = np.zeros(10)
 
-        got, v = await store.get_graph(self.logger, uuid, Recipe)
+        uuid = await store.add_graph(self.logger, want_g, want_v)
 
-        # TODO compare
+        got_g, got_v = await store.get_graph(uuid)
+
+        self.assertEqual(want_g, got_g)
+        np.testing.assert_almost_equal(want_v, got_v)
 
 
 if __name__ == "__main__":

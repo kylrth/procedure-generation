@@ -1,6 +1,5 @@
 import logging
 from abc import ABC, abstractmethod
-from os import PathLike
 from typing import Sequence, Type, cast
 
 import numpy as np
@@ -11,7 +10,7 @@ from weaviate.classes.query import Filter
 from weaviate.collections.classes.batch import BatchObjectReturn, BatchReferenceReturn
 from weaviate.types import UUID
 
-from retrieval.embedder import CachingEmbedder, embedder_from_name
+from retrieval.embedder import CachingEmbedder, Embedder
 from utils import spread_gather
 
 
@@ -95,6 +94,75 @@ class Graph[T]:
                 if isinstance(outgoing, Output):
                     self.outputs.append(outgoing)
 
+    def __eq__(self, ot: object, /) -> bool:
+        if not isinstance(ot, Graph):
+            return False
+
+        # check output number
+        if len(self.outputs) != len(ot.outputs):
+            return False
+        # check input number
+        if len(self.inputs) != len(ot.inputs):
+            return False
+
+        self_outputs = sorted(self.outputs, key=lambda x: x.content)
+        self_inputs = sorted(self.inputs, key=lambda x: x.content)
+        ot_outputs = sorted(ot.outputs, key=lambda x: x.content)
+        ot_inputs = sorted(ot.inputs, key=lambda x: x.content)
+
+        # check output contents
+        if any(self_outputs[i].content != ot_outputs[i].content for i in range(len(self_outputs))):
+            return False
+        # check input contents
+        if any(self_inputs[i].content != ot_inputs[i].content for i in range(len(self_inputs))):
+            return False
+
+        # Note that any graph with no outputs is vacuously the same as any other, because no nodes
+        # are reachable via back-traversal.
+
+        visited: set[Node] = set()  # track nodes visited in self
+        return all(
+            self.__eq_dfs(o1.from_, o2.from_, visited) for o1, o2 in zip(self.outputs, ot.outputs)
+        )
+
+    @staticmethod
+    def __eq_dfs(o1: Node | None, o2: Node | None, visited: set[Node]) -> bool:  # noqa: PLR0911
+        # check if the nodes exist (these might have come from Input edges)
+        if o1 is None:
+            return o2 is None
+        if o2 is None:
+            return False
+
+        # first check if the contents are the same
+        if o1.data != o2.data:
+            return False
+
+        visited.add(o1)
+
+        # We don't check outgoing edges because they're either a) already checked as an incoming
+        # edge of some node, or b) an extraneous edge leading to a part of the graph that doesn't
+        # produce any output. The latter case is an inconsistent state for a Graph to be in and will
+        # be ignored.
+
+        if len(o1.incoming) != len(o2.incoming):
+            return False
+
+        for i1, i2 in zip(
+            sorted(o1.incoming, key=lambda x: x.content),
+            sorted(o2.incoming, key=lambda x: x.content),
+        ):
+            if i1.content != i2.content:
+                return False
+
+            if i1.from_ in visited:
+                continue
+
+            # visit nodes
+            if not Graph.__eq_dfs(i1.from_, i2.from_, visited):
+                return False
+
+        return True
+
 
 class Step:
     api: str
@@ -105,6 +173,16 @@ class Step:
         self.api = api
         self.desc = desc
         self.args = args if args is not None else []
+
+    def __eq__(self, other: object, /) -> bool:
+        if not isinstance(other, Step):
+            return False
+
+        if self.api != other.api:
+            return False
+        if self.desc != other.desc:
+            return False
+        return self.args == other.args
 
 
 class Procedure(Graph[Step], ABC):
@@ -130,12 +208,16 @@ class MathSolution(Procedure):
         raise NotImplementedError
 
 
-class GraphProcedureStore:
+class GraphProcedureStore[T: Procedure]:
     def __init__(
-        self, store: weaviate.WeaviateAsyncClient, embedder: str, cache_path: str | PathLike
+        self,
+        store: weaviate.WeaviateAsyncClient,
+        embedder: Embedder,
+        cls: Type[T],
     ):
         self.store = store
-        self.embedder = CachingEmbedder(embedder_from_name(embedder), cache_path)
+        self.embedder = embedder
+        self.g_cls = cls
 
     async def setup_collection(self, *, prefix: str = ""):
         # node collection
@@ -196,17 +278,18 @@ class GraphProcedureStore:
             ],
         )
 
-    async def populate(self, logger: logging.Logger, procs: list[Procedure]):
+    async def populate(self, logger: logging.Logger, procs: list[T]):
         # embed
         logger.debug("embedding %d graph procedures", len(procs))
         formatted = [str(p) for p in procs]
         vectors = await self.embedder.embed(formatted)
 
-        # empty embeddings cache to disk because we likely won't need them during generation
-        self.embedder.flush()
+        if isinstance(self.embedder, CachingEmbedder):
+            # empty embeddings cache to disk because we likely won't need them during generation
+            self.embedder.flush()
 
         # insert to Weaviate
-        async def _task(g_v: tuple[Procedure, np.ndarray]):
+        async def _task(g_v: tuple[T, np.ndarray]):
             await self.add_graph(logger, g_v[0], g_v[1])
 
         use_tqdm = logger.getEffectiveLevel() >= logging.DEBUG
@@ -353,7 +436,7 @@ class GraphProcedureStore:
 
         return uuid
 
-    async def add_graph(self, logger: logging.Logger, g: Procedure, v: np.ndarray) -> UUID:
+    async def add_graph(self, logger: logging.Logger, g: T, v: np.ndarray) -> UUID:  # noqa: C901
         """Add a single graph to the store."""
         # we'll traverse the graph starting from the outputs, adding nodes and edges to their
         # collections and setting up references
@@ -412,17 +495,15 @@ class GraphProcedureStore:
 
         for e in g.inputs:
             if id(e) not in seen_edges:
-                logger.debug("did not see input edge '%s'", e.content)
+                logger.error("did not see input edge '%s'", e.content)
                 raise ValueError("malformed graph: input edge not reached by backward traversal")
 
         # insert graph
         return await self._insert_graph(input_uuids, output_uuids, v)
 
-    async def get_graph(
-        self, logger: logging.Logger, id_: UUID, cls: Type[Procedure]
-    ) -> tuple[Procedure, np.ndarray]:
+    async def get_graph(self, id_: UUID) -> tuple[T, np.ndarray]:
         """Get an existing graph and its embedding by ID."""
-        out = cls()
+        out = self.g_cls()
 
         # get output edges and nodes they lead from
         res = await self.graphs.query.fetch_object_by_id(
@@ -437,7 +518,7 @@ class GraphProcedureStore:
                 ),
             ),
         )
-        v = np.array(res.vector)
+        v = np.array(res.vector["default"])
         # collect visible nodes and add Output objects to out
         new_nodes: list[UUID] = []
         seen: dict[UUID, Node[Step]] = {}
@@ -452,8 +533,6 @@ class GraphProcedureStore:
             )
             content = cast(str, output.properties["content"])
             out.outputs.extend(node.add_outputs(content))
-            logger.debug("saw output '%s'", content)
-            logger.debug("saw node '%s'", node.data.desc)
 
             new_nodes.append(node_data.uuid)
             seen[node_data.uuid] = node
@@ -479,7 +558,6 @@ class GraphProcedureStore:
 
                 if "fromNode" not in edge.references:  # Input
                     out.inputs.extend(to_node.add_inputs(edge_content))
-                    logger.debug("saw input '%s'", edge_content)
                 else:  # internal edge
                     node_data = edge.references["fromNode"].objects[0]
                     node = Node(
@@ -490,8 +568,6 @@ class GraphProcedureStore:
                         )
                     )
                     node.new_edge_to(to_node, edge_content)
-                    logger.debug("saw edge '%s'", edge_content)
-                    logger.debug("saw node '%s'", node.data.desc)
 
                     if node_data.uuid not in seen:
                         new_nodes.append(node_data.uuid)
