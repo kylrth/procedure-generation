@@ -64,23 +64,26 @@ class ProcedureStore(Store):
 
     pfmt: ProcedureFormatter
 
-    def __init__(
-        self,
-        store: weaviate.WeaviateClient,
+    @classmethod
+    async def new(  # type: ignore[reportIncompatibleMethodOverride]
+        cls,
+        store: weaviate.WeaviateAsyncClient,
         name: str,
         desc: str,
         embedder: str,
         cache_path: str | PathLike,
         pfmt: ProcedureFormatter,
-    ):
-        super().__init__(store, name, desc, embedder, cache_path)
+    ) -> "ProcedureStore":
+        self = await super().new(store, name, desc, embedder, cache_path)
         self.pfmt = pfmt
+
+        return self
 
     @property
     def coll_properties(self) -> list[wc.Property]:
         return self._coll_properties
 
-    def populate(self, logger: logging.Logger, procs: list[Procedure]):
+    async def populate(self, logger: logging.Logger, procs: list[Procedure]):
         """Chunk, vectorize, cache, and upload the procedures."""
         logger.debug("embedding %d procedures", len(procs))
         formatted = [self.pfmt.format(p) for p in procs]
@@ -89,13 +92,13 @@ class ProcedureStore(Store):
         # empty embeddings cache to disk because we likely won't need them during generation
         self.embedder.flush()
 
-        self.weaviate_insert(logger, [p.to_dict() for p in procs], vectors)
+        await self.weaviate_insert(logger, [p.to_dict() for p in procs], vectors)
 
     async def search(self, query: str, k: int = 5) -> list[Procedure]:
         """Returns the procedures that will be inserted into the prompt."""
         embedded_query = (await self.embedder.embed([query], is_query=True))[0]
 
-        res = self.collection.query.near_vector(
+        res = await self.collection.query.near_vector(
             near_vector=embedded_query.tolist(),
             limit=k,
             return_properties=["input", "output", "steps"],

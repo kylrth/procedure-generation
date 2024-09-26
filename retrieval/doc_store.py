@@ -36,7 +36,7 @@ class DocStore(Store):
     def coll_properties(self) -> list[wc.Property]:
         return self._coll_properties
 
-    def populate(self, logger: logging.Logger, docs: list[Doc]):
+    async def populate(self, logger: logging.Logger, docs: list[Doc]):
         """Chunk, vectorize, cache, and upload the docs."""
         chunk_cache = self.embedder.path / "chunks.json"
 
@@ -55,7 +55,7 @@ class DocStore(Store):
         # empty embeddings cache to disk because we likely won't need them during generation
         self.embedder.flush()
 
-        self.weaviate_insert(logger, chunks, vectors)
+        await self.weaviate_insert(logger, chunks, vectors)
 
     def chunk_docs(
         self, data: list[Doc], chunk_size: int = 4000, overlap: int = 200
@@ -85,7 +85,7 @@ class DocStore(Store):
         """Returns the k docs with vector representation closes to that of the query."""
         embedded_query = (await self.embedder.embed([query], is_query=True))[0]
 
-        res = self.collection.query.near_vector(
+        res = await self.collection.query.near_vector(
             near_vector=embedded_query.tolist(),
             limit=k,
             return_properties=["title", "contents"],

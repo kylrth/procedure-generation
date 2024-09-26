@@ -1,13 +1,13 @@
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from os import PathLike
-from typing import Sequence, cast
+from typing import Sequence, Type, cast
 
 import numpy as np
 import weaviate
 import weaviate.classes as wvc
 import weaviate.classes.config as wc
+from weaviate.classes.query import Filter
 from weaviate.collections.classes.batch import BatchObjectReturn, BatchReferenceReturn
 from weaviate.types import UUID
 
@@ -17,17 +17,48 @@ from utils import spread_gather
 
 class Node[T]:
     data: T
-    incoming: list["Edge"]
-    outgoing: list["Edge"]
+    incoming: list["Edge[T]"]
+    outgoing: list["Edge[T]"]
+
+    def __init__(self, data: T):
+        self.data = data
+        self.incoming = []
+        self.outgoing = []
+
+    def new_edge_to(self, other: "Node[T]", edge: str) -> "Edge[T]":
+        out = Edge(edge, other, self)
+
+        self.outgoing.append(out)
+        other.incoming.append(out)
+
+        return out
+
+    def add_inputs(self, *inputs: str) -> list["Input[T]"]:
+        out = []
+        for i in inputs:
+            out.append(Input(i, self))
+
+        self.incoming.extend(out)
+
+        return out
+
+    def add_outputs(self, *outputs: str) -> list["Output[T]"]:
+        out = []
+        for o in outputs:
+            out.append(Output(o, self))
+
+        self.outgoing.extend(out)
+
+        return out
 
 
 class Edge[T]:
-    output: str
+    content: str
     to: Node[T] | None
     from_: Node[T] | None
 
-    def __init__(self, output: str, to: Node[T], from_: Node[T]):
-        self.output = output
+    def __init__(self, content: str, to: Node[T], from_: Node[T]):
+        self.content = content
         self.to = to
         self.from_ = from_
 
@@ -35,16 +66,16 @@ class Edge[T]:
 class Input[T](Edge[T]):
     from_ = None
 
-    def __init__(self, output: str, to: Node[T]):
-        self.output = output
+    def __init__(self, content: str, to: Node[T]):
+        self.content = content
         self.to = to
 
 
 class Output[T](Edge[T]):
     to = None
 
-    def __init__(self, output: str, from_: Node[T]):
-        self.output = output
+    def __init__(self, content: str, from_: Node[T]):
+        self.content = content
         self.from_ = from_
 
 
@@ -52,12 +83,28 @@ class Graph[T]:
     inputs: list[Input[T]]
     outputs: list[Output[T]]
 
+    def __init__(self, *nodes: Node[T]):
+        self.inputs = []
+        self.outputs = []
 
-@dataclass
+        for node in nodes:
+            for incoming in node.incoming:
+                if isinstance(incoming, Input):
+                    self.inputs.append(incoming)
+            for outgoing in node.outgoing:
+                if isinstance(outgoing, Output):
+                    self.outputs.append(outgoing)
+
+
 class Step:
     api: str
     desc: str
     args: list[str]
+
+    def __init__(self, api: str, desc: str, args: list[str] | None = None):
+        self.api = api
+        self.desc = desc
+        self.args = args if args is not None else []
 
 
 class Procedure(Graph[Step], ABC):
@@ -90,10 +137,10 @@ class GraphProcedureStore:
         self.store = store
         self.embedder = CachingEmbedder(embedder_from_name(embedder), cache_path)
 
-    async def setup_collection(self):
+    async def setup_collection(self, *, prefix: str = ""):
         # node collection
         self.nodes = await self.store.collections.create(
-            name="StepNode",
+            name=prefix + "StepNode",
             description="A node in a procedure graph",
             properties=[
                 wc.Property(
@@ -114,38 +161,38 @@ class GraphProcedureStore:
 
         # edge collection
         self.edges = await self.store.collections.create(
-            name="Edge",
+            name=prefix + "Edge",
             description="An input or output for a procedure or step",
             properties=[
                 wc.Property(
-                    name="contents",
+                    name="content",
                     data_type=wc.DataType.TEXT,
                     description="The name of the object",
                 ),
             ],
             # edges track references to nodes
             references=[
-                wc.ReferenceProperty(name="toNode", target_collection="StepNode"),
-                wc.ReferenceProperty(name="fromNode", target_collection="StepNode"),
+                wc.ReferenceProperty(name="toNode", target_collection=prefix + "StepNode"),
+                wc.ReferenceProperty(name="fromNode", target_collection=prefix + "StepNode"),
             ],
         )
 
         # nodes track references to edges
         await self.nodes.config.add_reference(
-            wc.ReferenceProperty(name="incoming", target_collection="Edge")
+            wc.ReferenceProperty(name="incoming", target_collection=prefix + "Edge")
         )
         await self.nodes.config.add_reference(
-            wc.ReferenceProperty(name="outgoing", target_collection="Edge")
+            wc.ReferenceProperty(name="outgoing", target_collection=prefix + "Edge")
         )
 
         # graph collection
         self.graphs = await self.store.collections.create(
-            name="Procedure",
+            name=prefix + "Procedure",
             description="Procedure graphs",
             properties=[],
             references=[
-                wc.ReferenceProperty(name="inputs", target_collection="Edge"),
-                wc.ReferenceProperty(name="outputs", target_collection="Edge"),
+                wc.ReferenceProperty(name="inputs", target_collection=prefix + "Edge"),
+                wc.ReferenceProperty(name="outputs", target_collection=prefix + "Edge"),
             ],
         )
 
@@ -195,7 +242,7 @@ class GraphProcedureStore:
         res = await self.edges.data.insert_many(
             [
                 wvc.data.DataObject(
-                    properties={"contents": e.output},
+                    properties={"content": e.content},
                     references={"toNode": uuid} if uuid is not None else None,
                 )
                 for e, uuid in zip(edges, prev_uuids, strict=True)
@@ -232,13 +279,14 @@ class GraphProcedureStore:
         nodes: Sequence[Node[Step]],
         seen: dict[int, UUID],
         prev_uuids: Sequence[UUID | None] | None = None,
-    ) -> Sequence[UUID]:
+    ) -> tuple[Sequence[UUID], Sequence[bool]]:
         if prev_uuids is None:
             prev_uuids = [None] * len(nodes)
 
         # insert nodes along with references to the outgoing edges if the UUIDs were provided
         new_nodes = []
         only_refs = []
+        skipped: list[bool] = []
         for n, uuid in zip(nodes, prev_uuids, strict=True):
             if id(n) in seen:
                 # we've seen this node before, but we still need to add references to the outgoing
@@ -251,6 +299,7 @@ class GraphProcedureStore:
                             to_uuid=uuid,
                         )
                     )
+                    skipped.append(True)
             else:
                 new_nodes.append(
                     wvc.data.DataObject(
@@ -262,13 +311,18 @@ class GraphProcedureStore:
                         references={"outgoing": uuid} if uuid is not None else None,
                     )
                 )
+                skipped.append(False)
         # new nodes
-        res = await self.nodes.data.insert_many(new_nodes)
-        self._raise_errors(logger, res)
-        node_uuids = [res.uuids[i] for i in range(len(nodes))]
+        if new_nodes:
+            res = await self.nodes.data.insert_many(new_nodes)
+            self._raise_errors(logger, res)
+            node_uuids = [res.uuids[i] for i in range(len(nodes))]
+        else:
+            node_uuids = []
         # forward references for existing nodes
-        res = await self.nodes.data.reference_add_many(only_refs)
-        self._raise_errors(logger, res)
+        if only_refs:
+            res = await self.nodes.data.reference_add_many(only_refs)
+            self._raise_errors(logger, res)
 
         # insert back-references for edges as well
         refs = []
@@ -286,7 +340,7 @@ class GraphProcedureStore:
             res = await self.edges.data.reference_add_many(refs)
             self._raise_errors(logger, res)
 
-        return node_uuids
+        return node_uuids, skipped
 
     async def _insert_graph(
         self, input_uuids: Sequence[UUID], output_uuids: Sequence[UUID], v: np.ndarray
@@ -299,7 +353,8 @@ class GraphProcedureStore:
 
         return uuid
 
-    async def add_graph(self, logger: logging.Logger, g: Procedure, v: np.ndarray):
+    async def add_graph(self, logger: logging.Logger, g: Procedure, v: np.ndarray) -> UUID:
+        """Add a single graph to the store."""
         # we'll traverse the graph starting from the outputs, adding nodes and edges to their
         # collections and setting up references
         seen_edges: dict[int, UUID] = {}
@@ -320,33 +375,126 @@ class GraphProcedureStore:
         prev_uuids = output_uuids
         while next_nodes:
             # add any new nodes, and create references to the previous edges
-            prev_uuids = await self._insert_nodes(logger, next_nodes, seen_nodes, prev_uuids)
-            # TODO bug here: if some nodes had been seen, we need to skip following their incoming
-            # edges
-            #
-            # TODO next we need to test this well :(
+            prev_uuids, skipped = await self._insert_nodes(
+                logger, next_nodes, seen_nodes, prev_uuids
+            )
 
             # discover the next edges
             next_edges: list[Edge[Step]] = []
-            for n in next_nodes:
+            prev_uuids_filtered = []
+            prev_uuids_iter = iter(prev_uuids)
+            for n, skip in zip(next_nodes, skipped):
+                if skip:  # already saw this node, so we don't need to follow its incoming edges
+                    continue
                 next_edges.extend(n.incoming)
+                prev_uuids_filtered.extend([next(prev_uuids_iter)] * len(n.incoming))
+
+            if not next_edges:
+                break
 
             # add these edges, and create references to the previous nodes
-            prev_uuids = await self._insert_edges(logger, next_edges, seen_edges, prev_uuids)
+            prev_uuids = await self._insert_edges(
+                logger, next_edges, seen_edges, prev_uuids_filtered
+            )
 
             # discover the next nodes
             next_nodes = []
-            for i, e in enumerate(next_edges):
+            prev_uuids_filtered = []
+            for i, (e, uuid) in enumerate(zip(next_edges, prev_uuids, strict=True)):
                 if e.from_ is None:
                     # must be input edge
                     input_uuids.append(prev_uuids[i])
                     continue
 
                 next_nodes.append(e.from_)
+                prev_uuids_filtered.append(uuid)
+            prev_uuids = prev_uuids_filtered
 
         for e in g.inputs:
             if id(e) not in seen_edges:
+                logger.debug("did not see input edge '%s'", e.content)
                 raise ValueError("malformed graph: input edge not reached by backward traversal")
 
         # insert graph
-        await self._insert_graph(input_uuids, output_uuids, v)
+        return await self._insert_graph(input_uuids, output_uuids, v)
+
+    async def get_graph(
+        self, logger: logging.Logger, id_: UUID, cls: Type[Procedure]
+    ) -> tuple[Procedure, np.ndarray]:
+        """Get an existing graph and its embedding by ID."""
+        out = cls()
+
+        # get output edges and nodes they lead from
+        res = await self.graphs.query.fetch_object_by_id(
+            id_,
+            include_vector=True,
+            return_properties=[],
+            return_references=wvc.query.QueryReference(
+                link_on="outputs",
+                return_properties=["content"],
+                return_references=wvc.query.QueryReference(
+                    link_on="fromNode", return_properties=["api", "description", "args"]
+                ),
+            ),
+        )
+        v = np.array(res.vector)
+        # collect visible nodes and add Output objects to out
+        new_nodes: list[UUID] = []
+        seen: dict[UUID, Node[Step]] = {}
+        for output in res.references["outputs"].objects:
+            node_data = output.references["fromNode"].objects[0]
+            node = Node(
+                Step(
+                    cast(str, node_data.properties["api"]),
+                    cast(str, node_data.properties["description"]),
+                    cast(list[str], node_data.properties["args"]),
+                )
+            )
+            content = cast(str, output.properties["content"])
+            out.outputs.extend(node.add_outputs(content))
+            logger.debug("saw output '%s'", content)
+            logger.debug("saw node '%s'", node.data.desc)
+
+            new_nodes.append(node_data.uuid)
+            seen[node_data.uuid] = node
+
+        while new_nodes:
+            # get incoming edges and nodes they lead from
+            res = await self.edges.query.fetch_objects(
+                filters=Filter.by_ref(link_on="toNode").by_id().contains_any(new_nodes),
+                return_properties=["content"],
+                return_references=[
+                    wvc.query.QueryReference(link_on="toNode"),  # so we know which nodes to link to
+                    wvc.query.QueryReference(  # backtrack to new (unseen) nodes
+                        link_on="fromNode", return_properties=["api", "description", "args"]
+                    ),
+                ],
+            )
+
+            # collect visible nodes and add Edge objects to out, watching for Input edges
+            new_nodes = []
+            for edge in res.objects:
+                edge_content = cast(str, edge.properties["content"])
+                to_node = seen[edge.references["toNode"].objects[0].uuid]
+
+                if "fromNode" not in edge.references:  # Input
+                    out.inputs.extend(to_node.add_inputs(edge_content))
+                    logger.debug("saw input '%s'", edge_content)
+                else:  # internal edge
+                    node_data = edge.references["fromNode"].objects[0]
+                    node = Node(
+                        Step(
+                            cast(str, node_data.properties["api"]),
+                            cast(str, node_data.properties["description"]),
+                            cast(list[str], node_data.properties["args"]),
+                        )
+                    )
+                    node.new_edge_to(to_node, edge_content)
+                    logger.debug("saw edge '%s'", edge_content)
+                    logger.debug("saw node '%s'", node.data.desc)
+
+                    if node_data.uuid not in seen:
+                        new_nodes.append(node_data.uuid)
+                    seen[node_data.uuid] = node
+
+        return out, v

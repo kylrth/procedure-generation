@@ -2,7 +2,7 @@ import itertools
 import logging
 from abc import ABC, abstractmethod
 from os import PathLike
-from typing import Any
+from typing import Any, Type, cast
 
 import numpy as np
 import weaviate
@@ -17,26 +17,33 @@ class Store(ABC):
     Store subclasses should implement a `populate` method that adds data to the collection.
     """
 
-    store: weaviate.WeaviateClient
-    collection: weaviate.collections.Collection
+    store: weaviate.WeaviateAsyncClient
+    collection: weaviate.collections.CollectionAsync
     embedder: CachingEmbedder
 
-    def __init__(
-        self,
-        store: weaviate.WeaviateClient,
+    @classmethod
+    async def new[
+        T
+    ](
+        cls: Type[T],
+        store: weaviate.WeaviateAsyncClient,
         name: str,
         desc: str,
         embedder: str,
         cache_path: str | PathLike,
-    ):
+    ) -> T:
+        self = cast(Store, cls())
+
         self.store = store
-        self.collection = self.store.collections.create(
+        self.collection = await self.store.collections.create(
             name=name,
             description=desc,
             properties=self.coll_properties,
             vectorizer_config=wvc.config.Configure.Vectorizer.none(),
         )
         self.embedder = CachingEmbedder(embedder_from_name(embedder), cache_path)
+
+        return cast(T, self)
 
     @property
     @abstractmethod
@@ -48,7 +55,7 @@ class Store(ABC):
     async def search(self, query: str, k: int = 5) -> list[Any]:
         pass
 
-    def weaviate_insert(
+    async def weaviate_insert(
         self,
         logger: logging.Logger,
         properties: list[dict[str, Any]],
@@ -68,7 +75,7 @@ class Store(ABC):
                 )
             )
 
-        res = self.collection.data.insert_many(objects)
+        res = await self.collection.data.insert_many(objects)
         if res.has_errors:
             if len(res.errors) > 0:
                 logger.error("first Weaviate error: " + next(iter(res.errors.values())).message)
