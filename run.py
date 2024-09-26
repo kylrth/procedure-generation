@@ -11,18 +11,15 @@ import asyncio
 import logging
 import random
 import sys
-import tempfile
 import traceback
 from pathlib import Path
-
-import weaviate
-from weaviate.embedded import EmbeddedOptions
 
 import dataset
 import retrieval
 from dataset import Procedure
 from systems import Model, System, AAG, FewShot, ReAct, RAG
 from utils import log, spread_gather
+from utils.weaviate import NiceWeaviate
 import time
 
 
@@ -73,43 +70,122 @@ def int_leq(v: int):
     return validate
 
 
-class NiceWeaviate(weaviate.WeaviateClient):
-    """This Weaviate client keeps things in a temporary directory and deletes it when done.
+async def main(args):
+    logger = logging.getLogger("main")
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
 
-    It also sets nice defaults for using an embedded instance like this.
-    """
+    dataset_name = args.dataset.lower()
+    if dataset_name == dataset_lcstep:
+        ds = dataset.LCStep(args.data_dir)
+    elif dataset_name == dataset_recipenlg:
+        ds = dataset.RecipeNLG(args.data_dir, n=10000)
+    elif dataset_name == dataset_champ:
+        ds = dataset.CHAMP(args.data_dir)
+    else:
+        raise NotImplementedError(f"unrecognized dataset '{args.dataset}'")
 
-    tdir: tempfile.TemporaryDirectory
-    port: int
-    grpc_port: int
+    logger.info("creating system...")
+    model = Model.from_full_name(args.model)
+    system_name = args.system.lower()
 
-    def __init__(self, port: int, grpc_port: int):
-        self.tdir = tempfile.TemporaryDirectory()
-        self.port = port
-        self.grpc_port = grpc_port
+    cache_path = Path("cache") / system_name / dataset_name / args.embedder
 
-    def __enter__(self):
-        path = self.tdir.__enter__()
-        super().__init__(
-            embedded_options=EmbeddedOptions(
-                persistence_data_path=path,
-                version="1.25.17",
-                port=self.port,
-                additional_env_vars={
-                    "AUTOSCHEMA_ENABLED": "false",
-                    "DISABLE_TELEMETRY": "true",
-                    "LOG_LEVEL": "warning",
-                },
-                grpc_port=self.grpc_port,
+    out_name = (
+        system_name
+        + ("_no-summ" if system_name == "aag" and not args.summarize else "")
+        + ("_no-critic" if system_name in ("rag", "aag") and not args.critic else "")
+        + (f"_{args.n_queries}" if system_name == "aag" and args.n_queries != 4 else "")
+    )
+    outdir = Path("output") / out_name / dataset_name / args.embedder
+
+    human = log.HumanLogger(outdir)
+    store = None
+
+    async with NiceWeaviate() as client:
+        if system_name == "zeroshot":
+            system = FewShot(model, args.dataset, shots=None)
+        elif system_name == "fewshot":
+            logger.debug(f"FewShot: selecting {args.k} docs")
+            procedures = ds.procedures(dataset.Split.TRAIN)
+            rng = random.Random(27)
+            shots = [shot.to_doc() for shot in rng.sample(procedures, args.k)]
+
+            system = FewShot(model, args.dataset, shots)
+        elif system_name == "rag":
+            # set up vector store with supporting docs + the train set of procedures
+            logger.debug("RAG: collecting docs")
+            procedures = ds.procedures(dataset.Split.TRAIN | dataset.Split.VAL)
+            docs = [p.to_doc() for p in procedures]
+            logger.debug(f"RAG: collected {len(docs)} docs for vector store")
+
+            logger.info("RAG: Creating collection and uploading docs to Weaviate collection")
+            store = retrieval.DocStore(
+                client, "Docs", "Documents for retrieval", args.embedder, cache_path
             )
-        )
-        super().__enter__()
+            await store.populate(logger, docs)
 
-        return self
+            system = RAG(model, store, args.k, args.dataset, args.critic)
+        elif system_name in {"react", "aag"}:
+            fancy = "AAG" if system_name == "aag" else "ReAct"
 
-    def __exit__(self, exc_type, exc_value, traceback):
-        super().__exit__(exc_type, exc_value, traceback)
-        self.tdir.__exit__(exc_type, exc_value, traceback)
+            # set up vector store for unchunked train procedures
+            logger.debug(f"{fancy}: collecting train procedures")
+            procedures = ds.procedures(dataset.Split.TRAIN | dataset.Split.VAL)
+            logger.debug(f"{fancy}: collected {len(procedures)} procedures for skill library")
+
+            logger.info(
+                f"{fancy}: Creating collection and uploading procedures to Weaviate collection"
+            )
+            store = retrieval.ProcedureStore(
+                client,
+                "Procedures",
+                "Skill library",
+                args.embedder,
+                cache_path,
+                retrieval.procedure_formatter_for(dataset_name),
+            )
+            await store.populate(logger, procedures)
+
+            if system_name == "aag":
+                system = AAG(
+                    model, store, args.k, args.dataset, args.summarize, args.critic, args.n_queries
+                )
+            else:  # "react"
+                system = ReAct(model.model, args.dataset, store, args.k)
+        else:
+            raise NotImplementedError(args.system)
+
+        # shorten eval set according to -n
+        eval_data = ds.procedures(dataset.Split.TEST)
+        n = min(args.n, len(eval_data))
+        eval_data = eval_data[:n]
+        logger.info(f"loaded {len(eval_data)} eval examples")
+
+        logger.info("starting generation...")
+
+        with log.CSVLogger(outdir / "output.csv") as csv:
+            try:
+                start = time.time_ns()
+                asyncio.run(
+                    spread_gather(
+                        lambda item: generate_and_record(logger, csv, human, system, *item),
+                        enumerate(eval_data),
+                        min(args.workers, n),
+                        len(eval_data),
+                    )
+                )
+                tot_time = time.time_ns() - start
+                logger.info(f"see results in in ./{outdir}")
+                logger.info(
+                    f"runtime for {args.system} with critic {args.critic} on {args.dataset}: "
+                    f"{tot_time / 1e9:.1f}s"
+                )
+            finally:
+                if store is not None:
+                    store.embedder.flush()
 
 
 # constants
@@ -183,119 +259,4 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    logger = logging.getLogger("main")
-    handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
-    logger.addHandler(handler)
-    logger.setLevel(logging.DEBUG)
-
-    dataset_name = args.dataset.lower()
-    if dataset_name == dataset_lcstep:
-        ds = dataset.LCStep(args.data_dir)
-    elif dataset_name == dataset_recipenlg:
-        ds = dataset.RecipeNLG(args.data_dir, n=10000)
-    elif dataset_name == dataset_champ:
-        ds = dataset.CHAMP(args.data_dir)
-    else:
-        raise NotImplementedError(f"unrecognized dataset '{args.dataset}'")
-
-    logger.info("creating system...")
-    model = Model.from_full_name(args.model)
-    system_name = args.system.lower()
-
-    cache_path = Path("cache") / system_name / dataset_name / args.embedder
-
-    out_name = (
-        system_name
-        + ("_no-summ" if system_name == "aag" and not args.summarize else "")
-        + ("_no-critic" if system_name in ("rag", "aag") and not args.critic else "")
-        + (f"_{args.n_queries}" if system_name == "aag" and args.n_queries != 4 else "")
-    )
-    outdir = Path("output") / out_name / dataset_name / args.embedder
-
-    human = log.HumanLogger(outdir)
-    store = None
-
-    port = random.randint(1000, 65534)
-    with NiceWeaviate(port, port + 1) as client:
-        if system_name == "zeroshot":
-            system = FewShot(model, args.dataset, shots=None)
-        elif system_name == "fewshot":
-            logger.debug(f"FewShot: selecting {args.k} docs")
-            procedures = ds.procedures(dataset.Split.TRAIN)
-            rng = random.Random(27)
-            shots = [shot.to_doc() for shot in rng.sample(procedures, args.k)]
-
-            system = FewShot(model, args.dataset, shots)
-        elif system_name == "rag":
-            # set up vector store with supporting docs + the train set of procedures
-            logger.debug("RAG: collecting docs")
-            procedures = ds.procedures(dataset.Split.TRAIN | dataset.Split.VAL)
-            docs = [p.to_doc() for p in procedures]
-            logger.debug(f"RAG: collected {len(docs)} docs for vector store")
-
-            logger.info("RAG: Creating collection and uploading docs to Weaviate collection")
-            store = retrieval.DocStore(
-                client, "Docs", "Documents for retrieval", args.embedder, cache_path
-            )
-            store.populate(logger, docs)
-
-            system = RAG(model, store, args.k, args.dataset, args.critic)
-        elif system_name in {"react", "aag"}:
-            fancy = "AAG" if system_name == "aag" else "ReAct"
-
-            # set up vector store for unchunked train procedures
-            logger.debug(f"{fancy}: collecting train procedures")
-            procedures = ds.procedures(dataset.Split.TRAIN | dataset.Split.VAL)
-            logger.debug(f"{fancy}: collected {len(procedures)} procedures for skill library")
-
-            logger.info(
-                f"{fancy}: Creating collection and uploading procedures to Weaviate collection"
-            )
-            store = retrieval.ProcedureStore(
-                client,
-                "Procedures",
-                "Skill library",
-                args.embedder,
-                cache_path,
-                retrieval.procedure_formatter_for(dataset_name),
-            )
-            store.populate(logger, procedures)
-
-            if system_name == "aag":
-                system = AAG(
-                    model, store, args.k, args.dataset, args.summarize, args.critic, args.n_queries
-                )
-            else:  # "react"
-                system = ReAct(model.model, args.dataset, store, args.k)
-        else:
-            raise NotImplementedError(args.system)
-
-        # shorten eval set according to -n
-        eval_data = ds.procedures(dataset.Split.TEST)
-        n = min(args.n, len(eval_data))
-        eval_data = eval_data[:n]
-        logger.info(f"loaded {len(eval_data)} eval examples")
-
-        logger.info("starting generation...")
-
-        with log.CSVLogger(outdir / "output.csv") as csv:
-            try:
-                start = time.time_ns()
-                asyncio.run(
-                    spread_gather(
-                        lambda item: generate_and_record(logger, csv, human, system, *item),
-                        enumerate(eval_data),
-                        min(args.workers, n),
-                        len(eval_data),
-                    )
-                )
-                tot_time = time.time_ns() - start
-                logger.info(f"see results in in ./{outdir}")
-                logger.info(
-                    f"runtime for {args.system} with critic {args.critic} on {args.dataset}: "
-                    f"{tot_time / 1e9:.1f}s"
-                )
-            finally:
-                if store is not None:
-                    store.embedder.flush()
+    asyncio.run(main(args))
