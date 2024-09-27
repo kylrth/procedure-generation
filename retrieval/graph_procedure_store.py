@@ -10,158 +10,11 @@ from weaviate.classes.query import Filter
 from weaviate.collections.classes.batch import BatchObjectReturn, BatchReferenceReturn
 from weaviate.types import UUID
 
+from graph import Edge as GEdge
+from graph import Graph as GGraph
+from graph import Node as GNode
 from retrieval.embedder import CachingEmbedder, Embedder
 from utils import spread_gather
-
-
-class Node[T]:
-    data: T
-    incoming: list["Edge[T]"]
-    outgoing: list["Edge[T]"]
-
-    def __init__(self, data: T):
-        self.data = data
-        self.incoming = []
-        self.outgoing = []
-
-    def new_edge_to(self, other: "Node[T]", edge: str) -> "Edge[T]":
-        out = Edge(edge, other, self)
-
-        self.outgoing.append(out)
-        other.incoming.append(out)
-
-        return out
-
-    def add_inputs(self, *inputs: str) -> list["Input[T]"]:
-        out = []
-        for i in inputs:
-            out.append(Input(i, self))
-
-        self.incoming.extend(out)
-
-        return out
-
-    def add_outputs(self, *outputs: str) -> list["Output[T]"]:
-        out = []
-        for o in outputs:
-            out.append(Output(o, self))
-
-        self.outgoing.extend(out)
-
-        return out
-
-
-class Edge[T]:
-    content: str
-    to: Node[T] | None
-    from_: Node[T] | None
-
-    def __init__(self, content: str, to: Node[T], from_: Node[T]):
-        self.content = content
-        self.to = to
-        self.from_ = from_
-
-
-class Input[T](Edge[T]):
-    from_ = None
-
-    def __init__(self, content: str, to: Node[T]):
-        self.content = content
-        self.to = to
-
-
-class Output[T](Edge[T]):
-    to = None
-
-    def __init__(self, content: str, from_: Node[T]):
-        self.content = content
-        self.from_ = from_
-
-
-class Graph[T]:
-    inputs: list[Input[T]]
-    outputs: list[Output[T]]
-
-    def __init__(self, *nodes: Node[T]):
-        self.inputs = []
-        self.outputs = []
-
-        for node in nodes:
-            for incoming in node.incoming:
-                if isinstance(incoming, Input):
-                    self.inputs.append(incoming)
-            for outgoing in node.outgoing:
-                if isinstance(outgoing, Output):
-                    self.outputs.append(outgoing)
-
-    def __eq__(self, ot: object, /) -> bool:
-        if not isinstance(ot, Graph):
-            return False
-
-        # check output number
-        if len(self.outputs) != len(ot.outputs):
-            return False
-        # check input number
-        if len(self.inputs) != len(ot.inputs):
-            return False
-
-        self_outputs = sorted(self.outputs, key=lambda x: x.content)
-        self_inputs = sorted(self.inputs, key=lambda x: x.content)
-        ot_outputs = sorted(ot.outputs, key=lambda x: x.content)
-        ot_inputs = sorted(ot.inputs, key=lambda x: x.content)
-
-        # check output contents
-        if any(self_outputs[i].content != ot_outputs[i].content for i in range(len(self_outputs))):
-            return False
-        # check input contents
-        if any(self_inputs[i].content != ot_inputs[i].content for i in range(len(self_inputs))):
-            return False
-
-        # Note that any graph with no outputs is vacuously the same as any other, because no nodes
-        # are reachable via back-traversal.
-
-        visited: set[Node] = set()  # track nodes visited in self
-        return all(
-            self.__eq_dfs(o1.from_, o2.from_, visited) for o1, o2 in zip(self.outputs, ot.outputs)
-        )
-
-    @staticmethod
-    def __eq_dfs(o1: Node | None, o2: Node | None, visited: set[Node]) -> bool:  # noqa: PLR0911
-        # check if the nodes exist (these might have come from Input edges)
-        if o1 is None:
-            return o2 is None
-        if o2 is None:
-            return False
-
-        # first check if the contents are the same
-        if o1.data != o2.data:
-            return False
-
-        visited.add(o1)
-
-        # We don't check outgoing edges because they're either a) already checked as an incoming
-        # edge of some node, or b) an extraneous edge leading to a part of the graph that doesn't
-        # produce any output. The latter case is an inconsistent state for a Graph to be in and will
-        # be ignored.
-
-        if len(o1.incoming) != len(o2.incoming):
-            return False
-
-        for i1, i2 in zip(
-            sorted(o1.incoming, key=lambda x: x.content),
-            sorted(o2.incoming, key=lambda x: x.content),
-        ):
-            if i1.content != i2.content:
-                return False
-
-            if i1.from_ in visited:
-                continue
-
-            # visit nodes
-            if not Graph.__eq_dfs(i1.from_, i2.from_, visited):
-                return False
-
-        return True
 
 
 class Step:
@@ -185,7 +38,13 @@ class Step:
         return self.args == other.args
 
 
-class Procedure(Graph[Step], ABC):
+# For procedures, all our nodes are Steps and our edges are strings.
+Edge = GEdge[Step, str]
+Graph = GGraph[Step, str]
+Node = GNode[Step, str]
+
+
+class Procedure(Graph, ABC):
     """A graph of steps to accomplish a given task."""
 
     @abstractmethod
@@ -309,7 +168,7 @@ class GraphProcedureStore[T: Procedure]:
     async def _insert_edges(
         self,
         logger: logging.Logger,
-        edges: Sequence[Edge[Step]],
+        edges: Sequence[Edge],
         seen: dict[int, UUID],
         prev_uuids: Sequence[UUID | None] | None = None,
     ) -> Sequence[UUID]:
@@ -359,7 +218,7 @@ class GraphProcedureStore[T: Procedure]:
     async def _insert_nodes(
         self,
         logger: logging.Logger,
-        nodes: Sequence[Node[Step]],
+        nodes: Sequence[Node],
         seen: dict[int, UUID],
         prev_uuids: Sequence[UUID | None] | None = None,
     ) -> tuple[Sequence[UUID], Sequence[bool]]:
@@ -447,7 +306,7 @@ class GraphProcedureStore[T: Procedure]:
         output_uuids = await self._insert_edges(logger, g.outputs, seen_edges)
 
         # discover the nodes these outputs come from
-        next_nodes: list[Node[Step]] = []
+        next_nodes: list[Node] = []
         for e in g.outputs:
             if e.from_ is None:
                 raise ValueError("malformed graph: output edge did not have from node")
@@ -463,7 +322,7 @@ class GraphProcedureStore[T: Procedure]:
             )
 
             # discover the next edges
-            next_edges: list[Edge[Step]] = []
+            next_edges: list[Edge] = []
             prev_uuids_filtered = []
             prev_uuids_iter = iter(prev_uuids)
             for n, skip in zip(next_nodes, skipped):
@@ -521,7 +380,7 @@ class GraphProcedureStore[T: Procedure]:
         v = np.array(res.vector["default"])
         # collect visible nodes and add Output objects to out
         new_nodes: list[UUID] = []
-        seen: dict[UUID, Node[Step]] = {}
+        seen: dict[UUID, Node] = {}
         for output in res.references["outputs"].objects:
             node_data = output.references["fromNode"].objects[0]
             node = Node(
