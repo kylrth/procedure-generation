@@ -69,13 +69,16 @@ class TestGraphProcedureStore(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self):
         await self.client.__aexit__(None, None, None)
 
-    async def test_one(self):
+    async def _new_test_store(self):
         store = GraphProcedureStore(self.client, TestEmbedder(), Recipe)
-
         await store.setup_collection(prefix=unittest.TestCase.id(self).split(".")[-1])
+        return store
+
+    async def test_add_get_one(self):
+        store = await self._new_test_store()
 
         want_g = example_recipe
-        want_v = np.zeros(10)
+        want_v = np.random.default_rng().random(10)
 
         uuid = await store.add_graph(self.logger, want_g, want_v)
 
@@ -83,6 +86,22 @@ class TestGraphProcedureStore(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(want_g, got_g)
         np.testing.assert_almost_equal(want_v, got_v)
+
+    async def test_search(self):
+        store = await self._new_test_store()
+
+        a = example_recipe
+        b = a.copy().cut_input_layer().cut_input_layer()
+        c = a.copy().cut_output_layer().cut_output_layer()
+
+        av, bv, cv = np.identity(3)
+
+        await store.add_graph(self.logger, a, av)
+        await store.add_graph(self.logger, b, bv)
+        await store.add_graph(self.logger, c, cv)
+
+        self.assertEqual([a], await store.search_v(av, k=1))
+        self.assertEqual([b, a, c], await store.search_v(np.array([0.1, 0.5, 0.0]), k=3))
 
 
 if __name__ == "__main__":

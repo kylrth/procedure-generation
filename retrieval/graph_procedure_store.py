@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from abc import ABC, abstractmethod
 from typing import Sequence, Type, cast
@@ -433,3 +434,19 @@ class GraphProcedureStore[T: Procedure]:
                     seen[node_data.uuid] = node
 
         return out, v
+
+    async def search(self, query: str, *, k: int = 10) -> list[T]:
+        """Find the top k procedures matching the query."""
+        v = (await self.embedder.embed([query], is_query=True))[0]
+        return await self.search_v(v, k=k)
+
+    async def search_v(self, v: np.ndarray, *, k: int = 10) -> list[T]:
+        # find the top matching graphs and just get their UUIDs
+        res = await self.graphs.query.near_vector(
+            near_vector=v.tolist(), limit=k, return_properties=[]
+        )
+
+        # build the graph objects
+        gs_vs = await asyncio.gather(*(self.get_graph(obj.uuid) for obj in res.objects))
+
+        return [g for g, _ in gs_vs]
