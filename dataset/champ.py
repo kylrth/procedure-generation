@@ -2,8 +2,8 @@ import random
 from os import PathLike
 
 import champ_dataset
-
-from .base import Dataset, Doc, Procedure
+import pickle
+from .base import Dataset, Doc, LinearProcedure, GraphProcedure
 
 
 def load_dataset():
@@ -42,7 +42,7 @@ def make_procedure_object(content, hints):
     input_str = get_input(content, hints)
     step_list = get_solution_steps(content)
 
-    return Procedure(input_str, content.text, step_list)
+    return LinearProcedure(input_str, content.text, step_list)
 
 
 # Pass data dir as None for CHAMP dataset
@@ -52,7 +52,7 @@ class CHAMP(Dataset):
         self.n = n
         self.rng = random.Random(42)
 
-    def _init_procedures(self) -> list[Procedure]:
+    def _init_procedures(self) -> list[LinearProcedure]:
         probs, hints, _ = load_dataset()  # don't use concepts
 
         out = []
@@ -62,6 +62,17 @@ class CHAMP(Dataset):
         self.rng.shuffle(out)
 
         return out
+
+    def _init_graphs(self) -> list[GraphProcedure]:
+        dir = self.dir / "graphs" / "champ"
+        file_list = dir.glob("*.pkl")
+        graph_list = []
+        for file in file_list:
+            with file.open("rb") as f:
+                graph = pickle.load(f)
+            graph_list.append(graph)
+
+        return graph_list
 
     def _get_docs(self) -> list[Doc]:
         doc_list = []

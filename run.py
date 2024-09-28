@@ -16,11 +16,12 @@ from pathlib import Path
 
 import dataset
 import retrieval
-from dataset import Procedure
-from systems import Model, System, AAG, FewShot, ReAct, RAG
+from dataset import LinearProcedure
+from systems import System, AAG, FewShot, ReAct, RAG
 from utils import log, spread_gather
 from utils.weaviate import NiceWeaviate
 import time
+import Model
 
 
 async def generate_and_record(
@@ -29,7 +30,7 @@ async def generate_and_record(
     human: log.HumanLogger,
     model: System,
     id_: int,
-    p: Procedure,
+    p: LinearProcedure,
 ):
     """Generate a procedure for this item with the model, and log the result."""
     with human.for_id(id_) as hlog:
@@ -109,7 +110,7 @@ async def main(args):
             system = FewShot(model, args.dataset, shots=None)
         elif system_name == "fewshot":
             logger.debug(f"FewShot: selecting {args.k} docs")
-            procedures = ds.procedures(dataset.Split.TRAIN)
+            procedures = ds.graphs(dataset.Split.TRAIN)
             rng = random.Random(27)
             shots = [shot.to_doc() for shot in rng.sample(procedures, args.k)]
 
@@ -117,7 +118,7 @@ async def main(args):
         elif system_name == "rag":
             # set up vector store with supporting docs + the train set of procedures
             logger.debug("RAG: collecting docs")
-            procedures = ds.procedures(dataset.Split.TRAIN | dataset.Split.VAL)
+            procedures = ds.graphs(dataset.Split.TRAIN | dataset.Split.VAL)
             docs = [p.to_doc() for p in procedures]
             logger.debug(f"RAG: collected {len(docs)} docs for vector store")
 
@@ -133,7 +134,7 @@ async def main(args):
 
             # set up vector store for unchunked train procedures
             logger.debug(f"{fancy}: collecting train procedures")
-            procedures = ds.procedures(dataset.Split.TRAIN | dataset.Split.VAL)
+            procedures = ds.graphs(dataset.Split.TRAIN | dataset.Split.VAL)
             logger.debug(f"{fancy}: collected {len(procedures)} procedures for skill library")
 
             logger.info(
@@ -159,7 +160,7 @@ async def main(args):
             raise NotImplementedError(args.system)
 
         # shorten eval set according to -n
-        eval_data = ds.procedures(dataset.Split.TEST)
+        eval_data = ds.graphs(dataset.Split.TEST)
         n = min(args.n, len(eval_data))
         eval_data = eval_data[:n]
         logger.info(f"loaded {len(eval_data)} eval examples")

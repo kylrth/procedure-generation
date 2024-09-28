@@ -9,7 +9,7 @@ from typing import ClassVar, Iterable
 
 from langchain_core.messages import BaseMessage
 
-from dataset import Procedure
+from dataset import LinearProcedure
 
 
 @dataclass
@@ -18,7 +18,7 @@ class Result:
 
     ID: int
     model: str
-    gold: Procedure
+    gold: LinearProcedure
     completion: list[str]
 
 

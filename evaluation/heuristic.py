@@ -1,7 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 
-from dataset import Procedure
+from dataset import LinearProcedure
 
 
 class Heuristic(ABC):
@@ -10,12 +10,12 @@ class Heuristic(ABC):
 
     @abstractmethod
     def evaluate(
-        self, logger: logging.Logger, gold: Procedure, generated: list[str]
+        self, logger: logging.Logger, gold: LinearProcedure, generated: list[str]
     ) -> int | float:
         pass
 
     @abstractmethod
     async def aevaluate(
-        self, logger: logging.Logger, gold: Procedure, generated: list[str]
+        self, logger: logging.Logger, gold: LinearProcedure, generated: list[str]
     ) -> int | float:
         pass

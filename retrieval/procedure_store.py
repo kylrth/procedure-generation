@@ -7,7 +7,7 @@ from typing import ClassVar
 import weaviate
 import weaviate.classes.config as wc
 
-from dataset import Procedure
+from dataset import LinearProcedure
 
 from .store import Store
 
@@ -17,7 +17,7 @@ class ProcedureFormatter:
     output_prefix: str
     input_prefix: str
 
-    def format(self, p: Procedure) -> str:
+    def format(self, p: LinearProcedure) -> str:
         return (
             self.output_prefix + p.output + self.input_prefix + p.input_ + "\n\n" + p.format_steps()
         )
@@ -83,7 +83,7 @@ class ProcedureStore(Store):
     def coll_properties(self) -> list[wc.Property]:
         return self._coll_properties
 
-    async def populate(self, logger: logging.Logger, procs: list[Procedure]):
+    async def populate(self, logger: logging.Logger, procs: list[LinearProcedure]):
         """Chunk, vectorize, cache, and upload the procedures."""
         logger.debug("embedding %d procedures", len(procs))
         formatted = [self.pfmt.format(p) for p in procs]
@@ -94,7 +94,7 @@ class ProcedureStore(Store):
 
         await self.weaviate_insert(logger, [p.to_dict() for p in procs], vectors)
 
-    async def search(self, query: str, k: int = 5) -> list[Procedure]:
+    async def search(self, query: str, k: int = 5) -> list[LinearProcedure]:
         """Returns the procedures that will be inserted into the prompt."""
         embedded_query = (await self.embedder.embed([query], is_query=True))[0]
 
@@ -107,7 +107,7 @@ class ProcedureStore(Store):
         out = []
         for obj in res.objects:
             out.append(
-                Procedure(
+                LinearProcedure(
                     obj.properties["input"], obj.properties["output"], obj.properties["steps"]
                 )
             )

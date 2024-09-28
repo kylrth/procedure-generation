@@ -6,7 +6,7 @@ import spacy
 from sklearn.feature_extraction.text import TfidfVectorizer
 from spacy.lang.en import stop_words
 
-from dataset import CHAMP, LCStep, Procedure, RecipeNLG, Split, format_steps
+from dataset import CHAMP, LCStep, LinearProcedure, RecipeNLG, Split, format_steps
 
 from .heuristic import Heuristic
 
@@ -31,7 +31,7 @@ class TfIdf(Heuristic):
         self.punctuations = list(punctuation)
         self.tf_idf_vect = self.fit_tf_idf(self.train_data)
 
-    def get_train_data(self) -> list[Procedure]:
+    def get_train_data(self) -> list[LinearProcedure]:
         if self.dataset_name == dataset_lcstep:
             ds = LCStep(data_dir)
         elif self.dataset_name == dataset_recipenlg:
@@ -58,7 +58,7 @@ class TfIdf(Heuristic):
         ]
         return sentence
 
-    def convert_procedures_to_string(self, proc_list: list[Procedure]) -> list[str]:
+    def convert_procedures_to_string(self, proc_list: list[LinearProcedure]) -> list[str]:
         out_str_list = []
         for procedure in proc_list:
             proc_str = "\n".join("- " + s for s in procedure.steps)
@@ -78,7 +78,9 @@ class TfIdf(Heuristic):
         top_20_indices = np.argsort(doc_term_matrix)[-20:]
         return vectorizer.get_feature_names_out()[top_20_indices]
 
-    def evaluate(self, logger: logging.Logger, gold: Procedure, generated: list[str]) -> float:
+    def evaluate(
+        self, logger: logging.Logger, gold: LinearProcedure, generated: list[str]
+    ) -> float:
         # Get important words
 
         gen_imp_words = self.convert_to_tf_idf_features(
@@ -96,5 +98,5 @@ class TfIdf(Heuristic):
         logger.debug("Returning important words overlap score")
         return count / len(gen_imp_words)
 
-    async def aevaluate(self, logger: logging.Logger, gold: Procedure, generated: list[str]):
+    async def aevaluate(self, logger: logging.Logger, gold: LinearProcedure, generated: list[str]):
         raise NotImplementedError
