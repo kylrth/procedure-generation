@@ -199,10 +199,21 @@ class Graph[T, U: _Comparable]:
 
         for node in nodes:
             if node not in reached_nodes:
-                raise ValueError(f"node {node.data} was not reachable by back-traversal")
+                raise self.UnreachableError(node)
         for i in self.inputs:
             if i not in reached_inputs:
-                raise ValueError(f"input {i.content} was not reachable by back-traversal")
+                raise self.UnreachableError(i)
+
+    class UnreachableError(Exception):
+        """Raised by the initializer when a Node or Input is unreachable by back-traversal from the
+        outputs."""
+
+        def __init__(self, missing: Node[T, U] | Input[T, U]):
+            self.missing = missing
+
+        def __str__(self):
+            t = "node" if isinstance(self.missing, Node) else "input"
+            return f"{t} {self.missing} was not reachable by back-traversal"
 
     def copy(self) -> Self:
         """Create a copy of the Graph by duplicating all Nodes and Edges.
