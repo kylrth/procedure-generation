@@ -3,7 +3,7 @@ import pickle
 from abc import ABC, abstractmethod
 from os import PathLike
 from pathlib import Path
-from typing import Callable, ClassVar, Generator, Iterable, Type, TypeVar
+from typing import Callable, ClassVar, Generator, Iterable, Type, cast
 
 import mmh3
 import numpy as np
@@ -39,10 +39,7 @@ _openai_max_input: dict[str, int] = {
 }
 
 
-T = TypeVar("T")
-
-
-def batch(tokens: Iterable[list[T]], max_tok: int) -> Generator[list[list[T]], None, None]:
+def batch[T](tokens: Iterable[list[T]], max_tok: int) -> Generator[list[list[T]], None, None]:
     """Yield batches of sublists which in total are not longer than max_tok."""
     current_batch = []
     current_length = 0
@@ -149,12 +146,16 @@ class HFEmbedder(NamedEmbedder):
             raise NotImplementedError(model) from None
 
     async def embed(self, text: list[str], *, is_query: bool = False) -> list[np.ndarray]:
-        return self.model.encode(
-            text,
-            prompt_name=self._is_query if is_query else self._is_doc,
-            batch_size=16,
-            show_progress_bar=len(text) > 1,
-            convert_to_numpy=True,
+        return cast(
+            list[np.ndarray],
+            self.model.encode(
+                text,
+                prompt_name=self._is_query if is_query else self._is_doc,
+                batch_size=16,
+                show_progress_bar=len(text) > 16,
+                convert_to_numpy=True,
+                normalize_embeddings=True,
+            ),
         )
 
 
