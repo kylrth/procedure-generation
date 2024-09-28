@@ -4,7 +4,6 @@ specific LMs."""
 from .aag import AAG
 from .few_shot import FewShot
 from .interface import Response, System
-from .model import Model
 from .rag import RAG
 from .react import ReAct
 
@@ -12,7 +11,6 @@ from .react import ReAct
 __all__ = [
     "Response",
     "System",
-    "Model",
     # systems
     "FewShot",
     "RAG",

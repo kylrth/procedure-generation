@@ -4,7 +4,7 @@ import sys
 import textwrap
 from typing import ClassVar
 
-from dataset import Procedure
+from dataset import LinearProcedure
 from retrieval import ProcedureStore
 from utils import log
 
@@ -49,7 +49,7 @@ class AAG(System):
     async def generate(self, logger: log.InstanceLogger, query: str, input_: str) -> Response:
         queries = await self.queries_relevant_to(logger, query, input_)
 
-        procs: list[list[Procedure]] = []
+        procs: list[list[LinearProcedure]] = []
         summaries: list[str] = []
         for q in queries:
             proc_list = await self.skills.search(q, self.k)
@@ -64,7 +64,7 @@ class AAG(System):
                 logger.write(f"  - {p.output}\n")
 
         init_steps = await self.get_rag_response(logger, query, input_)
-        candidate = Procedure(input_, query, init_steps)
+        candidate = LinearProcedure(input_, query, init_steps)
 
         logger.write("BEGIN RAG CANDIDATE\n")
         logger.write(textwrap.indent(candidate.format_steps(), "  ") + "\n")
@@ -193,7 +193,7 @@ class AAG(System):
         return sum_str.rstrip()
 
     async def update_steps(
-        self, logger: log.InstanceLogger, candidate: Procedure, knowledge_str: str
+        self, logger: log.InstanceLogger, candidate: LinearProcedure, knowledge_str: str
     ) -> list[str]:
         msg_prompt = (
             f"[BEGIN KNOWLEDGE]\n{knowledge_str}\n[END KNOWLEDGE]"
@@ -274,7 +274,7 @@ class AAG(System):
 
         raise ValueError("could not get good response from LLM after 3 tries")
 
-    def format_procedures(self, procs: list[Procedure]) -> str:
+    def format_procedures(self, procs: list[LinearProcedure]) -> str:
         seen = set()
         out = ""
         for p in procs:
@@ -287,7 +287,7 @@ class AAG(System):
         return out[2:]  # skip first "\n\n"
 
     async def create_summary(
-        self, logger: log.InstanceLogger, query: str, procs: list[Procedure]
+        self, logger: log.InstanceLogger, query: str, procs: list[LinearProcedure]
     ) -> str:
         context = self.format_procedures(procs)
         sys_instruction = (
@@ -337,7 +337,7 @@ class AAG(System):
         "champ": "",
     }
 
-    async def validate_update(self, logger: log.InstanceLogger, candidate: Procedure) -> str:
+    async def validate_update(self, logger: log.InstanceLogger, candidate: LinearProcedure) -> str:
         sys_instruction = (
             "[INSTRUCTION]\nYou are a human critic whose job is to validate the "
             "provided procedure, propose the changes to be made and evaluate if "
@@ -458,7 +458,7 @@ class AAG(System):
     }
 
     async def perform_validator_edits(
-        self, logger: log.InstanceLogger, candidate: Procedure, knowledge_str: str, edits: str
+        self, logger: log.InstanceLogger, candidate: LinearProcedure, knowledge_str: str, edits: str
     ) -> list[str]:
         msg_prompt = (
             f"[BEGIN KNOWLEDGE]\n{knowledge_str}\n[END KNOWLEDGE]"
@@ -490,7 +490,7 @@ class AAG(System):
     async def check_with_validator_and_modify(
         self,
         logger: log.InstanceLogger,
-        candidate: Procedure,
+        candidate: LinearProcedure,
         knowledge_str: str,
         max_updates: int = 3,
     ) -> list[str]:

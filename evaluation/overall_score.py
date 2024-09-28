@@ -3,7 +3,7 @@ import re
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from dataset import Procedure, format_steps
+from dataset import LinearProcedure, format_steps
 from systems import Model
 
 from .heuristic import Heuristic
@@ -86,10 +86,12 @@ class OverallScore(Heuristic):
 
         return int(match[-1])
 
-    def evaluate(self, logger: logging.Logger, gold: Procedure, generated: list[str]):
+    def evaluate(self, logger: logging.Logger, gold: LinearProcedure, generated: list[str]):
         raise NotImplementedError
 
-    async def aevaluate(self, logger: logging.Logger, gold: Procedure, generated: list[str]) -> int:
+    async def aevaluate(
+        self, logger: logging.Logger, gold: LinearProcedure, generated: list[str]
+    ) -> int:
         prompt = self.prepare_prompt(gold.format_steps(), format_steps(generated), gold.output)
         logger.debug("Prompt prepared")
         answer = await self.model.generate(prompt)

@@ -5,7 +5,7 @@ import editdistance as edt
 import spacy
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from dataset import Procedure, format_steps
+from dataset import LinearProcedure, format_steps
 from systems import Model
 
 from .heuristic import Heuristic
@@ -44,10 +44,12 @@ class EditDistance(Heuristic):
         ]
         return sentence
 
-    def evaluate(self, logger: logging.Logger, gold: Procedure, generated: list[str]):
+    def evaluate(self, logger: logging.Logger, gold: LinearProcedure, generated: list[str]):
         raise NotImplementedError
 
-    async def aevaluate(self, logger: logging.Logger, gold: Procedure, generated: list[str]) -> int:
+    async def aevaluate(
+        self, logger: logging.Logger, gold: LinearProcedure, generated: list[str]
+    ) -> int:
         gold_proc_steps = gold.format_steps()  # Removing the brackets
         gold_one_word_list = await self.get_one_word_list(gold_proc_steps)
         logger.debug("Got one word list for gold")

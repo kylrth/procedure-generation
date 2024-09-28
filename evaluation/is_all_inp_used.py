@@ -3,7 +3,7 @@ import re
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from dataset import Procedure, format_steps
+from dataset import LinearProcedure, format_steps
 from systems import Model
 
 from .heuristic import Heuristic
@@ -54,11 +54,11 @@ class AllInpUsed(Heuristic):
             filtered_sentence = re.sub(r"\[]", "", trim_ing_list)[1:-1].split(",")
         return filtered_sentence
 
-    def evaluate(self, logger: logging.Logger, gold: Procedure, generated: list[str]):
+    def evaluate(self, logger: logging.Logger, gold: LinearProcedure, generated: list[str]):
         raise NotImplementedError
 
     async def aevaluate(
-        self, logger: logging.Logger, gold: Procedure, generated: list[str]
+        self, logger: logging.Logger, gold: LinearProcedure, generated: list[str]
     ) -> float:
         logger.debug("Getting cleaned input now")
         logger.debug(f"Input to procedure is: {gold.input_}")

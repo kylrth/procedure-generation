@@ -2,7 +2,7 @@ import logging
 
 from torchmetrics.text.rouge import ROUGEScore
 
-from dataset import Procedure, format_steps
+from dataset import LinearProcedure, format_steps
 
 from .heuristic import Heuristic
 
@@ -12,7 +12,7 @@ class ScoreROUGE(Heuristic):
         self.rouge = ROUGEScore(use_stemmer=True)
 
     def evaluate(
-        self, logger: logging.Logger, gold: Procedure, generated: list[str]
+        self, logger: logging.Logger, gold: LinearProcedure, generated: list[str]
     ) -> dict[str, float]:
         # Input: Gold and Generated procedure steps
         logger.debug("Calculating rouge score")
@@ -28,5 +28,5 @@ class ScoreROUGE(Heuristic):
         logger.debug("Returning rouge score now")
         return rouge_stats
 
-    async def aevaluate(self, logger: logging.Logger, gold: Procedure, generated: list[str]):
+    async def aevaluate(self, logger: logging.Logger, gold: LinearProcedure, generated: list[str]):
         raise NotImplementedError

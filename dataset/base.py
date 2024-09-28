@@ -4,6 +4,7 @@ from enum import Flag, auto
 from os import PathLike
 from pathlib import Path
 from typing import Any
+from graph import Graph
 
 
 @dataclass
@@ -31,8 +32,8 @@ def format_steps(steps: list[str]) -> str:
 
 
 @dataclass
-class Procedure:
-    """The base definition of a procedure as used across all datasets."""
+class LinearProcedure:
+    """The base definition of a linear procedure as used across all datasets."""
 
     input_: str
     output: str
@@ -59,6 +60,34 @@ class Procedure:
 
     def __hash__(self):
         return hash(self.input_) ^ hash(self.output) ^ hash(tuple(self.steps))
+
+
+class Step:
+    api: str
+    desc: str
+    args: list[str]
+
+    def __init__(self, api: str, desc: str, args: list[str] | None = None):
+        self.api = api
+        self.desc = desc
+        self.args = args if args is not None else []
+
+    def __eq__(self, other: object, /) -> bool:
+        if not isinstance(other, Step):
+            return False
+
+        if self.api != other.api:
+            return False
+        if self.desc != other.desc:
+            return False
+        return self.args == other.args
+
+
+class GraphProcedure(Graph, ABC):
+    """A graph of steps to accomplish a given task."""
+
+    def __str__(self) -> str:
+        """Procedure types must implement a formatting method."""
 
 
 def train_val_test(data: list, val: float, test: float) -> tuple[list, list, list]:
@@ -118,17 +147,32 @@ class Dataset(ABC):
         self._all = None
 
     @abstractmethod
-    def _init_procedures(self) -> list[Procedure]:
+    def _init_procedures(self) -> list[LinearProcedure]:
         """Return the full list of procedures. Will only be called once and the result will be
         cached."""
 
-    def procedures(self, split: Split) -> list[Procedure]:
-        """Return the list of procedures corresponding to the specified section of data.
+    @abstractmethod
+    def _init_graphs(self) -> list[GraphProcedure]:
+        """Return the full list of graph procedures. Will only be called once and the result will be
+        cached."""
+
+    def procedures(self, split: Split) -> list[LinearProcedure]:
+        """Return the list of linear procedures corresponding to the specified section of data.
 
         May also be overridden if different functionality is desired.
         """
         if self._all is None:
             self._all = self._init_procedures()
+
+        return split.get(self._all)
+
+    def graphs(self, split: Split) -> list[GraphProcedure]:
+        """Return the list of graph procedures corresponding to the specified section of data.
+
+        May also be overridden if different functionality is desired.
+        """
+        if self._all is None:
+            self._all = self._init_graphs()
 
         return split.get(self._all)
 

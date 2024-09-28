@@ -1,6 +1,6 @@
 import logging
 
-from dataset import Procedure, format_steps
+from dataset import LinearProcedure, format_steps
 
 from .heuristic import Heuristic
 
@@ -17,7 +17,9 @@ class ApiOverlap(Heuristic):
             start_idx += 2
         return api_list
 
-    def evaluate(self, logger: logging.Logger, gold: Procedure, generated: list[str]) -> float:
+    def evaluate(
+        self, logger: logging.Logger, gold: LinearProcedure, generated: list[str]
+    ) -> float:
         gold_apis = self.get_apis(gold.format_steps())
         if not gold_apis:
             return 1  # nothing to check for
@@ -32,5 +34,5 @@ class ApiOverlap(Heuristic):
         logger.debug("Returning API overlap score")
         return num_present / len(gold_apis)
 
-    async def aevaluate(self, logger: logging.Logger, gold: Procedure, generated: list[str]):
+    async def aevaluate(self, logger: logging.Logger, gold: LinearProcedure, generated: list[str]):
         raise NotImplementedError

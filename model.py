@@ -5,8 +5,6 @@ from langchain_core.language_models import BaseLanguageModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI, OpenAI
 
-from dataset import Doc
-
 
 @dataclass
 class ModelDetails:
@@ -76,7 +74,7 @@ class Model:
         self,
         prompt: str,
         context: str | None = None,
-        examples: list[Doc] | None = None,
+        examples=None,
     ) -> str | list[BaseMessage]:
         """Builds the full input to the LLM as either a string prompt or a list of messages for a
         chat model.
@@ -122,7 +120,7 @@ class Model:
 
     @staticmethod
     def build_chat_prompt(
-        prompt: str, context: str | None = None, examples: list[Doc] | None = None
+        prompt: str, context: str | None = None, examples=None
     ) -> list[BaseMessage]:
         out = []
 
@@ -142,7 +140,7 @@ class Model:
         self,
         prompt: str,
         context: str | None = None,
-        examples: list[Doc] | None = None,
+        examples=None,
     ) -> str:
         out = ""
 

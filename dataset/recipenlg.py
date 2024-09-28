@@ -7,9 +7,10 @@ import re
 import sys
 from os import PathLike
 from typing import Any, Iterable
-
-from .base import Dataset, Doc, Procedure
-
+import glob
+import os
+from .base import Dataset, Doc, LinearProcedure, GraphProcedure
+import pickle
 
 _step_prefixes = re.compile(r"^\s*(?:\d+(?:\.|\))\s*|-)\s*(.*)$")
 
@@ -32,8 +33,8 @@ def parse_steps(s: str) -> list[str]:
     return out
 
 
-def recipe_to_procedure(d: dict[str, Any]) -> Procedure:
-    return Procedure(
+def recipe_to_procedure(d: dict[str, Any]) -> LinearProcedure:
+    return LinearProcedure(
         input_=", ".join(json.loads(d["ingredients"])),
         output=d["title"],
         steps=parse_steps(d["directions"]),
@@ -47,7 +48,7 @@ class RecipeNLG(Dataset):
         super().__init__(data_dir)
         self.reservoir = Reservoir(n, seed=42)
 
-    def _init_procedures(self) -> list[Procedure]:
+    def _init_procedures(self) -> list[LinearProcedure]:
         with (self.dir / "RecipeNLG" / "full_dataset.csv").open(newline="") as f:
             header = f.readline()
             self.reservoir.sample(f)
@@ -60,6 +61,17 @@ class RecipeNLG(Dataset):
         self.reservoir.rng.shuffle(out)
 
         return out
+
+    def _init_graphs(self) -> list[GraphProcedure]:
+        dir = self.dir / "graphs" / "recipenlg"
+        file_list = dir.glob("*.pkl")
+        graph_list = []
+        for file in file_list:
+            with file.open("rb") as f:
+                graph = pickle.load(f)
+            graph_list.append(graph)
+
+        return graph_list
 
     def _get_docs(self) -> list[Doc]:
         # TODO get generic cooking material

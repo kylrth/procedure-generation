@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import Awaitable
 
-from dataset import Procedure
+from dataset import LinearProcedure
 from evaluation.api_overlap import ApiOverlap
 from evaluation.edit_distance import EditDistance
 from evaluation.heuristic import Heuristic
@@ -24,7 +24,7 @@ async def evaluate_all(
     logger: logging.Logger,
     evals: dict[str, Heuristic],
     sample_id: int,
-    gold: Procedure,
+    gold: LinearProcedure,
     generated: list[str],
 ) -> dict[str, int | float]:
     """Evaluate a generated procedure by comparing with the gold procedure using various methods.
@@ -52,7 +52,7 @@ async def write_results(w: csv.DictWriter, d: Awaitable[dict[str, int | float]])
     w.writerow(await d)
 
 
-def read_outputs_csv(path: Path) -> list[tuple[int, Procedure, list[str]]]:
+def read_outputs_csv(path: Path) -> list[tuple[int, LinearProcedure, list[str]]]:
     out = []
 
     with path.open(newline="") as f:
@@ -62,7 +62,7 @@ def read_outputs_csv(path: Path) -> list[tuple[int, Procedure, list[str]]]:
             out.append(
                 (
                     int(row["question_id"]),
-                    Procedure(row["input"], row["output"], json.loads(row["gold_steps"])),
+                    LinearProcedure(row["input"], row["output"], json.loads(row["gold_steps"])),
                     json.loads(row["completion"]),
                 )
             )

@@ -11,7 +11,7 @@ from typing import Sequence
 import tqdm
 from langchain.schema import HumanMessage, SystemMessage
 
-from dataset import Procedure, format_steps
+from dataset import LinearProcedure, format_steps
 from evaluation.eval import read_outputs_csv
 from systems import Model
 from utils import spread_gather
@@ -20,7 +20,7 @@ from utils import spread_gather
 random.seed(1)
 
 
-def prepare_prompt(proc1_steps: str, proc2_steps: str, gold: Procedure, use_gt: bool):
+def prepare_prompt(proc1_steps: str, proc2_steps: str, gold: LinearProcedure, use_gt: bool):
     if not use_gt:
         prompt = [
             SystemMessage(
@@ -153,7 +153,7 @@ async def aevaluate(
     use_gt: bool,
     num_eval_each_type: int,
     q_id: int,
-    gold: Procedure,
+    gold: LinearProcedure,
     sys1_generated: list[str],
     sys2_generated: list[str],
 ) -> dict[str, int]:
@@ -218,7 +218,9 @@ async def pairwise_eval(
         w = csv.DictWriter(f, ["question_id", "choice"])
         w.writeheader()
 
-        async def _task(s1: tuple[int, Procedure, list[str]], s2: tuple[int, Procedure, list[str]]):
+        async def _task(
+            s1: tuple[int, LinearProcedure, list[str]], s2: tuple[int, LinearProcedure, list[str]]
+        ):
             d = await aevaluate(logger, model, args.gt, args.nruns, *s1, s2[2])
             w.writerow(d)
             pbar.update(1)

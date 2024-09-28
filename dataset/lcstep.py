@@ -4,8 +4,8 @@ import bisect
 import re
 from os import PathLike
 from pathlib import Path
-
-from .base import Dataset, Doc, Procedure
+import pickle
+from .base import Dataset, Doc, LinearProcedure, GraphProcedure
 
 
 def load_api_ref(data_dir: str | PathLike = "./dataset/") -> list[Doc]:
@@ -43,7 +43,7 @@ def load_concept_docs(data_dir: str | PathLike = "./dataset/") -> list[Doc]:
 _ordering_re = re.compile(r"\d+\. ")
 
 
-def procedure_from_text(text: str) -> tuple[Procedure, str]:
+def procedure_from_text(text: str) -> tuple[LinearProcedure, str]:
     """Parse text containing a formatted LCStep procedure.
 
     The procedure is returned along with the side note."""
@@ -81,7 +81,7 @@ def procedure_from_text(text: str) -> tuple[Procedure, str]:
         else:
             raise ValueError(f"procedure side note not marked with '{_prefixes[0]}'")
 
-    return Procedure(resources, goal, steps), side_note
+    return LinearProcedure(resources, goal, steps), side_note
 
 
 def _goal_and_resources_from_text(text: str) -> tuple[str, str]:
@@ -109,7 +109,7 @@ def _goal_and_resources_from_text(text: str) -> tuple[str, str]:
 
 def load_formatted_docs(
     data_dir: str | PathLike = "./dataset/",
-) -> list[dict[str, str | Procedure]]:
+) -> list[dict[str, str | LinearProcedure]]:
     """Returns the API reference docs.
 
     The returned dicts have keys "path": str, "procedure": Procedure, and "side_note": str.
@@ -150,8 +150,19 @@ def load_formatted_docs(
 
 
 class LCStep(Dataset):
-    def _init_procedures(self) -> list[Procedure]:
+    def _init_procedures(self) -> list[LinearProcedure]:
         return [d["procedure"] for d in load_formatted_docs(self.dir)]
+
+    def _init_graphs(self) -> list[GraphProcedure]:
+        dir = self.dir / "graphs" / "lcstep"
+        file_list = dir.glob("*.pkl")
+        graph_list = []
+        for file in file_list:
+            with file.open("rb") as f:
+                graph = pickle.load(f)
+            graph_list.append(graph)
+
+        return graph_list
 
     def _get_docs(self) -> list[Doc]:
         api_ref = load_api_ref(self.dir)

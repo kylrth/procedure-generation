@@ -1,13 +1,14 @@
 from .doc_store import DocStore
 from .procedure_store import ProcedureStore, procedure_formatter_for
 from .store import Store
-from .proc_to_graph import create_graphs_for_graph_store, get_graph_from_linear_procedure
+from .graph_procedure_store import Step, Procedure, GraphProcedureStore
 
 __all__ = [
     "Store",
     "DocStore",
     "ProcedureStore",
     "procedure_formatter_for",
-    "create_graphs_for_graph_store", 
-    "get_graph_from_linear_procedure"
+    "Step",
+    "Procedure",
+    "GraphProcedureStore",
 ]

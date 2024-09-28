@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from abc import ABC, abstractmethod
 from typing import Sequence, Type, cast
 
 import numpy as np
@@ -16,28 +15,7 @@ from graph import Graph as GGraph
 from graph import Node as GNode
 from retrieval.embedder import CachingEmbedder, Embedder
 from utils import spread_gather
-
-
-class Step:
-    api: str
-    desc: str
-    args: list[str]
-
-    def __init__(self, api: str, desc: str, args: list[str] | None = None):
-        self.api = api
-        self.desc = desc
-        self.args = args if args is not None else []
-
-    def __eq__(self, other: object, /) -> bool:
-        if not isinstance(other, Step):
-            return False
-
-        if self.api != other.api:
-            return False
-        if self.desc != other.desc:
-            return False
-        return self.args == other.args
-
+from dataset import GraphProcedure, Step
 
 # For procedures, all our nodes are Steps and our edges are strings.
 Edge = GEdge[Step, str]
@@ -45,30 +23,7 @@ Graph = GGraph[Step, str]
 Node = GNode[Step, str]
 
 
-class Procedure(Graph, ABC):
-    """A graph of steps to accomplish a given task."""
-
-    @abstractmethod
-    def __str__(self) -> str:
-        """Procedure types must implement a formatting method."""
-
-
-class Recipe(Procedure):
-    def __str__(self) -> str:
-        raise NotImplementedError
-
-
-class LangChainProcedure(Procedure):
-    def __str__(self) -> str:
-        raise NotImplementedError
-
-
-class MathSolution(Procedure):
-    def __str__(self) -> str:
-        raise NotImplementedError
-
-
-class GraphProcedureStore[T: Procedure]:
+class GraphProcedureStore[T: GraphProcedure]:
     def __init__(
         self,
         store: weaviate.WeaviateAsyncClient,

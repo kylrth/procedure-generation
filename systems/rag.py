@@ -2,7 +2,7 @@ import textwrap
 from typing import ClassVar
 
 import retrieval
-from dataset import Procedure
+from dataset import LinearProcedure
 from utils import log
 
 from .few_shot import FewShot
@@ -48,7 +48,7 @@ class RAG(FewShot):
 
         # call critic
         res.answer = await self.check_with_validator_and_modify(
-            logger, Procedure(input_, query, res.answer), context, max_updates=3
+            logger, LinearProcedure(input_, query, res.answer), context, max_updates=3
         )
 
         res.input_tokens = -1
@@ -59,7 +59,7 @@ class RAG(FewShot):
     async def check_with_validator_and_modify(
         self,
         logger: log.InstanceLogger,
-        candidate: Procedure,
+        candidate: LinearProcedure,
         knowledge_str: str,
         max_updates: int = 3,
     ) -> list[str]:
@@ -92,7 +92,7 @@ class RAG(FewShot):
         "champ": "",
     }
 
-    async def validate_update(self, logger: log.InstanceLogger, candidate: Procedure) -> str:
+    async def validate_update(self, logger: log.InstanceLogger, candidate: LinearProcedure) -> str:
         sys_instruction = (
             "[INSTRUCTION]\nYou are a human critic whose job is to validate the "
             "provided procedure, propose the changes to be made and evaluate if "
@@ -183,7 +183,7 @@ class RAG(FewShot):
     }
 
     async def perform_validator_edits(
-        self, logger: log.InstanceLogger, candidate: Procedure, knowledge_str: str, edits: str
+        self, logger: log.InstanceLogger, candidate: LinearProcedure, knowledge_str: str, edits: str
     ) -> list[str]:
         msg_prompt = (
             f"[BEGIN KNOWLEDGE]\n{knowledge_str}\n[END KNOWLEDGE]"
