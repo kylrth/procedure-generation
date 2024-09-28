@@ -450,3 +450,73 @@ class GraphProcedureStore[T: Procedure]:
         gs_vs = await asyncio.gather(*(self.get_graph(obj.uuid) for obj in res.objects))
 
         return [g for g, _ in gs_vs]
+
+    async def hierarchical_retrieval(self, query: str, *, k: int = 10, k2: int = 5) -> list[T]:
+        """Of the top k procedures matching the query, extract the top k2 partial procedures.
+
+        Partial procedures are extracted by traversing backward from the outputs, progressively
+        cutting out the nodes that are reached and then recomputing the embedding. The closest
+        version to the embedding of the original query wins.
+        """
+        embedded_query = (await self.embedder.embed([query], is_query=True))[0]
+
+        # find the top matching graphs and just get their UUIDs
+        res = await self.graphs.query.near_vector(
+            near_vector=embedded_query.tolist(), limit=k, return_properties=[]
+        )
+
+        # build the graph objects
+        gs_vs = await asyncio.gather(*(self.get_graph(obj.uuid) for obj in res.objects))
+        graphs, vectors = zip(*gs_vs)
+
+        # collect subgraphs
+        subgraphs: list[list[T]] = []
+        for graph in graphs:
+            these_subgraphs = []
+
+            # collect subgraphs by successively cutting input layers until we reach the empty graph
+            sg = graph.copy().cut_input_layer()
+            while sg:
+                these_subgraphs.append(sg)
+                sg = sg.copy().cut_input_layer()
+
+            # now collect subgraphs by cutting output layers
+            sg = graph.copy().cut_output_layer()
+            while sg:
+                these_subgraphs.append(sg)
+                sg = sg.copy().cut_output_layer()
+
+        # embed subgraphs (flatten to allow faster batch processing)
+        sg_vecs = await self.embedder.embed([str(sg) for sgs in subgraphs for sg in sgs])
+
+        # compute similarity between (sub)graphs and query
+        g_sims = np.dot(vectors, embedded_query)  # use dot product as embeddings are normalized
+        sg_sims = np.dot(sg_vecs, embedded_query)
+
+        # unflatten subgraph similarity scores
+        sg_sims_by_graph: list[np.ndarray] = []
+        start = 0
+        for sgs in subgraphs:
+            sg_sims_by_graph.append(sg_sims[start : start + len(sgs)])
+            start += len(sgs)
+
+        # find best (sub)graph of each graph
+        bests: list[T] = []
+        best_sims: list[float] = []
+        start = 0
+        for g, sgs, sim, sg_sims in zip(graphs, subgraphs, g_sims, sg_sims_by_graph):
+            best_g = g
+            best_sim = sim
+
+            best_sg_ind = np.argmax(sg_sims)
+            if sg_sims[best_sg_ind] > best_sim:
+                best_g = sgs[best_sg_ind]
+                best_sim = sg_sims[best_sg_ind]
+
+            bests.append(best_g)
+            best_sims.append(best_sim)
+
+        indices = np.argpartition(best_sims, -k2)[-k2:]  # top k2 best subgraphs
+        indices = indices[np.argsort(best_sims[indices])]  # indices don't come sorted; sort them
+
+        return [bests[i] for i in indices]
