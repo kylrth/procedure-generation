@@ -1,5 +1,6 @@
 from abc import abstractmethod
-from typing import Protocol, cast
+from enum import Enum, auto
+from typing import Callable, Protocol, Self, Sequence, cast
 
 
 class _Comparable(Protocol):
@@ -22,7 +23,7 @@ class Node[T, U: _Comparable]:
         self.incoming = []
         self.outgoing = []
 
-    def new_edge_to(self, other: "Node[T, U]", edge: U) -> "Edge[T, U]":
+    def new_edge_to(self, other: Self, edge: U) -> "Edge[T, U]":
         out = Edge(edge, other, self)
 
         self.outgoing.append(out)
@@ -91,6 +92,12 @@ class Output[T, U: _Comparable](Edge[T, U]):
         self.from_ = from_
 
 
+class DFSAction(Enum):
+    CONTINUE = auto()  # continue traversing down
+    SKIP = auto()  # don't continue further down from the current edge
+    QUIT = auto()  # stop traversal immediately
+
+
 class Graph[T, U: _Comparable]:
     """A set of nodes of type T and edges of type U, with special Input and Output edges each
     connected to only one Node.
@@ -109,7 +116,11 @@ class Graph[T, U: _Comparable]:
     outputs: list[Output[T, U]]
 
     def __init__(self, *nodes: Node[T, U]):
-        """Create a new Graph by collecting all Inputs and Outputs from nodes."""
+        """Create a new Graph by collecting all Inputs and Outputs from nodes.
+
+        A ValueError is raised if not all Nodes and Inputs are reached by back-traversal from
+        Outputs.
+        """
         self.inputs = []
         self.outputs = []
 
@@ -117,60 +128,127 @@ class Graph[T, U: _Comparable]:
             for incoming in node.incoming:
                 if isinstance(incoming, Input):
                     self.inputs.append(incoming)
+                elif isinstance(incoming, Output):
+                    raise TypeError("Output listed as incoming edge for Node")
             for outgoing in node.outgoing:
                 if isinstance(outgoing, Output):
                     self.outputs.append(outgoing)
+                elif isinstance(outgoing, Input):
+                    raise TypeError("Input listed as outgoing edge for Node")
 
-    def copy(self) -> "Graph[T, U]":
+        # check that all Inputs and Nodes are reached by back-traversal
+        self._check_reachable(nodes)
+
+    def dfs(self, f: Callable[[Edge[T, U]], DFSAction]):
+        """Call f on every Edge (including Inputs and Outputs) by doing depth-first search starting
+        from the inputs. THIS IS NOT GUARANTEED TO DISCOVER ALL NODES."""
+        visited: set[Node[T, U]] = set()
+        self._dfs(self.inputs, f, visited)
+
+    def back_dfs(self, f: Callable[[Edge[T, U]], DFSAction]):
+        """Call f on every Edge (including Inputs and Outputs) by doing depth-first search starting
+        from the outputs."""
+        visited: set[Node[T, U]] = set()
+        self._dfs(self.outputs, f, visited, backward=True)
+
+    @staticmethod
+    def _dfs(
+        es: Sequence[Edge[T, U]],
+        f: Callable[[Edge[T, U]], DFSAction],
+        visited: set[Node[T, U]],
+        *,
+        backward: bool = False,
+    ) -> DFSAction:
+        for e in es:
+            action = f(e)
+            if action == DFSAction.QUIT:
+                return action
+            if action == DFSAction.SKIP:
+                continue
+
+            nn = e.from_ if backward else e.to
+
+            if nn is None:
+                continue
+            if nn in visited:
+                continue
+
+            visited.add(nn)  # mark as visited before continuing to avoid infinite loops
+            action = Graph._dfs(
+                nn.incoming if backward else nn.outgoing, f, visited, backward=backward
+            )
+            if action == DFSAction.QUIT:
+                return action
+
+        return DFSAction.CONTINUE
+
+    def _check_reachable(self, nodes: Sequence[Node[T, U]]):
+        reached_nodes: set[Node[T, U]] = set()
+        reached_inputs: set[Input[T, U]] = set()
+
+        def collect_nodes_inputs(e: Edge[T, U]) -> DFSAction:
+            if e.from_ is None:
+                if not isinstance(e, Input):
+                    raise TypeError("Edge has an empty from_ field")
+                reached_inputs.add(e)
+            else:
+                reached_nodes.add(e.from_)
+            return DFSAction.CONTINUE
+
+        self.back_dfs(collect_nodes_inputs)
+
+        for node in nodes:
+            if node not in reached_nodes:
+                raise ValueError(f"node {node.data} was not reachable by back-traversal")
+        for i in self.inputs:
+            if i not in reached_inputs:
+                raise ValueError(f"input {i.content} was not reachable by back-traversal")
+
+    def copy(self) -> Self:
         """Create a copy of the Graph by duplicating all Nodes and Edges.
 
         Node data and Edge contents are shallow-copied.
         """
-        out = Graph()
-        visited: dict[int, Node[T, U]] = {}
+        out = self.__class__()
 
-        for o in self.outputs:
-            if o.from_ is None:
-                raise ValueError("malformed graph: output comes from nowhere")
+        # keep newly-created nodes so we can refer to them when we come across their old
+        # counterparts again
+        visited: dict[Node[T, U], Node[T, U]] = {}
 
-            if id(o.from_) in visited:
-                n = visited[id(o.from_)]
+        def copy_edge(e: Edge[T, U]) -> DFSAction:
+            # get our new copy of the to node
+            if e.to is None:
+                if e.from_ is None:
+                    raise ValueError("malformed graph: completely empty Edge")
+                # output
+                new_to_node = None
             else:
-                n = Node(o.from_.data)
-                visited[id(o.from_)] = n
+                new_to_node = visited[e.to]
 
-            out.outputs.extend(n.add_outputs(o.content))
-            for e in o.from_.incoming:
-                self._copy(out, e, n, visited)
+            if e.from_ is None:
+                # input
+                new_to_node = cast(Node[T, U], new_to_node)  # we already checked this above
+                out.inputs.extend(new_to_node.add_inputs(e.content))
+                return DFSAction.CONTINUE
 
+            if e.from_ in visited:
+                new_from_node = visited[e.from_]
+            else:
+                # construct the new node
+                new_from_node = Node(e.from_.data)
+                visited[e.from_] = new_from_node
+
+            # node is constructed and stored in `visited`, just need to connect it
+            if new_to_node is None:  # output
+                out.outputs.extend(new_from_node.add_outputs(e.content))
+            else:
+                new_from_node.new_edge_to(new_to_node, e.content)
+            return DFSAction.CONTINUE
+
+        self.back_dfs(copy_edge)
         return out
 
-    @staticmethod
-    def _copy(
-        out: "Graph[T, U]", e: Edge[T, U], to_node: Node[T, U], visited: dict[int, Node[T, U]]
-    ):
-        # e belongs to self; to_node is for the new graph
-
-        if e.from_ is None:
-            # input
-            out.inputs.extend(to_node.add_inputs(e.content))
-            return
-
-        if id(e.from_) in visited:
-            new_node = visited[id(e.from_)]
-        else:
-            # construct the new node
-            new_node = Node(e.from_.data)
-            visited[id(e.from_)] = new_node
-
-        # node is constructed, just need to connect it
-        new_node.new_edge_to(to_node, e.content)
-
-        # continue up to the incoming edges
-        for up in e.from_.incoming:
-            Graph._copy(out, up, new_node, visited)
-
-    def cut_input_layer(self) -> "Graph[T, U]":
+    def cut_input_layer(self) -> Self:
         """Remove IN-PLACE all nodes that consume this graph's inputs, and make those nodes' outputs
         the inputs instead.
 
@@ -206,7 +284,7 @@ class Graph[T, U: _Comparable]:
 
         return self
 
-    def cut_output_layer(self) -> "Graph[T, U]":
+    def cut_output_layer(self) -> Self:
         """Remove IN-PLACE all nodes that produce this graph's outputs, and make the inputs to those
         nodes the outputs instead.
 
@@ -289,8 +367,8 @@ class Graph[T, U: _Comparable]:
 
         # We don't check outgoing edges because they're either a) already checked as an incoming
         # edge of some node, or b) an extraneous edge leading to a part of the graph that doesn't
-        # produce any output. The latter case is an inconsistent state for a Graph to be in and will
-        # be ignored.
+        # produce any output. The latter case is an invalid state for a Graph to be in and will be
+        # ignored.
 
         if len(o1.incoming) != len(o2.incoming):
             return False

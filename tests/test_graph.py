@@ -1,6 +1,8 @@
 import unittest
 from typing import cast
 
+import pytest
+
 from graph import Graph, Node
 
 
@@ -44,8 +46,48 @@ example_graph = _example_graph()
 
 
 class TestGraph(unittest.TestCase):
+    def test_init(self):
+        a, b, c, d = (Node(i) for i in range(1, 5))
+        a.add_inputs(5)
+        a.new_edge_to(b, 6)
+        b.new_edge_to(c, 7)
+
+        # no outputs yet
+        with pytest.raises(ValueError, match="node 1 was not reachable by back-traversal"):
+            Graph(a, b, c, d)
+
+        c.add_outputs(8)
+        with pytest.raises(ValueError, match="node 4 was not reachable by back-traversal"):
+            Graph(a, b, c, d)
+
+        c.outgoing.clear()
+        c.new_edge_to(d, 9)
+        d.add_outputs(10)
+        Graph(a, b, c, d)  # success
+
+        d.outgoing.clear()
+        d.new_edge_to(a, 11)  # a loop with no outputs
+        with pytest.raises(ValueError, match="node 1 was not reachable by back-traversal"):
+            Graph(a, b, c, d)
+
+        c.add_outputs(12)  # a loop with an output
+        Graph(a, b, c, d)  # success
+
+        e = Node(13)
+        e.add_inputs(14)
+        with pytest.raises(ValueError, match="node 13 was not reachable by back-traversal"):
+            Graph(a, b, c, d, e)
+
+        e.add_outputs(15)
+        Graph(a, b, c, d, e)  # success with two entirely separate subgraphs
+
     def test_copy(self):
         self.assertEqual(example_graph, example_graph.copy())
+
+    def test_eq(self):
+        self.assertNotEqual(example_graph, Graph())
+        self.assertNotEqual(example_graph, example_graph.copy().cut_input_layer())
+        self.assertNotEqual(example_graph, example_graph.copy().cut_output_layer())
 
     def test_cut_input_layer(self):
         cut = example_graph.copy().cut_input_layer()  # remove steps 2, 3, 4
