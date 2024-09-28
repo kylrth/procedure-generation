@@ -34,21 +34,40 @@ instructions = {
     ),
 }
 
-human_instruction_nodes = (
-    "Please consider the procedure below:"
-    "\n\n{procedure_steps}\n\nCarefully think about it step-by-step and identify the "
-    "list of nodes that represent the full procedure with all the details preserved. "
-    "Your output should be a valid JSON object in the format below:\n"
-    '{{\n"Analysis": "<thoughts about the steps",\n"Nodes": [<list of Node>]\n}}\n'
-    "where each Node is another JSON object structured as:\n"
-    '{{\n"name": "<name of the node>",\n"description": "<description of node borrowed from steps>",\n'
-    '"inputs": [<list of input>],\n "output": "<output of the node>"\n}}\n'
-    "and each input is a string. Remember that "
-    "each node should perform a single action with the required inputs. "
-    "Please always make sure to include specific details from "
-    "the provided procedure like cooking time, temperature and full path "
-    "to the APIs in your descriptions of the nodes."
-)
+human_instruction_nodes = {
+    "recipenlg": (
+        "Please consider the procedure and the provided list of ingredients below:"
+        "\n\n[BEGIN INGREDIENTS]\n{ing}\n[END INGREDIENTS]\n[BEGIN STEPS]\n{procedure_steps}\n[END STEPS]\n\n"
+        "Carefully think about it step-by-step and identify the "
+        "list of nodes that represent the full procedure with all the details preserved. Use the ingredients list "
+        "to resolve any references to the ingredients in the provided steps. "
+        "Your output should be a valid JSON object in the format below:\n"
+        '{{\n"Analysis": "<thoughts about the steps",\n"Nodes": [<list of Node>]\n}}\n'
+        "where each Node is another JSON object structured as:\n"
+        '{{\n"name": "<name of the node>",\n"description": "<description of node borrowed from steps>",\n'
+        '"inputs": [<list of input>],\n "output": "<output of the node>"\n}}\n'
+        "and each input is a string. Remember that "
+        "each node should perform a single action with the required inputs. "
+        "Please always make sure to include specific details from "
+        "the provided procedure like cooking time, temperature and full path "
+        "to the APIs in your descriptions of the nodes."
+    ),
+    "lcstep": (
+        "Please consider the procedure below:"
+        "\n\n{procedure_steps}\n\nCarefully think about it step-by-step and identify the "
+        "list of nodes that represent the full procedure with all the details preserved. "
+        "Your output should be a valid JSON object in the format below:\n"
+        '{{\n"Analysis": "<thoughts about the steps",\n"Nodes": [<list of Node>]\n}}\n'
+        "where each Node is another JSON object structured as:\n"
+        '{{\n"name": "<name of the node>",\n"description": "<description of node borrowed from steps>",\n'
+        '"inputs": [<list of input>],\n "output": "<output of the node>"\n}}\n'
+        "and each input is a string. Remember that "
+        "each node should perform a single action with the required inputs. "
+        "Please always make sure to include specific details from "
+        "the provided procedure like cooking time, temperature and full path "
+        "to the APIs in your descriptions of the nodes.{ing}"
+    ),
+}
 
 human_instruction_node_refine = (
     "Consider the following node:\n"
@@ -64,15 +83,15 @@ human_instruction_edges = (
     "Please consider the list of identified graph nodes below:"
     "\n\n{graph_nodes}\n\nCarefully think about them step-by-step and identify the "
     "dependencies between the nodes. These dependencies will be represented by directed "
-    "edges between the nodes. For every identified edge, match the text of the output of the parent "
-    "to the corresponding input of the child."
+    "edges between the nodes. For every identified edge, find the input of the child that "
+    "corresponds to the output of the parent. We call this (<parent output>, <child input>) tuple as match. "
     "Your output should be a valid JSON object in the format below:\n"
     '{{\n"Analysis": "<thoughts about the dependencies>",\n"Nodes": [<list of Node>]\n'
     '"Edges": [<list of Edge>]\n}}\n'
     "where each Edge is another JSON object structured as:\n"
-    '{{\n"from": "<name of the from node>",\n"to": "<name of the to node>"\n}}\n'
-    "The Nodes should contain the same set of nodes as given in the prompt but with inputs "
-    "modified according to the instructions above."
+    '{{\n"from": "<name of the from node>",\n"to": "<name of the to node>",\n"match": <match>\n}}\n'
+    "where match is a tuple of strings defined above. "
+    "Make sure to not modify the nodes at all in your response."
 )
 
 human_instruction_corr_edges = (
@@ -81,15 +100,15 @@ human_instruction_corr_edges = (
     "In the above graph, following nodes have no edges to other nodes:\n\n{missing_nodes}\n\n"
     "Carefully think about them step-by-step and connect them "
     "to other nodes. These dependencies will be represented by directed "
-    "edges between the nodes. For every identified edge, match the text of the output of the parent "
-    "to the corresponding input of the child while preserving other inputs in the list."
+    "edges between the nodes. For every identified edge, find the input of the child that "
+    "corresponds to the output of the parent. We call this (<parent output>, <child input>) tuple as match. "
     "Your output should be a valid JSON object in the format below:\n"
     '{{\n"Analysis": "<thoughts about the new dependencies>",\n"Nodes": [<list of Node>]\n'
     '"Edges": [<list of Edge>]\n}}\n'
     "where each Edge is another JSON object structured as:\n"
-    '{{\n"from": "<name of the from node>",\n"to": "<name of the to node>"\n}}\n'
-    "The Nodes should contain the same set of nodes as given in the prompt but with inputs "
-    "modified according to the instructions above."
+    '{{\n"from": "<name of the from node>",\n"to": "<name of the to node>",\n"match": <match>\n}}\n'
+    "where match is a tuple of strings defined above. "
+    "Make sure to not modify the nodes at all in your response."
 )
 
 # sys_instructions_conv_to_graph = (
@@ -113,7 +132,7 @@ async def get_node_list(logger: log.InstanceLogger, sys_prompt: str, hum_prompt:
 async def refine_node(logger: log.InstanceLogger, sys_prompt: str, hum_prompt: str, model: Model):
     out = model.build_prompt(hum_prompt, sys_prompt)
     node_completion = await model.generate(out)
-    print(node_completion)
+    # print(node_completion)
     try:
         node = json.loads(node_completion)
     except:
@@ -127,6 +146,7 @@ async def get_edge_list(logger: log.InstanceLogger, sys_prompt: str, hum_prompt:
     try:
         nodes = json.loads(edge_completion)["Nodes"]
         edges = json.loads(edge_completion)["Edges"]
+        # output_node = json.loads(edge_completion)["Output Node"]
     except:
         print(edge_completion)
         raise ValueError
@@ -160,21 +180,77 @@ def check_node_edge_valid(nodes, edges):
     return missed_nodes
 
 
+def filter_edges(nodes, edges):
+    node_name_list = [node["name"] for node in nodes]
+    edge_list = []
+    for edge in edges:
+        if edge["from"] in node_name_list and edge["to"] in node_name_list:
+            edge_list.append(edge)
+
+    return edge_list
+
+
+"""
+TO-DO:
+
+If two edge correspond to the same input of the node, it's fine (mechanism of bools, fine if already true)
+Match might have 1 element instead of 2 and in that case take that same element for both
+"""
+
+
+def make_graph_object(nodes, edges, proc_title):
+    node_dict = {}
+    node_inp_dict = {}
+    for node in nodes:
+        step_obj = Step(node["name"], node["description"])
+        node_obj = Node(step_obj)
+        node_dict[node["name"]] = node_obj
+        node_inp_dict[node["name"]] = node["inputs"]
+
+    for edge in edges:
+        node_from = node_dict[edge["from"]]
+        node_to = node_dict[edge["to"]]
+        inp_out_list = edge["match"]
+        assert len(inp_out_list) > 0
+        node_from.new_edge_to(node_to, inp_out_list[0])
+
+        inp_list = node_inp_dict[edge["to"]]
+        if inp_out_list[0] in inp_list:
+            inp_list.remove(inp_out_list[0])
+        if len(inp_out_list) == 2:
+            if inp_out_list[1] in inp_list:
+                inp_list.remove(inp_out_list[1])
+
+        node_inp_dict[edge["to"]] = inp_list
+
+    # Add input and output
+    for name, inp_list in node_inp_dict.items():
+        node_dict[name].add_inputs(*inp_list)
+
+        if len(node_dict[name].outgoing) == 0:
+            node_dict[name].add_outputs(proc_title)
+
+    return Graph(*(node_dict.values()))
+
+
 async def get_graph_from_linear_procedure(
-    logger: log.InstanceLogger, steps: list[str], model: Model, dataset: str
-) -> Graph[Step]:
+    logger: log.InstanceLogger, proc: Procedure, model: Model, dataset: str
+):
+    steps = proc.steps
+    ing = proc.input_ if dataset == "recipenlg" else None
+
     sys_prompt = instructions[dataset]
-    hum_prompt_nodes = human_instruction_nodes.format(procedure_steps=steps)
+    hum_prompt_nodes = human_instruction_nodes[dataset].format(procedure_steps=steps, ing=ing)
     orig_nodes = await get_node_list(logger, sys_prompt, hum_prompt_nodes, model)
-    print(orig_nodes)
 
     for i, node in enumerate(orig_nodes):
-        # breakpoint()
         hum_prompt_node_refine = human_instruction_node_refine.format(node=node)
         orig_nodes[i] = await refine_node(logger, sys_prompt, hum_prompt_node_refine, model)
 
     hum_prompt_edges = human_instruction_edges.format(graph_nodes=orig_nodes)
     nodes, edges = await get_edge_list(logger, sys_prompt, hum_prompt_edges, model)
+
+    edges = filter_edges(nodes, edges)
 
     valid = False
     while not valid:
@@ -189,13 +265,18 @@ async def get_graph_from_linear_procedure(
             nodes, edges = await get_corrected_nodes_edges(
                 logger, sys_prompt, hum_prompt_corr_edges, model
             )
-    breakpoint()
-    # node_list = parse_nodes_and_edges()
-    return (nodes, edges)
+
+    proc_graph = make_graph_object(nodes, edges, proc.output)
+    return proc_graph
 
 
 async def create_graphs_for_graph_store(
     logger: log.InstanceLogger, procs: list[Procedure], model: Model, dataset: str
 ):
-    for i, p in enumerate(procs[32:]):
-        graph = await get_graph_from_linear_procedure(logger, p.steps, model, dataset)
+    graph_list = []
+    for p in procs:
+        graph = await get_graph_from_linear_procedure(logger, p, model, dataset)
+        breakpoint()
+        graph_list.append(graph)
+
+    return graph_list
