@@ -1,12 +1,15 @@
-from dataset.base import Step, GraphProcedure as GProcedure
-from graph import Node, Graph
+import json
+import os
+import pickle
+import random
+
+from dataset import LinearProcedure
+from dataset.base import GraphProcedure as GProcedure
+from dataset.base import Step
+from graph import Graph, Node
 from model import Model
 from utils import log
-from dataset import LinearProcedure
-import json
-import pickle
-import os
-import random
+
 
 random.seed(1)
 
@@ -25,8 +28,8 @@ instructions = {
         "given procedure into atomic steps where each step performs "
         "a single action just like a function in coding. The functions should be general "
         "enough so that they can be used across multiple different procedures. "
-        "Eventually, the task is to represent the procedure graphically with nodes as the functions "
-        "and edges relating the dependencies between those functions."
+        "Eventually, the task is to represent the procedure graphically with nodes as the "
+        "functions and edges relating the dependencies between those functions."
     ),
     "champ": (
         "You are a maths expert. Your "
@@ -43,14 +46,15 @@ instructions = {
 human_instruction_nodes = {
     "recipenlg": (
         "Please consider the procedure and the provided list of ingredients below:"
-        "\n\n[BEGIN INGREDIENTS]\n{ing}\n[END INGREDIENTS]\n[BEGIN STEPS]\n{procedure_steps}\n[END STEPS]\n\n"
-        "Carefully think about it step-by-step and identify the "
-        "list of nodes that represent the full procedure with all the details preserved. Use the ingredients list "
-        "to resolve any references to the ingredients in the provided steps. "
+        "\n\n[BEGIN INGREDIENTS]\n{ing}\n[END INGREDIENTS]\n[BEGIN STEPS]\n{procedure_steps}\n"
+        "[END STEPS]\n\nCarefully think about it step-by-step and identify the "
+        "list of nodes that represent the full procedure with all the details preserved. Use the "
+        "ingredients list to resolve any references to the ingredients in the provided steps. "
         "Your output should be a valid JSON object in the format below:\n"
         '{{\n"Analysis": "<thoughts about the steps",\n"Nodes": [<list of Node>]\n}}\n'
         "where each Node is another JSON object structured as:\n"
-        '{{\n"name": "<name of the node>",\n"description": "<description of node borrowed from steps>",\n'
+        '{{\n"name": "<name of the node>",\n"description": '
+        '"<description of node borrowed from steps>",\n'
         '"inputs": [<list of input>],\n "output": "<output of the node>"\n}}\n'
         "and each input is a string. Remember that "
         "each node should perform a single action with the required inputs. "
@@ -65,7 +69,8 @@ human_instruction_nodes = {
         "Your output should be a valid JSON object in the format below:\n"
         '{{\n"Analysis": "<thoughts about the steps",\n"Nodes": [<list of Node>]\n}}\n'
         "where each Node is another JSON object structured as:\n"
-        '{{\n"name": "<name of the node>",\n"description": "<description of node borrowed from steps>",\n'
+        '{{\n"name": "<name of the node>",\n"description": '
+        '"<description of node borrowed from steps>",\n'
         '"inputs": [<list of input>],\n "output": "<output of the node>"\n}}\n'
         "and each input is a string. Remember that "
         "each node should perform a single action with the required inputs. "
@@ -79,7 +84,8 @@ human_instruction_node_refine = (
     "Consider the following node:\n"
     "\n\n{node}\n\nIf required, add missing inputs to the node according to the "
     "description. Your output should be a single valid JSON object structured as:\n"
-    '{{\n"name": "<name of the node>",\n"description": "<description of node input in the prompt>",\n'
+    '{{\n"name": "<name of the node>",\n"description": '
+    '"<description of node input in the prompt>",\n'
     '"inputs": [<list of input>],\n "output": "<output of the node>"\n}}\n'
     "and each input is a string."
 )
@@ -89,7 +95,8 @@ human_instruction_edges = (
     "\n\n{graph_nodes}\n\nCarefully think about them step-by-step and identify the "
     "dependencies between the nodes. These dependencies will be represented by directed "
     "edges between the nodes. For every identified edge, find the input of the child that "
-    "corresponds to the output of the parent. We call this [<parent output>, <child input>] list as match. "
+    "corresponds to the output of the parent. We call this [<parent output>, <child input>] "
+    "list as match. "
     "Your output should be a valid JSON object in the format below:\n"
     '{{\n"Analysis": "<thoughts about the dependencies>",\n"Nodes": [<list of Node>]\n'
     '"Edges": [<list of Edge>]\n}}\n'
@@ -106,8 +113,8 @@ human_instruction_corr_edges = (
     "Carefully think about them step-by-step and connect them "
     "to other nodes. These dependencies will be represented by directed "
     "edges between the nodes. For every identified edge, find the input of the child that "
-    "corresponds to the output of the parent. We call this [<parent output>, <child input>] list as match. "
-    "Your output should be a valid JSON object in the format below:\n"
+    "corresponds to the output of the parent. We call this [<parent output>, <child input>] list "
+    "as match. Your output should be a valid JSON object in the format below:\n"
     '{{\n"Analysis": "<thoughts about the new dependencies>",\n"Nodes": [<list of Node>]\n'
     '"Edges": [<list of Edge>]\n}}\n'
     "where each Edge is another JSON object structured as:\n"
@@ -249,7 +256,6 @@ def make_graph_object(nodes, edges, proc_title):
 
 async def get_graph_from_linear_procedure(
     logger: log.InstanceLogger,
-    proc_id: int,
     proc: LinearProcedure,
     model: Model,
     dataset: str,
@@ -292,25 +298,42 @@ async def get_graph_from_linear_procedure(
     return proc_graph
 
 
+async def create_simple_linear_graph(logger: log.InstanceLogger, proc: LinearProcedure):
+    node_list = []
+    for i, step in enumerate(proc.steps):
+        step_obj = Step(f"Step {i}", step)
+        node_obj = Node(step_obj)
+        node_list.append(node_obj)
+    inp_list = [inp.strip() for inp in proc.input_.split(",")]
+    node_list[0].add_inputs(*inp_list)
+    node_list[-1].add_outputs(proc.output)
+    return GProcedure(*node_list)
+
+
 async def create_graphs_for_graph_store(
     logger: log.InstanceLogger,
     proc_id: int,
     proc: LinearProcedure,
     model: Model,
     dataset: str,
-    seed: int = None,
+    seed: int | None = None,
+    save_pkl: bool = True,
 ):
     num_retries = 5
     while num_retries > 0:
         try:
-            graph = await get_graph_from_linear_procedure(
-                logger, proc_id, proc, model, dataset, seed=seed
-            )
-            os.makedirs(f"./dataset/graphs/{dataset}", exist_ok=True)
-            with open(f"./dataset/graphs/{dataset}/{proc_id}.pkl", "wb") as f:
-                pickle.dump(graph, f)
-            return
+            graph = await get_graph_from_linear_procedure(logger, proc, model, dataset, seed=seed)
+            if save_pkl:
+                os.makedirs(f"./dataset/graphs/{dataset}", exist_ok=True)
+                with open(f"./dataset/graphs/{dataset}/{proc_id}.pkl", "wb") as f:
+                    pickle.dump(graph, f)
+                return
+            else:
+                return graph
         except (Graph.UnreachableError, ValueError, KeyError, AssertionError):
             seed = random.randint(0, 1000)
             num_retries -= 1
     print(f"Skipping Procedure {proc_id}")
+    if not save_pkl:
+        graph = await create_simple_linear_graph(logger, proc)
+        return graph

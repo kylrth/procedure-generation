@@ -3,11 +3,11 @@ from typing import ClassVar
 
 import retrieval
 from dataset import LinearProcedure
+from model import Model
 from utils import log
 
 from .few_shot import FewShot
 from .interface import Response
-from .model import Model
 
 
 class RAG(FewShot):
@@ -15,23 +15,37 @@ class RAG(FewShot):
     searching a vector store for texts with similar embeddings to the query."""
 
     model: Model
-    docs: retrieval.DocStore
+    graphs: retrieval.GraphProcedureStore
     k: int
     critic: bool
 
-    def __init__(self, model: Model, docs: retrieval.DocStore, k: int, dataset: str, critic: bool):
+    def __init__(
+        self,
+        model: Model,
+        graphs: retrieval.GraphProcedureStore,
+        k: int,
+        dataset: str,
+        critic: bool,
+        hs: bool,
+    ):
         super().__init__(model, dataset)
-        self.docs = docs
+        self.graphs = graphs
         self.k = k
         self.critic = critic
+        self.hs = hs
 
     async def generate(self, logger: log.InstanceLogger, query: str, input_: str) -> Response:
-        # retrieve docs
-        docs = await self.docs.search(f"{query} using {input_}", self.k)
-        logger.write(f"retrieved {len(docs)} docs\n")
+        # retrieve graphs
+        if self.hs:
+            graphs = await self.graphs.hierarchical_retrieval(
+                f"{query} using {input_}", k=2 * self.k, k2=self.k
+            )
+        else:
+            graphs = await self.graphs.search(f"{query} using {input_}", k=self.k)
+        logger.write(f"retrieved {len(graphs)} graphs\n")
 
         # build prompt
-        context = self.build_context(docs)
+        context = self.build_context([str(graph) for graph in graphs])
         msg_prompt = (
             context + "\n\n" + self._prompt_inst[self.dataset].format(query=query, input_=input_)
         )
@@ -41,18 +55,22 @@ class RAG(FewShot):
 
         # call model
         completion = await self.model.generate(prompt)
-        res = self._make_result(prompt, completion)
+        res = await self._make_result(prompt, completion, query, input_)
 
         if not self.critic:
             return res
 
         # call critic
-        res.answer = await self.check_with_validator_and_modify(
-            logger, LinearProcedure(input_, query, res.answer), context, max_updates=3
-        )
+        raise NotImplementedError
+        # completion = await self.check_with_validator_and_modify(
+        #     logger,
+        #     LinearProcedure(input_, query, self.parse_completion(completion)),
+        #     context,
+        #     max_updates=3,
+        # )
 
-        res.input_tokens = -1
-        res.output_tokens = -1
+        # res.input_tokens = -1
+        # res.output_tokens = -1
 
         return res
 
