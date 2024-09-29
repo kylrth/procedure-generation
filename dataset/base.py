@@ -4,6 +4,7 @@ from enum import Flag, auto
 from os import PathLike
 from pathlib import Path
 from typing import Any
+
 from graph import Graph
 
 
@@ -83,11 +84,32 @@ class Step:
         return self.args == other.args
 
 
-class GraphProcedure(Graph, ABC):
+class GraphProcedure(Graph[Step, str], ABC):
     """A graph of steps to accomplish a given task."""
 
     def __str__(self) -> str:
-        """Procedure types must implement a formatting method."""
+        """Used for embedding and inserting into LLM prompts."""
+        out: list[str] = []
+
+        # outputs
+        if len(self.outputs) == 0:
+            return ""
+        if len(self.outputs) == 1:
+            out.append(f"goal: {self.outputs[0].content}")
+        else:
+            s = ", ".join(o.content for o in self.outputs)
+            out.append(f"outputs: {s}")
+
+        # inputs
+        s = ", ".join(i.content for i in self.inputs)
+        out.append(f"inputs: {s}")
+
+        # topological sort of nodes
+        nodes = self.topo_sort()
+        for node in nodes:
+            out.append(f"- {node.data.desc}")
+
+        return "\n".join(out)
 
 
 def train_val_test(data: list, val: float, test: float) -> tuple[list, list, list]:
