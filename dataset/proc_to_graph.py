@@ -330,7 +330,7 @@ async def create_graphs_for_graph_store(
                 return
             else:
                 return graph
-        except (Graph.UnreachableError, ValueError, KeyError, AssertionError):
+        except (Graph.UnreachableError, ValueError, KeyError, AssertionError, TypeError):
             seed = random.randint(0, 1000)
             num_retries -= 1
     print(f"Skipping Procedure {proc_id}")
