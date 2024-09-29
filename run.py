@@ -21,7 +21,7 @@ from systems import System, AAG, FewShot, ReAct, RAG
 from utils import log, spread_gather
 from utils.weaviate import NiceWeaviate
 import time
-import Model
+from model import Model
 
 
 async def generate_and_record(
@@ -112,23 +112,23 @@ async def main(args):
             logger.debug(f"FewShot: selecting {args.k} docs")
             procedures = ds.graphs(dataset.Split.TRAIN)
             rng = random.Random(27)
-            shots = [shot.to_doc() for shot in rng.sample(procedures, args.k)]
+            shots = [str(shot) for shot in rng.sample(procedures, args.k)]
 
             system = FewShot(model, args.dataset, shots)
         elif system_name == "rag":
             # set up vector store with supporting docs + the train set of procedures
             logger.debug("RAG: collecting docs")
             procedures = ds.graphs(dataset.Split.TRAIN | dataset.Split.VAL)
-            docs = [p.to_doc() for p in procedures]
-            logger.debug(f"RAG: collected {len(docs)} docs for vector store")
+            logger.debug(f"RAG: collected {len(procedures)} docs for vector store")
 
             logger.info("RAG: Creating collection and uploading docs to Weaviate collection")
-            store = retrieval.DocStore(
-                client, "Docs", "Documents for retrieval", args.embedder, cache_path
+            embedder = retrieval.CachingEmbedder(
+                retrieval.embedder_from_name(args.embedder), cache_path
             )
-            await store.populate(logger, docs)
+            store = retrieval.GraphProcedureStore(client, embedder)
+            await store.populate(logger, procedures)
 
-            system = RAG(model, store, args.k, args.dataset, args.critic)
+            system = RAG(model, store, args.k, args.dataset, args.critic, args.hs)
         elif system_name in {"react", "aag"}:
             fancy = "AAG" if system_name == "aag" else "ReAct"
 
@@ -140,22 +140,28 @@ async def main(args):
             logger.info(
                 f"{fancy}: Creating collection and uploading procedures to Weaviate collection"
             )
-            store = retrieval.ProcedureStore(
+            embedder = retrieval.CachingEmbedder(
+                retrieval.embedder_from_name(args.embedder), cache_path
+            )
+            store = retrieval.GraphProcedureStore(
                 client,
-                "Procedures",
-                "Skill library",
-                args.embedder,
-                cache_path,
-                retrieval.procedure_formatter_for(dataset_name),
+                embedder,
             )
             await store.populate(logger, procedures)
 
             if system_name == "aag":
                 system = AAG(
-                    model, store, args.k, args.dataset, args.summarize, args.critic, args.n_queries
+                    model,
+                    store,
+                    args.k,
+                    args.dataset,
+                    args.summarize,
+                    args.critic,
+                    args.hs,
+                    args.n_queries,
                 )
             else:  # "react"
-                system = ReAct(model.model, args.dataset, store, args.k)
+                system = ReAct(model, args.dataset, store, args.k, args.hs)
         else:
             raise NotImplementedError(args.system)
 
@@ -257,7 +263,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--critic", action="store_true", help="Whether to use critic in the system or not"
     )
-
+    parser.add_argument(
+        "--hs", action="store_true", help="Whether to use hierarchical search in the system or not"
+    )
     args = parser.parse_args()
 
     asyncio.run(main(args))

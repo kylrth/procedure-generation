@@ -2,13 +2,14 @@ import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
+from dataset import GraphProcedure
 from utils import log
 
 
 @dataclass
 class Response:
     # answer in the form of a list of steps
-    answer: list[str]
+    answer: GraphProcedure
 
     # the model used to generate completions
     model: str

@@ -4,11 +4,12 @@ from langchain import hub
 from langchain.agents import AgentExecutor, BaseMultiActionAgent, create_react_agent
 from langchain.tools import BaseTool, tool
 from langchain_core.callbacks import CallbackManager
-from langchain_core.language_models import BaseLanguageModel
 from langchain_core.prompts.prompt import PromptTemplate
 from langchain_core.runnables import RunnableConfig
 
 import retrieval
+from dataset import LinearProcedure, create_graphs_for_graph_store
+from model import Model
 from utils import log
 from utils.lc import FileHandleCallbackHandler
 
@@ -112,16 +113,20 @@ class ReAct(System):
     )
 
     def __init__(
-        self, model: BaseLanguageModel, dataset: str, docs: retrieval.ProcedureStore, k: int
+        self, model: Model, dataset: str, graphs: retrieval.GraphProcedureStore, k: int, hs: bool
     ):
         self.dataset = dataset
-        self.docs = docs
+        self.graphs = graphs
         self.k = k
+        self.model = model
+        self.hs = hs
 
         prompt = cast(PromptTemplate, hub.pull("hwchase17/react"))
         prompt.template = self._template.format(**self._dataset_details[dataset])
         self.agent = AgentExecutor(
-            agent=cast(BaseMultiActionAgent, create_react_agent(model, [self.search_tool], prompt)),
+            agent=cast(
+                BaseMultiActionAgent, create_react_agent(model.model, [self.search_tool], prompt)
+            ),
             tools=[self.search_tool],
             callbacks=CallbackManager(handlers=[]),  # handlers will be managed in `generate`
             handle_parsing_errors=True,
@@ -140,9 +145,14 @@ class ReAct(System):
         if self._search_tool is None:
 
             async def search(query: str) -> str:
-                procedures = await self.docs.search(query, self.k)
+                if self.hs:
+                    procedures = await self.graphs.hierarchical_retrieval(
+                        query, k=2 * self.k, k2=self.k
+                    )
+                else:
+                    procedures = await self.graphs.search(query, self.k)
 
-                return "\n\n".join(self.docs.pfmt.format(p) for p in procedures)
+                return "\n\n".join(str(p) for p in procedures)
 
             search.__doc__ = (
                 f"Search a database for known {self._example_name[self.dataset]} related to the "
@@ -160,4 +170,8 @@ class ReAct(System):
             config=RunnableConfig(callbacks=[FileHandleCallbackHandler(logger._wrapped)]),
         )
 
-        return Response(answer=self.parse_completion(res["output"]), model="")
+        proc = LinearProcedure(input_, query, self.parse_completion(res["output"]))
+        graph = await create_graphs_for_graph_store(
+            logger, -1, proc, self.model, self.dataset, save_pkl=False
+        )
+        return Response(answer=graph, model="")

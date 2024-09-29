@@ -2,11 +2,11 @@ from typing import ClassVar
 
 from langchain_core.messages import BaseMessage
 
-from dataset import Doc
+from dataset import LinearProcedure, create_graphs_for_graph_store
+from model import Model
 from utils import log
 
 from .interface import Response, System
-from .model import Model
 
 
 class FewShot(System):
@@ -15,7 +15,7 @@ class FewShot(System):
     model: Model
     dataset: str
 
-    def __init__(self, model: Model, dataset: str, shots: list[Doc] | None = None):
+    def __init__(self, model: Model, dataset: str, shots: list[str] | None = None):
         self.model = model
         self.dataset = dataset
         self.shots = self.build_context(shots if shots is not None else [])
@@ -26,10 +26,10 @@ class FewShot(System):
         "champ": "EXAMPLE",
     }
 
-    def build_context(self, docs: list[Doc]) -> str:
+    def build_context(self, docs: list[str]) -> str:
         out = ""
         for doc in docs:
-            out += f"\n\n{self._example_name[self.dataset]} '{doc.title}':\n\n{doc.contents}"
+            out += f"\n\n{self._example_name[self.dataset]} {doc}"
 
         return out[2:]  # skip first "\n\n"
 
@@ -37,7 +37,7 @@ class FewShot(System):
         prompt = await self.build_prompt(logger, query, input_)
         completion = await self.model.generate(prompt)
 
-        return self._make_result(prompt, completion)
+        return await self._make_result(prompt, completion, query, input_)
 
     _instructions: ClassVar[dict[str, str]] = {
         "lcstep": (
@@ -93,9 +93,16 @@ class FewShot(System):
 
         return out
 
-    def _make_result(self, prompt: str | list[BaseMessage], completion: str):
+    async def _make_result(
+        self, prompt: str | list[BaseMessage], completion: str, query: str, input_: str
+    ):
+        proc_steps = self.parse_completion(completion)
+        proc = LinearProcedure(input_, query, proc_steps)
+        graph = await create_graphs_for_graph_store(
+            None, -1, proc, self.model, self.dataset, save_pkl=False
+        )
         return Response(
-            answer=self.parse_completion(completion),
+            answer=graph,
             model=self.model.name,
             input_tokens=self.model.get_num_tokens(prompt),
             output_tokens=self.model.get_num_tokens(completion),

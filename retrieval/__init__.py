@@ -1,7 +1,9 @@
 from .doc_store import DocStore
+from .embedder import CachingEmbedder, embedder_from_name
+from .graph_procedure_store import GraphProcedureStore, Procedure, Step
 from .procedure_store import ProcedureStore, procedure_formatter_for
 from .store import Store
-from .graph_procedure_store import Step, Procedure, GraphProcedureStore
+
 
 __all__ = [
     "Store",
@@ -11,4 +13,6 @@ __all__ = [
     "Step",
     "Procedure",
     "GraphProcedureStore",
+    "CachingEmbedder",
+    "embedder_from_name",
 ]

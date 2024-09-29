@@ -5,11 +5,11 @@ import textwrap
 from typing import ClassVar
 
 from dataset import LinearProcedure
+from model import Model
 from retrieval import ProcedureStore
 from utils import log
 
 from .interface import Response, System
-from .model import Model
 from .rag import RAG
 
 

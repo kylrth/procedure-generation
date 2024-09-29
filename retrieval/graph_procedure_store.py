@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Sequence, Type, cast
+from typing import Sequence, cast
 
 import numpy as np
 import weaviate
@@ -10,12 +10,13 @@ from weaviate.classes.query import Filter
 from weaviate.collections.classes.batch import BatchObjectReturn, BatchReferenceReturn
 from weaviate.types import UUID
 
+from dataset import GraphProcedure, Step
 from graph import Edge as GEdge
 from graph import Graph as GGraph
 from graph import Node as GNode
 from retrieval.embedder import CachingEmbedder, Embedder
 from utils import spread_gather
-from dataset import GraphProcedure, Step
+
 
 # For procedures, all our nodes are Steps and our edges are strings.
 Edge = GEdge[Step, str]
@@ -23,16 +24,14 @@ Graph = GGraph[Step, str]
 Node = GNode[Step, str]
 
 
-class GraphProcedureStore[T: GraphProcedure]:
+class GraphProcedureStore:
     def __init__(
         self,
         store: weaviate.WeaviateAsyncClient,
         embedder: Embedder,
-        cls: Type[T],
     ):
         self.store = store
         self.embedder = embedder
-        self.g_cls = cls
 
     async def setup_collection(self, *, prefix: str = ""):
         # node collection
@@ -93,7 +92,7 @@ class GraphProcedureStore[T: GraphProcedure]:
             ],
         )
 
-    async def populate(self, logger: logging.Logger, procs: list[T]):
+    async def populate(self, logger: logging.Logger, procs: list[GraphProcedure]):
         # embed
         logger.debug("embedding %d graph procedures", len(procs))
         formatted = [str(p) for p in procs]
@@ -104,7 +103,7 @@ class GraphProcedureStore[T: GraphProcedure]:
             self.embedder.flush()
 
         # insert to Weaviate
-        async def _task(g_v: tuple[T, np.ndarray]):
+        async def _task(g_v: tuple[GraphProcedure, np.ndarray]):
             await self.add_graph(logger, g_v[0], g_v[1])
 
         use_tqdm = logger.getEffectiveLevel() >= logging.DEBUG
@@ -251,7 +250,9 @@ class GraphProcedureStore[T: GraphProcedure]:
 
         return uuid
 
-    async def add_graph(self, logger: logging.Logger, g: T, v: np.ndarray) -> UUID:  # noqa: C901
+    async def add_graph(  # noqa: C901
+        self, logger: logging.Logger, g: GraphProcedure, v: np.ndarray
+    ) -> UUID:
         """Add a single graph to the store."""
         # we'll traverse the graph starting from the outputs, adding nodes and edges to their
         # collections and setting up references
@@ -316,9 +317,9 @@ class GraphProcedureStore[T: GraphProcedure]:
         # insert graph
         return await self._insert_graph(input_uuids, output_uuids, v)
 
-    async def get_graph(self, id_: UUID) -> tuple[T, np.ndarray]:
+    async def get_graph(self, id_: UUID) -> tuple[GraphProcedure, np.ndarray]:
         """Get an existing graph and its embedding by ID."""
-        out = self.g_cls()
+        out = GraphProcedure()
 
         # get output edges and nodes they lead from
         res = await self.graphs.query.fetch_object_by_id(
@@ -390,12 +391,12 @@ class GraphProcedureStore[T: GraphProcedure]:
 
         return out, v
 
-    async def search(self, query: str, *, k: int = 10) -> list[T]:
+    async def search(self, query: str, *, k: int = 10) -> list[GraphProcedure]:
         """Find the top k procedures matching the query."""
         v = (await self.embedder.embed([query], is_query=True))[0]
         return await self.search_v(v, k=k)
 
-    async def search_v(self, v: np.ndarray, *, k: int = 10) -> list[T]:
+    async def search_v(self, v: np.ndarray, *, k: int = 10) -> list[GraphProcedure]:
         # find the top matching graphs and just get their UUIDs
         res = await self.graphs.query.near_vector(
             near_vector=v.tolist(), limit=k, return_properties=[]
@@ -406,7 +407,9 @@ class GraphProcedureStore[T: GraphProcedure]:
 
         return [g for g, _ in gs_vs]
 
-    async def hierarchical_retrieval(self, query: str, *, k: int = 10, k2: int = 5) -> list[T]:
+    async def hierarchical_retrieval(
+        self, query: str, *, k: int = 10, k2: int = 5
+    ) -> list[GraphProcedure]:
         """Of the top k procedures matching the query, extract the top k2 partial procedures.
 
         Partial procedures are extracted by traversing backward from the outputs, progressively
@@ -425,7 +428,7 @@ class GraphProcedureStore[T: GraphProcedure]:
         graphs, vectors = zip(*gs_vs)
 
         # collect subgraphs
-        subgraphs: list[list[T]] = []
+        subgraphs: list[list[GraphProcedure]] = []
         for graph in graphs:
             these_subgraphs = []
 
@@ -456,7 +459,7 @@ class GraphProcedureStore[T: GraphProcedure]:
             start += len(sgs)
 
         # find best (sub)graph of each graph
-        bests: list[T] = []
+        bests: list[GraphProcedure] = []
         best_sims: list[float] = []
         start = 0
         for g, sgs, sim, sg_sims in zip(graphs, subgraphs, g_sims, sg_sims_by_graph):
