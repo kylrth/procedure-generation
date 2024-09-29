@@ -3,7 +3,7 @@ from typing import cast
 
 import pytest
 
-from graph import Graph, Node
+from graph import DFSAction, Edge, Graph, Node
 
 
 def _example_graph() -> Graph[str, str]:
@@ -53,11 +53,15 @@ class TestGraph(unittest.TestCase):
         b.new_edge_to(c, 7)
 
         # no outputs yet
-        with pytest.raises(ValueError, match="node 1 was not reachable by back-traversal"):
+        with pytest.raises(
+            Graph.UnreachableError, match="node 1 was not reachable by back-traversal"
+        ):
             Graph(a, b, c, d)
 
         c.add_outputs(8)
-        with pytest.raises(ValueError, match="node 4 was not reachable by back-traversal"):
+        with pytest.raises(
+            Graph.UnreachableError, match="node 4 was not reachable by back-traversal"
+        ):
             Graph(a, b, c, d)
 
         c.outgoing.clear()
@@ -67,7 +71,9 @@ class TestGraph(unittest.TestCase):
 
         d.outgoing.clear()
         d.new_edge_to(a, 11)  # a loop with no outputs
-        with pytest.raises(ValueError, match="node 1 was not reachable by back-traversal"):
+        with pytest.raises(
+            Graph.UnreachableError, match="node 1 was not reachable by back-traversal"
+        ):
             Graph(a, b, c, d)
 
         c.add_outputs(12)  # a loop with an output
@@ -75,7 +81,9 @@ class TestGraph(unittest.TestCase):
 
         e = Node(13)
         e.add_inputs(14)
-        with pytest.raises(ValueError, match="node 13 was not reachable by back-traversal"):
+        with pytest.raises(
+            Graph.UnreachableError, match="node 13 was not reachable by back-traversal"
+        ):
             Graph(a, b, c, d, e)
 
         e.add_outputs(15)
@@ -83,6 +91,42 @@ class TestGraph(unittest.TestCase):
 
     def test_copy(self):
         self.assertEqual(example_graph, example_graph.copy())
+
+    def test_topo_sort(self):
+        # test with example graph
+        nodes = example_graph.topo_sort()
+
+        def check_topo(e: Edge) -> DFSAction:
+            if e.from_ is None or e.to is None:
+                return DFSAction.CONTINUE
+
+            if nodes.index(e.from_) >= nodes.index(e.to):
+                self.fail(f"node {e.from_.data} came after {e.to.data}")
+
+            return DFSAction.CONTINUE
+
+        self.assertEqual(9, len(nodes))
+        example_graph.back_dfs(check_topo)
+
+        # graph with two outputs
+        a, b, c = Node(1), Node(2), Node(3)
+        a.new_edge_to(b, 4)
+        b.new_edge_to(c, 5)
+        c.add_outputs(6, 7)
+        g = Graph(a, b, c)
+        nodes = g.topo_sort()
+        self.assertEqual(3, len(nodes))
+        g.back_dfs(check_topo)
+
+        # should fail with loop
+        a, b, c = Node(1), Node(2), Node(3)
+        a.new_edge_to(b, 4)
+        b.new_edge_to(c, 5)
+        c.new_edge_to(a, 6)
+        c.add_outputs(7)
+        g = Graph(a, b, c)
+        with pytest.raises(Graph.DAGError):
+            g.topo_sort()
 
     def test_eq(self):
         self.assertNotEqual(example_graph, Graph())

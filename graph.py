@@ -139,22 +139,49 @@ class Graph[T, U: _Comparable]:
         # check that all Inputs and Nodes are reached by back-traversal
         self._check_reachable(nodes)
 
-    def dfs(self, f: Callable[[Edge[T, U]], DFSAction]):
+    def dfs(
+        self,
+        f: Callable[[Edge[T, U]], DFSAction],
+        after: Callable[[Edge[T, U]], None] | None = None,
+    ):
         """Call f on every Edge (including Inputs and Outputs) by doing depth-first search starting
-        from the inputs. THIS IS NOT GUARANTEED TO DISCOVER ALL NODES."""
-        visited: set[Node[T, U]] = set()
-        self._dfs(self.inputs, f, visited)
+        from the inputs. THIS IS NOT GUARANTEED TO DISCOVER ALL NODES.
 
-    def back_dfs(self, f: Callable[[Edge[T, U]], DFSAction]):
-        """Call f on every Edge (including Inputs and Outputs) by doing depth-first search starting
-        from the outputs."""
+        `after` is an optional function that will be called after having called f on all Edges below
+        the current Edge.
+        """
+        if after is None:
+            after = self._no_after
+
         visited: set[Node[T, U]] = set()
-        self._dfs(self.outputs, f, visited, backward=True)
+        self._dfs(self.inputs, f, after, visited)
+
+    def back_dfs(
+        self,
+        f: Callable[[Edge[T, U]], DFSAction],
+        after: Callable[[Edge[T, U]], None] | None = None,
+    ):
+        """Call f on every Edge (including Inputs and Outputs) by doing depth-first search starting
+        from the outputs.
+
+        `after` is an optional function that will be called after having called f on all Edges above
+        the current Edge.
+        """
+        if after is None:
+            after = self._no_after
+
+        visited: set[Node[T, U]] = set()
+        self._dfs(self.outputs, f, after, visited, backward=True)
+
+    @staticmethod
+    def _no_after(e: Edge[T, U]):
+        pass
 
     @staticmethod
     def _dfs(
         es: Sequence[Edge[T, U]],
         f: Callable[[Edge[T, U]], DFSAction],
+        after: Callable[[Edge[T, U]], None],
         visited: set[Node[T, U]],
         *,
         backward: bool = False,
@@ -175,10 +202,12 @@ class Graph[T, U: _Comparable]:
 
             visited.add(nn)  # mark as visited before continuing to avoid infinite loops
             action = Graph._dfs(
-                nn.incoming if backward else nn.outgoing, f, visited, backward=backward
+                nn.incoming if backward else nn.outgoing, f, after, visited, backward=backward
             )
             if action == DFSAction.QUIT:
                 return action
+
+            after(e)
 
         return DFSAction.CONTINUE
 
@@ -213,7 +242,8 @@ class Graph[T, U: _Comparable]:
 
         def __str__(self):
             t = "node" if isinstance(self.missing, Node) else "input"
-            return f"{t} {self.missing} was not reachable by back-traversal"
+            data = self.missing.data if isinstance(self.missing, Node) else self.missing.content
+            return f"{t} {data} was not reachable by back-traversal"
 
     def copy(self) -> Self:
         """Create a copy of the Graph by duplicating all Nodes and Edges.
@@ -258,6 +288,43 @@ class Graph[T, U: _Comparable]:
 
         self.back_dfs(copy_edge)
         return out
+
+    def topo_sort(self) -> list[Node[T, U]]:
+        """Return a topological sort of the nodes, such that no node in the list depends on any
+        later nodes in the list."""
+        # we use an algorithm for topological sorting based on DFS
+        # https://en.wikipedia.org/wiki/Topological_sorting#Depth-first_search
+        perm_mark: set[Node[T, U]] = set()
+        temp_mark: set[Node[T, U]] = set()
+        ordered: list[Node[T, U]] = []
+
+        def topo_enter(e: Edge[T, U]) -> DFSAction:
+            n = e.from_
+            if n is None:
+                return DFSAction.CONTINUE
+
+            if n in perm_mark:
+                return DFSAction.SKIP
+            if n in temp_mark:
+                raise self.DAGError
+
+            temp_mark.add(n)
+            return DFSAction.CONTINUE
+
+        def topo_exit(e: Edge[T, U]):
+            n = e.from_
+            if n is None:
+                return
+
+            perm_mark.add(n)
+            ordered.append(n)
+
+        self.back_dfs(topo_enter, after=topo_exit)
+        return ordered
+
+    class DAGError(Exception):
+        def __init__(self):
+            super().__init__("graph has a loop")
 
     def cut_input_layer(self) -> Self:
         """Remove IN-PLACE all nodes that consume this graph's inputs, and make those nodes' outputs
