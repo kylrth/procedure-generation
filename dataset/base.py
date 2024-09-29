@@ -51,6 +51,17 @@ class LinearProcedure:
             contents=self.format_steps(),
         )
 
+    def __str__(self) -> str:
+        """Used for embedding and inserting into LLM prompts."""
+        out: list[str] = []
+        out.append(f"goal: {self.output}")
+        out.append(f"inputs: {self.input_}")
+        out.append("steps:")
+        for step in self.steps:
+            out.append(f"- {step}")
+
+        return "\n".join(out)
+
     def to_dict(self) -> dict[str, Any]:
         """Return the procedure as a dictionary."""
         return {
@@ -106,8 +117,10 @@ class GraphProcedure(Graph[Step, str], ABC):
 
         # topological sort of nodes
         nodes = self.topo_sort()
+        out.append("steps:")
         for node in nodes:
-            out.append(f"- {node.data.desc}")
+            inputs = [e.content for e in node.incoming]
+            out.append(f"- ({', '.join(inputs)}) -> {node.outgoing[0].content}: {node.data.desc}")
 
         return "\n".join(out)
 
