@@ -16,7 +16,7 @@ from pathlib import Path
 
 import dataset
 import retrieval
-from dataset import LinearProcedure
+from dataset import GraphProcedure
 from systems import System, AAG, FewShot, ReAct, RAG
 from utils import log, spread_gather
 from utils.weaviate import NiceWeaviate
@@ -26,11 +26,10 @@ from model import Model
 
 async def generate_and_record(
     logger: logging.Logger,
-    csv: log.CSVLogger,
     human: log.HumanLogger,
     model: System,
     id_: int,
-    p: LinearProcedure,
+    p: GraphProcedure,
 ):
     """Generate a procedure for this item with the model, and log the result."""
     with human.for_id(id_) as hlog:
@@ -39,14 +38,7 @@ async def generate_and_record(
             hlog.write(f"  input: '{p.input_}'\n")
             res = await model.generate(hlog, p.output, p.input_)
             hlog.write("\nFINISHED GENERATING\n\n")
-            csv.result(
-                log.Result(
-                    ID=id_,
-                    model=res.model,
-                    gold=p,
-                    completion=res.answer,
-                )
-            )
+
             hlog.write(f"BEGIN GENERATED:\n{dataset.format_steps(res.answer)}\nEND GENERATED\n")
             hlog.write(f"BEGIN REFERENCE:\n{p.format_steps()}\nEND REFERENCE\n")
             if res.input_tokens != -1 or res.output_tokens != -1:
@@ -96,7 +88,7 @@ async def main(args):
 
     out_name = (
         system_name
-        + ("_no-summ" if system_name == "aag" and not args.summarize else "")
+        + ("_hs" if system_name in ("aag", "rag", "react") and args.hs else "_s")
         + ("_no-critic" if system_name in ("rag", "aag") and not args.critic else "")
         + (f"_{args.n_queries}" if system_name == "aag" and args.n_queries != 4 else "")
     )
@@ -172,26 +164,25 @@ async def main(args):
 
         logger.info("starting generation...")
 
-        with log.CSVLogger(outdir / "output.csv") as csv:
-            try:
-                start = time.time_ns()
-                asyncio.run(
-                    spread_gather(
-                        lambda item: generate_and_record(logger, csv, human, system, *item),
-                        enumerate(eval_data),
-                        min(args.workers, n),
-                        len(eval_data),
-                    )
+        try:
+            start = time.time_ns()
+            asyncio.run(
+                spread_gather(
+                    lambda item: generate_and_record(logger, human, system, *item),
+                    enumerate(eval_data),
+                    min(args.workers, n),
+                    len(eval_data),
                 )
-                tot_time = time.time_ns() - start
-                logger.info(f"see results in in ./{outdir}")
-                logger.info(
-                    f"runtime for {args.system} with critic {args.critic} on {args.dataset}: "
-                    f"{tot_time / 1e9:.1f}s"
-                )
-            finally:
-                if store is not None:
-                    store.embedder.flush()
+            )
+            tot_time = time.time_ns() - start
+            logger.info(f"see results in in ./{outdir}")
+            logger.info(
+                f"runtime for {args.system} with critic {args.critic} on {args.dataset}: "
+                f"{tot_time / 1e9:.1f}s"
+            )
+        finally:
+            if store is not None:
+                store.embedder.flush()
 
 
 # constants
