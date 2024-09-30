@@ -20,12 +20,6 @@ class FewShot(System):
         self.dataset = dataset
         self.shots = self.build_context(shots if shots is not None else [])
 
-    _example_name: ClassVar[dict[str, str]] = {
-        "lcstep": "DOCUMENTATION",
-        "recipenlg": "RECIPE",
-        "champ": "EXAMPLE",
-    }
-
     def build_context(self, docs: list[str]) -> str:
         out = ""
         for doc in docs:

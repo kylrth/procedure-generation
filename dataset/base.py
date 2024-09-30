@@ -111,6 +111,15 @@ class GraphProcedure(Graph[Step, str], ABC):
 
         return "\n".join(out)
 
+    def get_title(self):
+        if len(self.outputs) == 0:
+            return ""
+        elif len(self.outputs) == 1:
+            return self.outputs[0].content
+        else:
+            s = ", ".join(o.content for o in self.outputs)
+            return s
+
 
 def train_val_test(data: list, val: float, test: float) -> tuple[list, list, list]:
     """Take test% of samples as test data from the end, then val% for val data, then everything

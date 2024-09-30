@@ -1,6 +1,7 @@
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import ClassVar
 
 from dataset import GraphProcedure
 from utils import log
@@ -21,6 +22,12 @@ class Response:
 class System(ABC):
     """This is the interface that all systems in this package will implement. It can be imported for
     type annotations."""
+
+    _example_name: ClassVar[dict[str, str]] = {
+        "lcstep": "DOCUMENTATION",
+        "recipenlg": "RECIPE",
+        "champ": "EXAMPLE",
+    }
 
     @abstractmethod
     async def generate(self, logger: log.InstanceLogger, query: str, input_: str) -> Response:
