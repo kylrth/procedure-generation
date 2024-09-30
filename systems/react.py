@@ -150,7 +150,7 @@ class ReAct(System):
                         query, k=2 * self.k, k2=self.k
                     )
                 else:
-                    procedures = await self.graphs.search(query, self.k)
+                    procedures = await self.graphs.search(query, k=self.k)
 
                 return "\n\n".join(str(p) for p in procedures)
 

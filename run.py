@@ -155,7 +155,6 @@ async def main(args):
                     store,
                     args.k,
                     args.dataset,
-                    args.summarize,
                     args.critic,
                     args.hs,
                     args.n_queries,
@@ -256,9 +255,6 @@ if __name__ == "__main__":
         type=int,
         default=4,
         help="Number of re-written queries",
-    )
-    parser.add_argument(
-        "--summarize", action="store_true", help="Whether to use summarization in the AAG"
     )
     parser.add_argument(
         "--critic", action="store_true", help="Whether to use critic in the system or not"
