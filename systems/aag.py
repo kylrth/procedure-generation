@@ -8,6 +8,7 @@ from dataset import GraphProcedure, LinearProcedure, create_graphs_for_graph_sto
 from model import Model
 from retrieval import GraphProcedureStore
 from utils import log
+from utils.workers import spread_gather
 
 from .interface import Response, System
 
@@ -313,7 +314,7 @@ class AAG(System):
         for p in procs:
             if p in seen:
                 continue
-            out += f"\n\n{self._example_name[self.dataset]} {str(p)}"
+            out += f"\n\n{self._example_name[self.dataset]} {p!s}"
             seen.add(p)
 
         return out[2:]  # skip first "\n\n"
@@ -354,3 +355,281 @@ class AAG(System):
         completion = await self.model.generate(prompt)
 
         return completion
+
+    """
+    Validator checks for:
+    1) If all inputs are used or not: Accept extra
+    ingredients in the serving part but not while
+    making components of the dish
+    2) Completes the user goal or not: any change in flow of steps or
+    adding some details.
+
+    Suggest edits as a bulleted list. If no update required,
+    respond 'NO UPDATE REQUIRED'
+    """
+
+    _validator_opt_inst: ClassVar[dict[str, str]] = {
+        "lcstep": "",
+        "recipenlg": (
+            "For the provided recipe, do not penalize additional ingredients "
+            "used for better serving or decorating and the utensils. However, "
+            "there should not be extra ingredients used in making the components "
+            "of the food."
+        ),
+        "champ": "",
+    }
+
+    async def validate_update(self, logger: log.InstanceLogger, candidate: LinearProcedure) -> str:
+        sys_instruction = (
+            "[INSTRUCTION]\nYou are a human critic whose job is to validate the "
+            "provided procedure, propose the changes to be made and evaluate if "
+            "the steps lead to the mentioned "
+            "user goal or not. You should also assess if the quality of the steps "
+            "can be improved by modifying the flow of the steps or adding "
+            "more details to make it more clear and doable.\n\n"
+            "Furthermore, it is very important for the procedure to use all the "
+            "mentioned input resources. Carefully judge if the procedure uses "
+            "all the resources and point out in your response if it misses "
+            "something. {opt_inst}\n\n"
+            "Please output only your edits in a bulleted list or if there "
+            "are absolutely no edits, please strictly output only 'NO UPDATE REQUIRED'. "
+            "You are required to strictly follow the mentioned output format."
+        )
+        msg_prompt = (
+            f"[USER GOAL]\n{candidate.output}\n\n"
+            f"[INPUT RESOURCES]\n{candidate.input_}\n\n"
+            f"[BEGIN PROCEDURE]\n{candidate.format_steps()}\n[END PROCEDURE]"
+        )
+        prompt = self.model.build_prompt(
+            prompt=msg_prompt,  # Human Message
+            context=sys_instruction.format(
+                opt_inst=self._validator_opt_inst[self.dataset]
+            ),  # System Message
+        )
+        completion = await self.model.generate(prompt)
+
+        logger.write("VALIDATOR PROMPT\n")
+        logger.log_prompt(prompt)
+        logger.write("BEGIN VALIDATOR ANSWER\n")
+        logger.write(textwrap.indent(completion, "  ") + "\n")
+        logger.write("END VALIDATOR ANSWER\n")
+        return completion
+
+    _perform_edits_instructions: ClassVar[dict[str, str]] = {
+        "lcstep": (
+            "Please update the provided high-level steps in accordance with the suggested edits "
+            "to accomplish the specified goal using "
+            "the LangChain Python library. Make sure all the other details remain unaltered. "
+            "Don't include code, extraneous commentary, or examples, but do refer "
+            "to the specific LangChain APIs (or other APIs) used in each step. Don't produce any "
+            "text other than the list of steps. Use any of the provided reference answers to "
+            "relevant questions on the steps to achieve the specified goal."
+        ),
+        "recipenlg": (
+            "Please update the provided high-level steps in accordance with the suggested edits "
+            "to create a recipe for the specified "
+            "food. Make sure all the other details remain unaltered. Don't "
+            "include extraneous commentary, or examples, but do refer to the special "
+            "characteristics and state of the ingredients used in each step. Don't produce any "
+            "text other than the list of steps. Use any of the provided reference answers to "
+            "relevant questions on the steps to achieve the specified goal."
+        ),
+        "champ": (
+            "Please update the provided high-level steps in accordance with the suggested edits "
+            "to solve the given math problem. Make sure all the other details remain unaltered. "
+            "Don't include code, extraneous commentary, or examples, but do refer to the "
+            "concepts and hints used in "
+            "each step. Don't produce any text other than the list of steps. Use any of the "
+            "provided reference answers to relevant questions on the steps to achieve the "
+            "specified goal."
+        ),
+    }
+
+    _no_summ_perform_edits_instructions: ClassVar[dict[str, str]] = {
+        "lcstep": (
+            "Please update the provided high-level steps in accordance with the suggested edits "
+            "to accomplish the specified goal using "
+            "the LangChain Python library. Make sure all the other details remain unaltered. "
+            "Don't include code, extraneous commentary, or examples, but do refer "
+            "to the specific LangChain APIs (or other APIs) used in each step. Don't produce any "
+            "text other than the list of steps. Use any of the provided reference documentation to "
+            "achieve the specified goal."
+        ),
+        "recipenlg": (
+            "Please update the provided high-level steps in accordance with the suggested edits "
+            "to create a recipe for the specified "
+            "food. Make sure all the other details remain unaltered. Don't "
+            "include extraneous commentary, or examples, but do refer to the special "
+            "characteristics and state of the ingredients used in each step. Don't produce any "
+            "text other than the list of steps. Use any of the provided reference recipes to "
+            "achieve the specified goal."
+        ),
+        "champ": (
+            "Please update the provided high-level steps in accordance with the suggested edits "
+            "to solve the given math problem. Make sure all the other details remain unaltered. "
+            "Don't include code, extraneous commentary, or examples, but do refer to the "
+            "concepts and hints used in "
+            "each step. Don't produce any text other than the list of steps. Use any of the "
+            "provided reference problems and their solutions to achieve the "
+            "specified goal."
+        ),
+    }
+
+    _perf_edit_inst: ClassVar[dict[str, str]] = {
+        "lcstep": (
+            "Please perform all the edits and update the list of steps to "
+            "accomplish '{query}' using the knowledge "
+            "above. Create and use these resources in your response: {input_}. "
+            "Please output only the updated steps. Your response should start with '1.'. "
+            "The final response should not contain direct references to the knowledge above."
+        ),
+        "recipenlg": (
+            "Please perform all the edits and update the list of steps to "
+            "accomplish '{query}' using the knowledge "
+            "above. Use these ingredients in your response: {input_}. "
+            "Please output only the updated steps. Your response should start with '1.'. "
+            "The final response should not contain direct references to the knowledge above."
+        ),
+        "champ": (
+            "Please perform all the edits and update the list of steps to "
+            "solve '{query}' using the knowledge above. "
+            "Use this additional information in preparing your response: {input_}. "
+            "Please output only the updated steps. Your response should start with '1.'. "
+            "The final response should not contain direct references to the knowledge above."
+        ),
+    }
+
+    async def perform_validator_edits(
+        self, logger: log.InstanceLogger, candidate: LinearProcedure, knowledge_str: str, edits: str
+    ) -> list[str]:
+        msg_prompt = (
+            f"[BEGIN KNOWLEDGE]\n{knowledge_str}\n[END KNOWLEDGE]"
+            "\n\n"
+            f"[BEGIN STEPS]\n{candidate.format_steps()}\n[END STEPS]"
+            "\n\n"
+            f"[BEGIN EDITS]\n{edits}\n[END EDITS]"
+            "\n\n"
+            + self._perf_edit_inst[self.dataset].format(
+                query=candidate.output, input_=candidate.input_
+            )
+        )
+
+        if self.summarize:
+            sys_instruction = self._perform_edits_instructions[self.dataset]
+        else:
+            sys_instruction = self._no_summ_perform_edits_instructions[self.dataset]
+        prompt = self.model.build_prompt(prompt=msg_prompt, context=sys_instruction)
+        logger.write("Prompt to update candidate based on edits:\n")
+        logger.log_prompt(prompt)
+        completion = await self.model.generate(prompt)
+
+        return self.parse_completion(completion)
+
+    def any_edits_suggested(self, completion):
+        resp_lines = completion.split("\n")
+        return any(line.startswith("- ") for line in resp_lines)
+
+    async def check_with_validator_and_modify(
+        self,
+        logger: log.InstanceLogger,
+        candidate: LinearProcedure,
+        knowledge_str: str,
+        max_updates: int = 3,
+    ) -> list[str]:
+        break_phrase = "NO UPDATE REQUIRED"
+        updates_done = 0
+
+        while updates_done < max_updates:
+            validator_edits = await self.validate_update(logger, candidate)
+            if break_phrase in validator_edits and not self.any_edits_suggested(validator_edits):
+                logger.write(f"EXITING EDIT LOOP EARLY AFTER {updates_done} updates")
+                break
+            candidate.steps = await self.perform_validator_edits(
+                logger, candidate, knowledge_str, validator_edits
+            )
+            logger.write("BEGIN EDITED STEPS\n")
+            logger.write(textwrap.indent(candidate.format_steps(), "  ") + "\n")
+            logger.write("END EDITED STEPS\n")
+            updates_done += 1
+
+        return candidate.steps
+
+    _critic_sys: ClassVar[str] = (
+        "You are {role} tasked with critiquing the provided procedure. Please list up to 4 "
+        "criticisms in a simple bulleted list. Don't criticize the goal or inputs, as these are "
+        "requirements. Be conservative and only point out real problems. If there are no real "
+        "issues, say NO CRITIQUES."
+    )
+    _critic_role: ClassVar[dict[str, str]] = {
+        "lcstep": "an expert in developing LangChain applications in Python",
+        "recipenlg": "an expert chef",
+        "champ": "a skill competition math problem solver",
+    }
+
+    _critic_react: ClassVar[str] = (
+        "You are preparing a {p_name} for '{query}' using the following {i_name_pl}:\n"
+        "{inputs}\n"
+        "Here's what you wrote:\n"
+        "\n"
+        "{candidate}\n"
+        "\n"
+        "A reviewer says the following:\n"
+        "\n"
+        "{criticism}\n"
+        "\n"
+        "Please state whether you agree with this criticism, and why. Then, if you disagree, write "
+        "'Result: WON'T FIX'. If you agree, write instead a search question to help you discover "
+        "the information you need to solve the problem, like 'Result: <question>'."
+    )
+    _p_name: ClassVar[dict[str, str]] = {
+        "lcstep": "step-by-step procedure",
+        "recipenlg": "recipe",
+        "champ": "step-by-step solution",
+    }
+    _i_name_pl: ClassVar[dict[str, str]] = {
+        "lcstep": "resources",
+        "recipenlg": "ingredients/tools",
+        "champ": "hints",
+    }
+
+    async def critic(
+        self, logger: log.InstanceLogger, query: str, input_: str, candidate: GraphProcedure
+    ) -> list[str]:
+        """Critique the candidate procedure and produce a list of questions to get the necessary
+        information to fix the issues."""
+        # collect criticism
+        sys = self._critic_sys.format(role=self._critic_role[self.dataset])
+        hum = str(candidate)
+        res = await self.model.generate(self.model.build_prompt(hum, context=sys))
+        if "NO CRITIQUES" in res and "\n- " not in res:
+            logger.write("NO CRITIQUES\n")
+            return []
+        criticisms = [crit[2:].strip() for crit in res.strip().split("\n") if crit.startswith("- ")]
+
+        # convert criticisms to queries
+        async def _task(criticism):
+            prompt = self._critic_react.format(
+                p_name=self._p_name[self.dataset],
+                query=query,
+                i_name_pl=self._i_name_pl[self.dataset],
+                inputs=input_,
+                candidate=str(candidate),
+                criticism=criticism,
+            )
+
+            return criticism, await self.model.generate(self.model.build_prompt(prompt))
+
+        results = await spread_gather(_task, criticisms, n=5)
+        search_queries = []
+        logger.write("BEGIN CRITICISMS\n")
+        for criticism, completion in results:
+            if "Result: WON'T FIX" in completion:
+                logger.write(f"  - {criticism}: WON'T FIX\n")
+                continue
+
+            search_query = completion.rsplit("Result: ", 1)[1]
+            logger.write(f"  - {criticism}: '{search_query}'\n")
+            search_queries.append(search_query)
+        logger.write("END CRITICISMS\n")
+
+        return search_queries
