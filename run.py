@@ -34,13 +34,13 @@ async def generate_and_record(
     """Generate a procedure for this item with the model, and log the result."""
     with human.for_id(id_) as hlog:
         try:
-            hlog.write(f"processing query '{p.output}'\n")
-            hlog.write(f"  input: '{p.input_}'\n")
-            res = await model.generate(hlog, p.output, p.input_)
+            hlog.write(f"processing query '{p.get_title()}'\n")
+            hlog.write(f"  input: '{p.get_inputs()}'\n")
+            res = await model.generate(hlog, p.get_title(), p.get_inputs())
             hlog.write("\nFINISHED GENERATING\n\n")
 
-            hlog.write(f"BEGIN GENERATED:\n{dataset.format_steps(res.answer)}\nEND GENERATED\n")
-            hlog.write(f"BEGIN REFERENCE:\n{p.format_steps()}\nEND REFERENCE\n")
+            hlog.write(f"BEGIN GENERATED:\n{str(res.answer)}\nEND GENERATED\n")
+            hlog.write(f"BEGIN REFERENCE:\n{str(p)}\nEND REFERENCE\n")
             if res.input_tokens != -1 or res.output_tokens != -1:
                 hlog.write(f"used {res.input_tokens} input and {res.output_tokens} output tokens\n")
         except Exception:  # noqa: BLE001  # logging the exception for tracing purposes
