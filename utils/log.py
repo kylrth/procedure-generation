@@ -1,11 +1,12 @@
 import csv
 import io
 import json
+import logging
 import os
 import textwrap
 from dataclasses import dataclass
 from pathlib import Path
-from typing import ClassVar, Iterable
+from typing import ClassVar, Iterable, cast
 
 from langchain_core.messages import BaseMessage
 
@@ -66,6 +67,7 @@ class CSVLogger:
 # for logging while generating results for a particular instance
 class InstanceLogger:
     _wrapped: io.TextIOWrapper
+    _normal: logging.Logger | None = None
 
     def __init__(self, wrapped: io.TextIOWrapper):
         self._wrapped = wrapped
@@ -93,6 +95,22 @@ class InstanceLogger:
         self._wrapped.write(textwrap.indent(messages_to_string(p), "  "))
         self._wrapped.write(f"\nEND {kind}\n")
 
+    @property
+    def normal(self) -> logging.Logger:
+        """A normal logger class that forwards leveled log information to the InstanceLogger."""
+        if self._normal is not None:
+            return self._normal
+
+        self._normal = logging.getLogger(self._wrapped.name)
+
+        handler = logging.StreamHandler(self._wrapped)
+        handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+        self._normal.addHandler(handler)
+
+        self._normal.setLevel(logging.DEBUG)
+
+        return self._normal
+
 
 class HumanLogger:
     """This object logs results to a human-readable log folder, with separate files for each
@@ -116,8 +134,9 @@ def messages_to_string(messages: str | list[BaseMessage]) -> str:
         return messages
 
     def _format(msg: BaseMessage) -> str:
-        if "\n" not in msg.content:
-            return msg.__class__.__name__ + "(" + msg.content + ")"
-        return msg.__class__.__name__ + "(\n  " + msg.content.replace("\n", "\n  ") + "\n)"
+        content = cast(str, msg.content)
+        if "\n" not in content:
+            return msg.__class__.__name__ + "(" + content + ")"
+        return msg.__class__.__name__ + "(\n  " + content.replace("\n", "\n  ") + "\n)"
 
     return "\n".join(_format(msg) for msg in messages)

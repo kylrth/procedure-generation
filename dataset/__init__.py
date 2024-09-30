@@ -1,17 +1,17 @@
 from .base import (
     Dataset,
     Doc,
+    GraphProcedure,
     LinearProcedure,
     Split,
+    Step,
     format_steps,
     train_val_test,
-    GraphProcedure,
-    Step,
 )
 from .champ import CHAMP
 from .lcstep import LCStep
+from .proc_to_graph import build_graph_from_linear_procedure, build_graph_with_retries
 from .recipenlg import RecipeNLG
-from .proc_to_graph import get_graph_from_linear_procedure, create_graphs_for_graph_store
 
 
 __all__ = [
@@ -26,6 +26,6 @@ __all__ = [
     "train_val_test",
     "GraphProcedure",
     "Step",
-    "create_graphs_for_graph_store",
-    "get_graph_from_linear_procedure",
+    "build_graph_from_linear_procedure",
+    "build_graph_with_retries",
 ]

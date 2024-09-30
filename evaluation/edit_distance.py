@@ -6,7 +6,7 @@ import spacy
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from dataset import LinearProcedure, format_steps
-from systems import Model
+from model import Model
 
 from .heuristic import Heuristic
 

@@ -127,11 +127,11 @@ class GraphProcedure(Graph[Step, str], ABC):
     def get_title(self):
         if len(self.outputs) == 0:
             return ""
-        elif len(self.outputs) == 1:
+        if len(self.outputs) == 1:
             return self.outputs[0].content
-        else:
-            s = ", ".join(o.content for o in self.outputs)
-            return s
+
+        s = ", ".join(o.content for o in self.outputs)
+        return s
 
     def get_inputs(self):
         if len(self.inputs) == 0:

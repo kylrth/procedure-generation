@@ -2,15 +2,15 @@ import csv
 import itertools
 import json
 import math
+import pickle
 import random
 import re
 import sys
 from os import PathLike
 from typing import Any, Iterable
-import glob
-import os
-from .base import Dataset, Doc, LinearProcedure, GraphProcedure
-import pickle
+
+from .base import Dataset, Doc, GraphProcedure, LinearProcedure
+
 
 _step_prefixes = re.compile(r"^\s*(?:\d+(?:\.|\))\s*|-)\s*(.*)$")
 
@@ -63,8 +63,8 @@ class RecipeNLG(Dataset):
         return out
 
     def _init_graphs(self) -> list[GraphProcedure]:
-        dir = self.dir / "graphs" / "recipenlg"
-        file_list = dir.glob("*.pkl")
+        d = self.dir / "graphs" / "recipenlg"
+        file_list = d.glob("*.pkl")
         graph_list = []
         for file in file_list:
             with file.open("rb") as f:

@@ -13,7 +13,7 @@ from langchain.schema import HumanMessage, SystemMessage
 
 from dataset import LinearProcedure, format_steps
 from evaluation.eval import read_outputs_csv
-from systems import Model
+from model import Model
 from utils import spread_gather
 
 

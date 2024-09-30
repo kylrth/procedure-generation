@@ -1,11 +1,13 @@
 """Tools for loading the LCStep dataset. For creating the dataset, see the LCStep/ folder."""
 
 import bisect
+import pickle
 import re
 from os import PathLike
 from pathlib import Path
-import pickle
-from .base import Dataset, Doc, LinearProcedure, GraphProcedure
+from typing import cast
+
+from .base import Dataset, Doc, GraphProcedure, LinearProcedure
 
 
 def load_api_ref(data_dir: str | PathLike = "./dataset/") -> list[Doc]:
@@ -151,11 +153,11 @@ def load_formatted_docs(
 
 class LCStep(Dataset):
     def _init_procedures(self) -> list[LinearProcedure]:
-        return [d["procedure"] for d in load_formatted_docs(self.dir)]
+        return [cast(LinearProcedure, d["procedure"]) for d in load_formatted_docs(self.dir)]
 
     def _init_graphs(self) -> list[GraphProcedure]:
-        dir = self.dir / "graphs" / "lcstep"
-        file_list = dir.glob("*.pkl")
+        d = self.dir / "graphs" / "lcstep"
+        file_list = d.glob("*.pkl")
         graph_list = []
         for file in file_list:
             with file.open("rb") as f:

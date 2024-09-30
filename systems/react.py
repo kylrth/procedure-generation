@@ -8,7 +8,7 @@ from langchain_core.prompts.prompt import PromptTemplate
 from langchain_core.runnables import RunnableConfig
 
 import retrieval
-from dataset import LinearProcedure, create_graphs_for_graph_store
+from dataset import LinearProcedure, build_graph_with_retries
 from model import Model
 from utils import log
 from utils.lc import FileHandleCallbackHandler
@@ -171,7 +171,5 @@ class ReAct(System):
         )
 
         proc = LinearProcedure(input_, query, self.parse_completion(res["output"]))
-        graph = await create_graphs_for_graph_store(
-            logger, -1, proc, self.model, self.dataset, save_pkl=False
-        )
+        graph = await build_graph_with_retries(logger.normal, proc, self.model, self.dataset)
         return Response(answer=graph, model="")

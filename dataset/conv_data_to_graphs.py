@@ -1,23 +1,36 @@
 import argparse
-import logging
 import asyncio
-import sys
+import logging
+import pickle
+from pathlib import Path
+
+from dataset import (
+    CHAMP,
+    Dataset,
+    LCStep,
+    LinearProcedure,
+    RecipeNLG,
+    Split,
+    build_graph_with_retries,
+)
 from model import Model
-from dataset.base import Split, Dataset
-from dataset.proc_to_graph import create_graphs_for_graph_store
-from utils import log, spread_gather
-from dataset import LCStep, RecipeNLG, CHAMP
+from utils import spread_gather
 
 
 async def convert_dataset_to_graphs(
-    logger: log.InstanceLogger, ds: Dataset, dataset: str, model: Model, workers: int
+    logger: logging.Logger, ds: Dataset, dataset: str, model: Model, workers: int
 ):
     procedures = ds.procedures(Split.TRAIN | Split.VAL | Split.TEST)
+    root = Path("./dataset/graphs") / dataset
+    root.mkdir(parents=True, exist_ok=True)
+
+    async def _task(i: int, p: LinearProcedure):
+        g = await build_graph_with_retries(logger, p, model, dataset)
+        with (root / f"{i}.pkl").open("wb") as f:
+            pickle.dump(g, f)
+
     await spread_gather(
-        lambda item: create_graphs_for_graph_store(logger, *item, model, dataset),
-        enumerate(procedures),
-        min(workers, 100),
-        len(procedures),
+        lambda item: _task(*item), enumerate(procedures), min(workers, 100), len(procedures)
     )
 
 

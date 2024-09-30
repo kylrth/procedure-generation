@@ -92,7 +92,7 @@ class GraphProcedureStore:
             ],
         )
 
-    async def populate(self, logger: logging.Logger, procs: list[GraphProcedure]):
+    async def populate(self, logger: logging.Logger, procs: Sequence[GraphProcedure]):
         # embed
         logger.debug("embedding %d graph procedures", len(procs))
         formatted = [str(p) for p in procs]
