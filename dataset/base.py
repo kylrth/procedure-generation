@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from enum import Flag, auto
 from os import PathLike
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 from graph import Graph
 
@@ -140,7 +140,9 @@ class GraphProcedure(Graph[Step, str], ABC):
         return s
 
 
-def train_val_test(data: list, val: float, test: float) -> tuple[list, list, list]:
+def train_val_test[
+    T
+](data: Sequence[T], val: float, test: float) -> tuple[Sequence[T], Sequence[T], Sequence[T]]:
     """Take test% of samples as test data from the end, then val% for val data, then everything
     before as train data.
 
@@ -166,7 +168,7 @@ class Split(Flag):
     VAL = auto()
     TEST = auto()
 
-    def get(self, data: list, val: float = 0.1, test: float = 0.2) -> list:
+    def get[T](self, data: list[T], val: float = 0.1, test: float = 0.2) -> list[T]:
         """Get the specified split of the given data."""
         d_train, d_val, d_test = train_val_test(data, val, test)
 
@@ -194,7 +196,8 @@ class Dataset(ABC):
         This is usually just "./dataset".
         """
         self.dir = Path(data_dir)
-        self._all = None
+        self._all_p = None
+        self._all_g = None
 
     @abstractmethod
     def _init_procedures(self) -> list[LinearProcedure]:
@@ -206,25 +209,25 @@ class Dataset(ABC):
         """Return the full list of graph procedures. Will only be called once and the result will be
         cached."""
 
-    def procedures(self, split: Split) -> list[LinearProcedure]:
+    def procedures(self, split: Split) -> Sequence[LinearProcedure]:
         """Return the list of linear procedures corresponding to the specified section of data.
 
         May also be overridden if different functionality is desired.
         """
-        if self._all is None:
-            self._all = self._init_procedures()
+        if self._all_p is None:
+            self._all_p = self._init_procedures()
 
-        return split.get(self._all)
+        return split.get(self._all_p)
 
-    def graphs(self, split: Split) -> list[GraphProcedure]:
+    def graphs(self, split: Split) -> Sequence[GraphProcedure]:
         """Return the list of graph procedures corresponding to the specified section of data.
 
         May also be overridden if different functionality is desired.
         """
-        if self._all is None:
-            self._all = self._init_graphs()
+        if self._all_g is None:
+            self._all_g = self._init_graphs()
 
-        return split.get(self._all)
+        return split.get(self._all_g)
 
     @abstractmethod
     def _get_docs(self) -> list[Doc]:

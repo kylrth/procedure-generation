@@ -7,9 +7,9 @@ import random
 import re
 import sys
 from os import PathLike
-from typing import Any, Iterable
+from typing import Any, Iterable, Sequence, cast
 
-from .base import Dataset, Doc, GraphProcedure, LinearProcedure
+from .base import Dataset, Doc, GraphProcedure, LinearProcedure, Split
 
 
 _step_prefixes = re.compile(r"^\s*(?:\d+(?:\.|\))\s*|-)\s*(.*)$")
@@ -47,6 +47,7 @@ class RecipeNLG(Dataset):
     def __init__(self, data_dir: str | PathLike, n: int = sys.maxsize):
         super().__init__(data_dir)
         self.reservoir = Reservoir(n, seed=42)
+        self.g_train = None
 
     def _init_procedures(self) -> list[LinearProcedure]:
         with (self.dir / "RecipeNLG" / "full_dataset.csv").open(newline="") as f:
@@ -65,13 +66,44 @@ class RecipeNLG(Dataset):
     def _init_graphs(self) -> list[GraphProcedure]:
         d = self.dir / "graphs" / "recipenlg"
         file_list = d.glob("*.pkl")
-        graph_list = []
+        graph_list: list[GraphProcedure] = []
         for file in file_list:
             with file.open("rb") as f:
                 graph = pickle.load(f)
             graph_list.append(graph)
 
-        return graph_list
+        # move all short recipes (<3 nodes) from val/test into train because they are often
+        # low-quality
+        # This means we need to keep track of these ourselves instead of letting Dataset do it,
+        # because we're changing the ratios.
+        self.g_train = Split.TRAIN.get(graph_list)
+        self.g_val: list[GraphProcedure] = []
+        self.g_test: list[GraphProcedure] = []
+
+        for ex in Split.VAL.get(graph_list):
+            if ex.counts()[0] >= 3:
+                self.g_val.append(ex)
+        for ex in Split.TEST.get(graph_list):
+            if ex.counts()[0] >= 3:
+                self.g_test.append(ex)
+
+        return []  # not used, we override the graphs method
+
+    def graphs(self, split: Split) -> Sequence[GraphProcedure]:
+        if self.g_train is None:
+            self._init_graphs()
+
+        # we override so we can maintain the separate lists; see _init_graphs
+        out = []
+        for s in split:
+            match s:
+                case Split.TRAIN:
+                    out.extend(cast(Sequence[GraphProcedure], self.g_train))
+                case Split.VAL:
+                    out.extend(self.g_val)
+                case Split.TEST:
+                    out.extend(self.g_test)
+        return out
 
     def _get_docs(self) -> list[Doc]:
         # TODO get generic cooking material
