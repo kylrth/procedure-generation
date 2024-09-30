@@ -245,6 +245,22 @@ class Graph[T, U: _Comparable]:
             data = self.missing.data if isinstance(self.missing, Node) else self.missing.content
             return f"{t} {data} was not reachable by back-traversal"
 
+    def counts(self) -> tuple[int, int]:
+        """The number of unique Edges and Nodes in the Graph."""
+        seen: set[Node[T, U]] = set()
+        edges = {"": 0}  # so we can access the count inside the function
+
+        def count(e: Edge[T, U]) -> DFSAction:
+            if e.from_ is not None:
+                seen.add(e.from_)
+            if e.to is not None:
+                seen.add(e.to)
+            edges[""] += 1
+            return DFSAction.CONTINUE
+
+        self.back_dfs(count)
+        return len(seen), edges[""]
+
     def copy(self) -> Self:
         """Create a copy of the Graph by duplicating all Nodes and Edges.
 
