@@ -16,7 +16,7 @@ from evaluation.number_comparison import NumberComparison
 from evaluation.overall_score import OverallScore
 from evaluation.rouge_score import ScoreROUGE
 from evaluation.tfidf import TfIdf
-from systems import Model
+from model import Model
 from utils import spread_gather
 
 

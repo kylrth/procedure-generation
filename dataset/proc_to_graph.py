@@ -1,14 +1,13 @@
 import json
-import os
-import pickle
+import logging
 import random
+from typing import Awaitable, Callable, Type
 
-from dataset import LinearProcedure
-from dataset.base import GraphProcedure as GProcedure
-from dataset.base import Step
 from graph import Graph, Node
 from model import Model
-from utils import log
+
+from .base import GraphProcedure as GProcedure
+from .base import LinearProcedure, Step
 
 
 random.seed(1)
@@ -124,9 +123,7 @@ human_instruction_corr_edges = (
 )
 
 
-async def get_node_list(
-    logger: log.InstanceLogger, sys_prompt: str, hum_prompt: str, model: Model, seed: int = None
-):
+async def get_node_list(sys_prompt: str, hum_prompt: str, model: Model, seed: int | None = None):
     out = model.build_prompt(hum_prompt, sys_prompt)
     if seed is not None:
         node_completion = await model.generate(out, seed=seed)
@@ -135,15 +132,12 @@ async def get_node_list(
 
     try:
         nodes = json.loads(node_completion)["Nodes"]
-    except:
-        # print(node_completion)
-        raise ValueError
+    except Exception as e:  # make sure any exception type here is caught by the outer except
+        raise ValueError from e
     return nodes
 
 
-async def refine_node(
-    logger: log.InstanceLogger, sys_prompt: str, hum_prompt: str, model: Model, seed: int = None
-):
+async def refine_node(sys_prompt: str, hum_prompt: str, model: Model, seed: int | None = None):
     out = model.build_prompt(hum_prompt, sys_prompt)
     if seed is not None:
         node_completion = await model.generate(out, seed=seed)
@@ -151,15 +145,12 @@ async def refine_node(
         node_completion = await model.generate(out)
     try:
         node = json.loads(node_completion)
-    except:
-        # print(node_completion)
-        raise ValueError
+    except Exception as e:  # make sure any exception type here is caught by the outer except
+        raise ValueError from e
     return node
 
 
-async def get_edge_list(
-    logger: log.InstanceLogger, sys_prompt: str, hum_prompt: str, model: Model, seed: int = None
-):
+async def get_edge_list(sys_prompt: str, hum_prompt: str, model: Model, seed: int | None = None):
     out = model.build_prompt(hum_prompt, sys_prompt)
     if seed is not None:
         edge_completion = await model.generate(out, seed=seed)
@@ -168,15 +159,13 @@ async def get_edge_list(
     try:
         nodes = json.loads(edge_completion)["Nodes"]
         edges = json.loads(edge_completion)["Edges"]
-        # output_node = json.loads(edge_completion)["Output Node"]
-    except:
-        # print(edge_completion)
-        raise ValueError
+    except Exception as e:  # make sure any exception type here is caught by the outer except
+        raise ValueError from e
     return nodes, edges
 
 
 async def get_corrected_nodes_edges(
-    logger: log.InstanceLogger, sys_prompt: str, hum_prompt: str, model: Model, seed: int = None
+    sys_prompt: str, hum_prompt: str, model: Model, seed: int | None = None
 ):
     out = model.build_prompt(hum_prompt, sys_prompt)
     if seed is not None:
@@ -186,9 +175,8 @@ async def get_corrected_nodes_edges(
     try:
         nodes = json.loads(edge_completion)["Nodes"]
         edges = json.loads(edge_completion)["Edges"]
-    except:
-        # print(edge_completion)
-        raise ValueError
+    except Exception as e:  # make sure any exception type here is caught by the outer except
+        raise ValueError from e
     return nodes, edges
 
 
@@ -230,19 +218,18 @@ def make_graph_object(nodes, edges, proc_title):
 
         if node_from == node_to:
             continue
-        else:
-            inp_out_list = edge["match"]
-            assert len(inp_out_list) > 0
-            node_from.new_edge_to(node_to, inp_out_list[0])
 
-            inp_list = node_inp_dict[edge["to"]]
-            if inp_out_list[0] in inp_list:
-                inp_list.remove(inp_out_list[0])
-            if len(inp_out_list) == 2:
-                if inp_out_list[1] in inp_list:
-                    inp_list.remove(inp_out_list[1])
+        inp_out_list = edge["match"]
+        assert len(inp_out_list) > 0  # noqa: S101  # AssertionError will be caught
+        node_from.new_edge_to(node_to, inp_out_list[0])
 
-            node_inp_dict[edge["to"]] = inp_list
+        inp_list = node_inp_dict[edge["to"]]
+        if inp_out_list[0] in inp_list:
+            inp_list.remove(inp_out_list[0])
+        if len(inp_out_list) == 2 and inp_out_list[1] in inp_list:
+            inp_list.remove(inp_out_list[1])
+
+        node_inp_dict[edge["to"]] = inp_list
 
     # Add input and output
     for name, inp_list in node_inp_dict.items():
@@ -254,26 +241,25 @@ def make_graph_object(nodes, edges, proc_title):
     return GProcedure(*(node_dict.values()))
 
 
-async def get_graph_from_linear_procedure(
-    logger: log.InstanceLogger,
+async def build_graph_from_linear_procedure(
     proc: LinearProcedure,
     model: Model,
     dataset: str,
-    seed: int = None,
-):
+    seed: int | None = None,
+) -> GProcedure:
     steps = proc.steps
     ing = proc.input_ if dataset == "recipenlg" else None
 
     sys_prompt = instructions[dataset]
     hum_prompt_nodes = human_instruction_nodes[dataset].format(procedure_steps=steps, ing=ing)
-    orig_nodes = await get_node_list(logger, sys_prompt, hum_prompt_nodes, model, seed)
+    orig_nodes = await get_node_list(sys_prompt, hum_prompt_nodes, model, seed)
 
     for i, node in enumerate(orig_nodes):
         hum_prompt_node_refine = human_instruction_node_refine.format(node=node)
-        orig_nodes[i] = await refine_node(logger, sys_prompt, hum_prompt_node_refine, model, seed)
+        orig_nodes[i] = await refine_node(sys_prompt, hum_prompt_node_refine, model, seed)
 
     hum_prompt_edges = human_instruction_edges.format(graph_nodes=orig_nodes)
-    nodes, edges = await get_edge_list(logger, sys_prompt, hum_prompt_edges, model, seed)
+    nodes, edges = await get_edge_list(sys_prompt, hum_prompt_edges, model, seed)
 
     edges = filter_edges(nodes, edges)
 
@@ -284,21 +270,21 @@ async def get_graph_from_linear_procedure(
             missed_nodes = check_node_edge_valid(nodes, edges)
             if len(missed_nodes) == 0:
                 valid = True
-            else:
-                print("going into correction mode")
-                hum_prompt_corr_edges = human_instruction_corr_edges.format(
-                    graph_nodes=nodes, edges=edges, missing_nodes=missed_nodes
-                )
-                nodes, edges = await get_corrected_nodes_edges(
-                    logger, sys_prompt, hum_prompt_corr_edges, model, seed
-                )
-                seed = random.randint(0, 1000)
-                num_tries -= 1
+                break
+
+            hum_prompt_corr_edges = human_instruction_corr_edges.format(
+                graph_nodes=nodes, edges=edges, missing_nodes=missed_nodes
+            )
+            nodes, edges = await get_corrected_nodes_edges(
+                sys_prompt, hum_prompt_corr_edges, model, seed
+            )
+            seed = random.randint(0, 1000)
+            num_tries -= 1
     proc_graph = make_graph_object(nodes, edges, proc.output)
     return proc_graph
 
 
-async def create_simple_linear_graph(logger: log.InstanceLogger, proc: LinearProcedure):
+async def create_simple_linear_graph(proc: LinearProcedure):
     node_list = []
     for i, step in enumerate(proc.steps):
         step_obj = Step(f"Step {i}", step)
@@ -310,30 +296,39 @@ async def create_simple_linear_graph(logger: log.InstanceLogger, proc: LinearPro
     return GProcedure(*node_list)
 
 
-async def create_graphs_for_graph_store(
-    logger: log.InstanceLogger,
-    proc_id: int,
+async def with_retries[
+    T
+](
+    f: Callable[[int | None], Awaitable[T]], *, exc: tuple[Type[Exception], ...], retries: int = 5
+) -> T:
+    seed = None
+    for _ in range(retries):
+        try:
+            return await f(seed)
+        except exc:
+            seed = random.randint(0, 1000)
+
+    raise MaxRetriesError
+
+
+class MaxRetriesError(Exception):
+    def __init__(self):
+        super().__init__("maximum retries reached")
+
+
+async def build_graph_with_retries(
+    logger: logging.Logger,
     proc: LinearProcedure,
     model: Model,
     dataset: str,
-    seed: int | None = None,
-    save_pkl: bool = True,
-):
-    num_retries = 5
-    while num_retries > 0:
-        try:
-            graph = await get_graph_from_linear_procedure(logger, proc, model, dataset, seed=seed)
-            if save_pkl:
-                os.makedirs(f"./dataset/graphs/{dataset}", exist_ok=True)
-                with open(f"./dataset/graphs/{dataset}/{proc_id}.pkl", "wb") as f:
-                    pickle.dump(graph, f)
-                return
-            else:
-                return graph
-        except (Graph.UnreachableError, ValueError, KeyError, AssertionError, TypeError):
-            seed = random.randint(0, 1000)
-            num_retries -= 1
-    print(f"Skipping Procedure {proc_id}")
-    if not save_pkl:
-        graph = await create_simple_linear_graph(logger, proc)
-        return graph
+) -> GProcedure:
+    """Build the graph and retry up to 4 times with different seeds if it fails. If it fails all
+    those times, create a simple linear graph as a failure mode."""
+    try:
+        return await with_retries(
+            lambda seed: build_graph_from_linear_procedure(proc, model, dataset, seed=seed),
+            exc=(Graph.UnreachableError, ValueError, KeyError, AssertionError, TypeError),
+        )
+    except MaxRetriesError:
+        logger.warning("max retries reached; building simple linear graph")
+        return await create_simple_linear_graph(proc)

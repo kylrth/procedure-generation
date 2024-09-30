@@ -55,7 +55,7 @@ class RAG(FewShot):
 
         # call model
         completion = await self.model.generate(prompt)
-        res = await self._make_result(prompt, completion, query, input_)
+        res = await self._make_result(logger, prompt, completion, query, input_)
 
         if not self.critic:
             return res

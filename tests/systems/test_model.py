@@ -1,11 +1,13 @@
 import asyncio
 import unittest
+from typing import cast
 
 from langchain_community.llms.fake import FakeListLLM
+from langchain_core.language_models import BaseLanguageModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 
 from dataset import Doc
-from systems.model import Model
+from model import Model
 
 
 class FakeChatModel:
@@ -30,7 +32,7 @@ class TestModel(unittest.TestCase):
 
     def test_basic_chat(self):
         response = "Hi there, I'm a fake chat model."
-        model = Model(FakeChatModel(response), True)
+        model = Model(cast(BaseLanguageModel, FakeChatModel(response)), True)
 
         out = asyncio.run(model.generate("What could possibly go wrong?"))
 

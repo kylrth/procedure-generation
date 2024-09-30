@@ -1,9 +1,10 @@
+import pickle
 import random
 from os import PathLike
 
 import champ_dataset
-import pickle
-from .base import Dataset, Doc, LinearProcedure, GraphProcedure
+
+from .base import Dataset, Doc, GraphProcedure, LinearProcedure
 
 
 def load_dataset():
@@ -64,8 +65,8 @@ class CHAMP(Dataset):
         return out
 
     def _init_graphs(self) -> list[GraphProcedure]:
-        dir = self.dir / "graphs" / "champ"
-        file_list = dir.glob("*.pkl")
+        d = self.dir / "graphs" / "champ"
+        file_list = d.glob("*.pkl")
         graph_list = []
         for file in file_list:
             with file.open("rb") as f:

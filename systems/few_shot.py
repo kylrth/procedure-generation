@@ -2,7 +2,7 @@ from typing import ClassVar
 
 from langchain_core.messages import BaseMessage
 
-from dataset import LinearProcedure, create_graphs_for_graph_store
+from dataset import LinearProcedure, build_graph_with_retries
 from model import Model
 from utils import log
 
@@ -31,7 +31,7 @@ class FewShot(System):
         prompt = await self.build_prompt(logger, query, input_)
         completion = await self.model.generate(prompt)
 
-        return await self._make_result(prompt, completion, query, input_)
+        return await self._make_result(logger, prompt, completion, query, input_)
 
     _instructions: ClassVar[dict[str, str]] = {
         "lcstep": (
@@ -88,13 +88,16 @@ class FewShot(System):
         return out
 
     async def _make_result(
-        self, prompt: str | list[BaseMessage], completion: str, query: str, input_: str
+        self,
+        logger: log.InstanceLogger,
+        prompt: str | list[BaseMessage],
+        completion: str,
+        query: str,
+        input_: str,
     ):
         proc_steps = self.parse_completion(completion)
         proc = LinearProcedure(input_, query, proc_steps)
-        graph = await create_graphs_for_graph_store(
-            None, -1, proc, self.model, self.dataset, save_pkl=False
-        )
+        graph = await build_graph_with_retries(logger.normal, proc, self.model, self.dataset)
         return Response(
             answer=graph,
             model=self.model.name,

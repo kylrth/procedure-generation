@@ -4,7 +4,7 @@ import sys
 import textwrap
 from typing import ClassVar
 
-from dataset import GraphProcedure, LinearProcedure, create_graphs_for_graph_store
+from dataset import GraphProcedure, LinearProcedure, build_graph_with_retries
 from model import Model
 from retrieval import GraphProcedureStore
 from utils import log
@@ -54,8 +54,8 @@ class AAG(System):
 
         candidate_steps = await self.update_steps(logger, None, input_, knowledge_str)
         candidate_linear = LinearProcedure(input_, query, candidate_steps)
-        candidate = await create_graphs_for_graph_store(
-            logger, -1, candidate_linear, self.model, self.dataset, save_pkl=False
+        candidate = await build_graph_with_retries(
+            logger.normal, candidate_linear, self.model, self.dataset
         )
 
         if self.use_critic:
@@ -70,8 +70,8 @@ class AAG(System):
                 knowledge_str = self.format_knowledge(queries, answers)
                 candidate_steps = await self.update_steps(logger, candidate, input_, knowledge_str)
                 candidate_linear = LinearProcedure(input_, query, candidate_steps)
-                candidate = await create_graphs_for_graph_store(
-                    logger, -1, candidate_linear, self.model, self.dataset, save_pkl=False
+                candidate = await build_graph_with_retries(
+                    logger.normal, candidate_linear, self.model, self.dataset
                 )
                 max_critic_cycles -= 1
         return Response(
@@ -225,9 +225,9 @@ class AAG(System):
             msg_prompt = (
                 f"[BEGIN KNOWLEDGE]\n{knowledge_str}\n[END KNOWLEDGE]"
                 "\n\n"
-                f"[BEGIN CANDIDATE]\n{str(candidate)}\n[END CANDIDATE]"
+                f"[BEGIN CANDIDATE]\n{candidate!s}\n[END CANDIDATE]"
                 "\n\n"
-                + +self._prompt_inst_with_cand[self.dataset].format(
+                + self._prompt_inst_with_cand[self.dataset].format(
                     query=candidate.get_title(), input_=input_
                 )
             )

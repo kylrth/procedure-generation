@@ -4,6 +4,8 @@
 
 import shutup
 
+from retrieval.embedder import CachingEmbedder
+
 shutup.please()
 
 import argparse
@@ -11,17 +13,16 @@ import asyncio
 import logging
 import random
 import sys
+import time
 import traceback
 from pathlib import Path
 
 import dataset
 import retrieval
-from dataset import GraphProcedure
-from systems import System, AAG, FewShot, ReAct, RAG
+from model import Model
+from systems import AAG, RAG, FewShot, ReAct, System
 from utils import log, spread_gather
 from utils.weaviate import NiceWeaviate
-import time
-from model import Model
 
 
 async def generate_and_record(
@@ -29,7 +30,7 @@ async def generate_and_record(
     human: log.HumanLogger,
     model: System,
     id_: int,
-    p: GraphProcedure,
+    p: dataset.GraphProcedure,
 ):
     """Generate a procedure for this item with the model, and log the result."""
     with human.for_id(id_) as hlog:
@@ -39,8 +40,8 @@ async def generate_and_record(
             res = await model.generate(hlog, p.get_title(), p.get_inputs())
             hlog.write("\nFINISHED GENERATING\n\n")
 
-            hlog.write(f"BEGIN GENERATED:\n{str(res.answer)}\nEND GENERATED\n")
-            hlog.write(f"BEGIN REFERENCE:\n{str(p)}\nEND REFERENCE\n")
+            hlog.write(f"BEGIN GENERATED:\n{res.answer!s}\nEND GENERATED\n")
+            hlog.write(f"BEGIN REFERENCE:\n{p!s}\nEND REFERENCE\n")
             if res.input_tokens != -1 or res.output_tokens != -1:
                 hlog.write(f"used {res.input_tokens} input and {res.output_tokens} output tokens\n")
         except Exception:  # noqa: BLE001  # logging the exception for tracing purposes
@@ -63,7 +64,7 @@ def int_leq(v: int):
     return validate
 
 
-async def main(args):
+async def main(args):  # noqa: PLR0912, PLR0915
     logger = logging.getLogger("main")
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
@@ -181,7 +182,7 @@ async def main(args):
                 f"{tot_time / 1e9:.1f}s"
             )
         finally:
-            if store is not None:
+            if store is not None and isinstance(store.embedder, CachingEmbedder):
                 store.embedder.flush()
 
 
