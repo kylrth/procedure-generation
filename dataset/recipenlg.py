@@ -72,14 +72,12 @@ class RecipeNLG(Dataset):
                 graph = pickle.load(f)
             graph_list.append(graph)
 
-        # move all short recipes (<3 nodes) from val/test into train because they are often
-        # low-quality
+        # remove all short recipes (<3 nodes) from val/test because they are often low-quality
         # This means we need to keep track of these ourselves instead of letting Dataset do it,
         # because we're changing the ratios.
         self.g_train = Split.TRAIN.get(graph_list)
         self.g_val: list[GraphProcedure] = []
         self.g_test: list[GraphProcedure] = []
-
         for ex in Split.VAL.get(graph_list):
             if ex.counts()[0] >= 3:
                 self.g_val.append(ex)
@@ -87,6 +85,25 @@ class RecipeNLG(Dataset):
             if ex.counts()[0] >= 3:
                 self.g_test.append(ex)
 
+        # these graphs are malformed; skip
+        # fmt: off
+        bad_ids = [
+            5890, 8324, 8467, 7706, 4908, 3505, 7361, 6594, 9541, 1496, 8283, 2012, 6237, 7397,
+            3435, 3436, 5484, 8815, 8699,
+        ]
+        # fmt: on
+        for i in sorted(bad_ids, reverse=True):
+            if i < len(self.g_train):
+                del self.g_train[i]
+                continue
+
+            i -= len(self.g_train)
+            if i < len(self.g_val):
+                del self.g_val[i]
+                continue
+
+            i -= len(self.g_val)
+            del self.g_test[i]
         return []  # not used, we override the graphs method
 
     def graphs(self, split: Split) -> Sequence[GraphProcedure]:

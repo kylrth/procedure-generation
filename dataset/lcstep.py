@@ -164,6 +164,9 @@ class LCStep(Dataset):
                 graph = pickle.load(f)
             graph_list.append(graph)
 
+        # this graph is malformed; skip
+        del graph_list[32]
+
         return graph_list
 
     def _get_docs(self) -> list[Doc]:
