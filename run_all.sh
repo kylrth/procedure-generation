@@ -5,7 +5,6 @@
 set -e
 
 datasets=("champ" "lcstep" "recipenlg")
-embedders=("hf-all-mpnet-base-v2")
 systems=("zeroshot" "fewshot" "rag" "react" "aag")
 
 for dataset in "${datasets[@]}"
@@ -14,30 +13,34 @@ do
     do
         for system in "${systems[@]}"
         do
-            flags="--dataset $dataset --embedder $embedder --system $system"
+            flags="--ds $dataset --system $system"
             echo "running with flags: $flags"
             $@ $flags
 
-            # RAG has an optional critic
+            # RAG has an optional critic and hierarchical retrieval
             if [ "$system" == "rag" ]
             then
-                flags="--dataset $dataset --embedder $embedder --system $system --critic"
+                flags="--ds $dataset --system $system --critic"
+                echo "running with flags: $flags"
+                $@ $flags
+
+                flags="--ds $dataset --system $system --hierarchical-retrieval"
                 echo "running with flags: $flags"
                 $@ $flags
             fi
 
-            # AAG has optional summarization and critic
+            # AAG can ablate critic and hierarchical retrieval
             if [ "$system" == "aag" ]
             then
-                flags="--dataset $dataset --embedder $embedder --system $system --summarize --critic"
+                flags="--ds $dataset --system $system --no-critic"
                 echo "running with flags: $flags"
                 $@ $flags
 
-                flags="--dataset $dataset --embedder $embedder --system $system --summarize"
+                flags="--ds $dataset --system $system --no-hierarchical-retrieval"
                 echo "running with flags: $flags"
                 $@ $flags
 
-                flags="--dataset $dataset --embedder $embedder --system $system --critic"
+                flags="--ds $dataset --system $system --no-critic --no-hierarchical-retrieval"
                 echo "running with flags: $flags"
                 $@ $flags
             fi
