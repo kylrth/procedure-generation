@@ -258,3 +258,10 @@ class CachingEmbedder(Embedder):
             with filepath.open("rb") as f:
                 for k, v in pickle.load(f).items():
                     self.cache[k] = v
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, tb):
+        self.flush()
+        return False

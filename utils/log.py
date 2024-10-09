@@ -3,6 +3,7 @@ import io
 import json
 import logging
 import os
+import pickle
 import textwrap
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,7 +11,7 @@ from typing import ClassVar, Iterable, cast
 
 from langchain_core.messages import BaseMessage
 
-from dataset import LinearProcedure
+from dataset import GraphProcedure, LinearProcedure
 
 
 @dataclass
@@ -67,10 +68,12 @@ class CSVLogger:
 # for logging while generating results for a particular instance
 class InstanceLogger:
     _wrapped: io.TextIOWrapper
+    _out: Path
     _normal: logging.Logger | None = None
 
-    def __init__(self, wrapped: io.TextIOWrapper):
-        self._wrapped = wrapped
+    def __init__(self, root: Path, id_: int):
+        self._wrapped = (root / f"{id_}.log").open("w")
+        self._out = root / f"{id_}.pkl"
 
     @property
     def name(self) -> str:
@@ -94,6 +97,11 @@ class InstanceLogger:
         self._wrapped.write(f"BEGIN {kind}\n")
         self._wrapped.write(textwrap.indent(messages_to_string(p), "  "))
         self._wrapped.write(f"\nEND {kind}\n")
+
+    def result(self, want: GraphProcedure, got: GraphProcedure):
+        """Pickle the reference and generated procedures together for later evaluation."""
+        with self._out.open("wb") as f:
+            pickle.dump((want, got), f)
 
     @property
     def normal(self) -> logging.Logger:
@@ -125,7 +133,7 @@ class HumanLogger:
 
     def for_id(self, id_: int) -> InstanceLogger:
         """Return a logger for the specified example ID."""
-        return InstanceLogger((self.path / f"{id_}.log").open("w"))
+        return InstanceLogger(self.path, id_)
 
 
 def messages_to_string(messages: str | list[BaseMessage]) -> str:
