@@ -11,10 +11,10 @@ from weaviate.collections.classes.batch import BatchObjectReturn, BatchReference
 from weaviate.types import UUID
 
 from dataset import GraphProcedure, Step
+from embedder import CachingEmbedder, Embedder
 from graph import Edge as GEdge
 from graph import Graph as GGraph
 from graph import Node as GNode
-from retrieval.embedder import CachingEmbedder, Embedder
 from utils import spread_gather
 
 

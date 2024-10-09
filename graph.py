@@ -338,6 +338,16 @@ class Graph[T, U: _Comparable]:
         self.back_dfs(topo_enter, after=topo_exit)
         return ordered
 
+    def compute_diameter(self, node: Node[T, U]):  # Pass output node  when calling first
+        if node is None:
+            return 0
+        diameter = 0
+        parents_of_node = [e.from_ for e in node.incoming]
+        for par_node in parents_of_node:
+            diameter = max(diameter, self.compute_diameter(par_node) + 1)
+
+        return diameter
+
     class DAGError(Exception):
         def __init__(self):
             super().__init__("graph has a loop")

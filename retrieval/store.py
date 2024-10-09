@@ -8,7 +8,7 @@ import numpy as np
 import weaviate
 from weaviate import classes as wvc
 
-from .embedder import CachingEmbedder, embedder_from_name
+from embedder import CachingEmbedder, embedder_from_name
 
 
 class Store(ABC):
