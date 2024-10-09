@@ -92,7 +92,7 @@ class GraphProcedureStore:
             ],
         )
 
-    async def populate(self, logger: logging.Logger, procs: Sequence[GraphProcedure]):
+    async def populate(self, logger: logging.Logger, procs: Sequence[GraphProcedure], w: int = 10):
         # embed
         logger.debug("embedding %d graph procedures", len(procs))
         formatted = [str(p) for p in procs]
@@ -102,14 +102,25 @@ class GraphProcedureStore:
             # empty embeddings cache to disk because we likely won't need them during generation
             self.embedder.flush()
 
+        success_stats = {
+            "failed": 0,
+            "uploaded": 0,
+        }
+
         # insert to Weaviate
         async def _task(g_v: tuple[GraphProcedure, np.ndarray]):
-            await self.add_graph(logger, g_v[0], g_v[1])
+            try:
+                await self.add_graph(logger, g_v[0], g_v[1])
+                success_stats["uploaded"] += 1
+            except ValueError:
+                success_stats["failed"] += 1
 
         use_tqdm = logger.getEffectiveLevel() >= logging.DEBUG
         await spread_gather(
-            _task, zip(procs, vectors), n=10, length=len(procs) if use_tqdm else None
+            _task, zip(procs, vectors), n=w, length=len(procs) if use_tqdm else None
         )
+
+        print(success_stats)
 
     def _raise_errors(self, logger: logging.Logger, res: BatchObjectReturn | BatchReferenceReturn):
         if not res.has_errors:
@@ -124,16 +135,16 @@ class GraphProcedureStore:
         self,
         logger: logging.Logger,
         edges: Sequence[Edge],
-        seen: dict[int, UUID],
+        seen: dict[Edge, UUID],
         prev_uuids: Sequence[UUID | None] | None = None,
     ) -> Sequence[UUID]:
         if prev_uuids is None:
             prev_uuids = [None] * len(edges)
 
         for e in edges:
-            if id(e) in seen:
+            if e in seen:
                 raise ValueError("malformed graph: encountered the same edge twice")
-        if len({id(e) for e in edges}) != len(edges):
+        if len(set(edges)) != len(edges):
             raise ValueError("malformed graph: encountered the same edge twice")
 
         res = await self.edges.data.insert_many(
@@ -166,7 +177,7 @@ class GraphProcedureStore:
 
         # mark as seen and store UUIDs
         for e, uuid in zip(edges, edge_uuids, strict=True):
-            seen[id(e)] = uuid
+            seen[e] = uuid
 
         return edge_uuids
 
@@ -174,7 +185,7 @@ class GraphProcedureStore:
         self,
         logger: logging.Logger,
         nodes: Sequence[Node],
-        seen: dict[int, UUID],
+        seen: dict[Node, UUID],
         prev_uuids: Sequence[UUID | None] | None = None,
     ) -> tuple[Sequence[UUID], Sequence[bool]]:
         if prev_uuids is None:
@@ -185,13 +196,13 @@ class GraphProcedureStore:
         only_refs = []
         skipped: list[bool] = []
         for n, uuid in zip(nodes, prev_uuids, strict=True):
-            if id(n) in seen:
+            if n in seen:
                 # we've seen this node before, but we still need to add references to the outgoing
                 # edge we discovered it through
                 if uuid is not None:
                     only_refs.append(
                         wvc.data.DataReference(
-                            from_uuid=seen[id(n)],
+                            from_uuid=seen[n],
                             from_property="outgoing",
                             to_uuid=uuid,
                         )
@@ -256,8 +267,8 @@ class GraphProcedureStore:
         """Add a single graph to the store."""
         # we'll traverse the graph starting from the outputs, adding nodes and edges to their
         # collections and setting up references
-        seen_edges: dict[int, UUID] = {}
-        seen_nodes: dict[int, UUID] = {}
+        seen_edges: dict[Edge, UUID] = {}
+        seen_nodes: dict[Node, UUID] = {}
 
         # start with outputs
         output_uuids = await self._insert_edges(logger, g.outputs, seen_edges)
