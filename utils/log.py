@@ -7,11 +7,10 @@ import pickle
 import textwrap
 from dataclasses import dataclass
 from pathlib import Path
-from typing import ClassVar, Iterable, cast
+from typing import Any, ClassVar, Iterable, cast
 
 from langchain_core.messages import BaseMessage
-
-from dataset import GraphProcedure, LinearProcedure
+from dataset import GraphProcedure
 
 
 @dataclass
@@ -20,7 +19,7 @@ class Result:
 
     ID: int
     model: str
-    gold: LinearProcedure
+    gold: Any
     completion: list[str]
 
 

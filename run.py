@@ -21,9 +21,9 @@ from weaviate import WeaviateAsyncClient
 
 import dataset
 import retrieval
+from embedder import CachingEmbedder, embedder_from_name
 from dataset import GraphProcedure
 from model import Model
-from retrieval.embedder import Embedder
 from systems import AAG, RAG, FewShot, ReAct, System
 from utils import log, spread_gather
 from utils.experiment import Config, help
