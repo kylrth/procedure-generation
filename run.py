@@ -106,7 +106,7 @@ class SystemOption(StrEnum):
         await store.setup_collection()
 
         logger.info(f"{self.fancy_name}: uploading {len(train)} procedures to Weaviate collection")
-        await store.populate(logger, train)
+        await store.populate(logger, train, w=exp.workers)
 
         match self:
             case SystemOption.RAG:
