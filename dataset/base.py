@@ -171,11 +171,16 @@ class GraphProcedure(Graph[Step, str], ABC):
 
         for _ in range(num_cycles):
             for node in reversed(node_list):
-                embeds_stack = np.stack(
+                stack_list = [node.data]
+                stack_list.extend(
                     [in_edge.from_.data for in_edge in node.incoming if in_edge.from_ is not None]
                 )
-                max_pooled_embed = np.max(embeds_stack, axis=0)
-                node.data = max_pooled_embed
+
+                if len(stack_list) == 1:
+                    continue
+                else:
+                    max_pooled_embed = np.max(np.stack(stack_list), axis=0)
+                    node.data = max_pooled_embed
 
         embed_to_return = node_list[-1].data
         return embed_to_return / np.linalg.norm(embed_to_return)
