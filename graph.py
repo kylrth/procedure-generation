@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from enum import Enum, auto
-from typing import Callable, Protocol, Self, Sequence, cast
+from typing import Awaitable, Callable, Protocol, Self, Sequence, cast
 
 
 class _Comparable(Protocol):
@@ -156,6 +156,18 @@ class Graph[T, U: _Comparable]:
         visited: set[Node[T, U]] = set()
         self._dfs(self.inputs, f, after, visited)
 
+    async def adfs(
+        self,
+        f: Callable[[Edge[T, U]], Awaitable[DFSAction]],
+        after: Callable[[Edge[T, U]], Awaitable[None]] | None = None,
+    ):
+        """Async version of dfs."""
+        if after is None:
+            after = self._ano_after
+
+        visited: set[Node[T, U]] = set()
+        await self._adfs(self.inputs, f, after, visited)
+
     def back_dfs(
         self,
         f: Callable[[Edge[T, U]], DFSAction],
@@ -172,6 +184,18 @@ class Graph[T, U: _Comparable]:
 
         visited: set[Node[T, U]] = set()
         self._dfs(self.outputs, f, after, visited, backward=True)
+
+    async def aback_dfs(
+        self,
+        f: Callable[[Edge[T, U]], Awaitable[DFSAction]],
+        after: Callable[[Edge[T, U]], Awaitable[None]] | None = None,
+    ):
+        """Async version of back_dfs."""
+        if after is None:
+            after = self._ano_after
+
+        visited: set[Node[T, U]] = set()
+        await self._adfs(self.outputs, f, after, visited, backward=True)
 
     @staticmethod
     def _no_after(e: Edge[T, U]):
@@ -208,6 +232,44 @@ class Graph[T, U: _Comparable]:
                 return action
 
             after(e)
+
+        return DFSAction.CONTINUE
+
+    @staticmethod
+    async def _ano_after(e: Edge[T, U]):
+        pass
+
+    @staticmethod
+    async def _adfs(
+        es: Sequence[Edge[T, U]],
+        f: Callable[[Edge[T, U]], Awaitable[DFSAction]],
+        after: Callable[[Edge[T, U]], Awaitable[None]],
+        visited: set[Node[T, U]],
+        *,
+        backward: bool = False,
+    ) -> DFSAction:
+        for e in es:
+            action = await f(e)
+            if action == DFSAction.QUIT:
+                return action
+            if action == DFSAction.SKIP:
+                continue
+
+            nn = e.from_ if backward else e.to
+
+            if nn is None:
+                continue
+            if nn in visited:
+                continue
+
+            visited.add(nn)  # mark as visited before continuing to avoid infinite loops
+            action = await Graph._adfs(
+                nn.incoming if backward else nn.outgoing, f, after, visited, backward=backward
+            )
+            if action == DFSAction.QUIT:
+                return action
+
+            await after(e)
 
         return DFSAction.CONTINUE
 
@@ -261,18 +323,28 @@ class Graph[T, U: _Comparable]:
         self.back_dfs(count)
         return len(seen), edges[""]
 
-    def copy(self) -> Self:
-        """Create a copy of the Graph by duplicating all Nodes and Edges.
+    def apply[
+        NT, NU: _Comparable
+    ](
+        self,
+        nf: Callable[[Node[T, U]], NT],
+        ef: Callable[[Edge[T, U]], NU],
+        *,
+        cls: type | None = None,
+    ) -> "Graph[NT, NU]":
+        """Apply nf and ef to each of the Nodes and Edges reachable by back-traversal to create
+        the data and contents for a new Graph.
 
-        Node data and Edge contents are shallow-copied.
+        If cls is provided, it is used to construct the new Graph object instead of the Graph
+        constructor.
         """
-        out = self.__class__()
+        out = cast(Graph[NT, NU], self.__class__() if cls is None else cls())
 
         # keep newly-created nodes so we can refer to them when we come across their old
         # counterparts again
-        visited: dict[Node[T, U], Node[T, U]] = {}
+        visited: dict[Node[T, U], Node[NT, NU]] = {}
 
-        def copy_edge(e: Edge[T, U]) -> DFSAction:
+        def apply_edge(e: Edge[T, U]) -> DFSAction:
             # get our new copy of the to node
             if e.to is None:
                 if e.from_ is None:
@@ -284,26 +356,82 @@ class Graph[T, U: _Comparable]:
 
             if e.from_ is None:
                 # input
-                new_to_node = cast(Node[T, U], new_to_node)  # we already checked this above
-                out.inputs.extend(new_to_node.add_inputs(e.content))
+                new_to_node = cast(Node[NT, NU], new_to_node)  # we already checked this above
+                out.inputs.extend(new_to_node.add_inputs(ef(e)))
                 return DFSAction.CONTINUE
 
             if e.from_ in visited:
                 new_from_node = visited[e.from_]
             else:
                 # construct the new node
-                new_from_node = Node(e.from_.data)
+                new_from_node = Node(nf(e.from_))
                 visited[e.from_] = new_from_node
 
             # node is constructed and stored in `visited`, just need to connect it
             if new_to_node is None:  # output
-                out.outputs.extend(new_from_node.add_outputs(e.content))
+                out.outputs.extend(new_from_node.add_outputs(ef(e)))
             else:
-                new_from_node.new_edge_to(new_to_node, e.content)
+                new_from_node.new_edge_to(new_to_node, ef(e))
             return DFSAction.CONTINUE
 
-        self.back_dfs(copy_edge)
+        self.back_dfs(apply_edge)
         return out
+
+    async def aapply[
+        NT, NU: _Comparable
+    ](
+        self,
+        nf: Callable[[Node[T, U]], Awaitable[NT]],
+        ef: Callable[[Edge[T, U]], Awaitable[NU]],
+        *,
+        cls: type | None = None,
+    ) -> "Graph[NT, NU]":
+        """Async version of apply."""
+        out = cast(Graph[NT, NU], self.__class__() if cls is None else cls())
+
+        # keep newly-created nodes so we can refer to them when we come across their old
+        # counterparts again
+        visited: dict[Node[T, U], Node[NT, NU]] = {}
+
+        async def apply_edge(e: Edge[T, U]) -> DFSAction:
+            # get our new copy of the to node
+            if e.to is None:
+                if e.from_ is None:
+                    raise ValueError("malformed graph: completely empty Edge")
+                # output
+                new_to_node = None
+            else:
+                new_to_node = visited[e.to]
+
+            if e.from_ is None:
+                # input
+                new_to_node = cast(Node[NT, NU], new_to_node)  # we already checked this above
+                out.inputs.extend(new_to_node.add_inputs(await ef(e)))
+                return DFSAction.CONTINUE
+
+            if e.from_ in visited:
+                new_from_node = visited[e.from_]
+            else:
+                # construct the new node
+                new_from_node = Node(await nf(e.from_))
+                visited[e.from_] = new_from_node
+
+            # node is constructed and stored in `visited`, just need to connect it
+            if new_to_node is None:  # output
+                out.outputs.extend(new_from_node.add_outputs(await ef(e)))
+            else:
+                new_from_node.new_edge_to(new_to_node, await ef(e))
+            return DFSAction.CONTINUE
+
+        await self.aback_dfs(apply_edge)
+        return out
+
+    def copy(self) -> Self:
+        """Create a copy of the Graph by duplicating all Nodes and Edges.
+
+        Node data and Edge contents are shallow-copied.
+        """
+        return cast(Self, self.apply(lambda n: n.data, lambda e: e.content, cls=self.__class__))
 
     def topo_sort(self) -> list[Node[T, U]]:
         """Return a topological sort of the nodes, such that no node in the list depends on any
@@ -338,7 +466,7 @@ class Graph[T, U: _Comparable]:
         self.back_dfs(topo_enter, after=topo_exit)
         return ordered
 
-    def compute_diameter(self, node: Node[T, U]):  # Pass output node  when calling first
+    def compute_diameter(self, node: Node[T, U] | None):  # Pass output node  when calling first
         if node is None:
             return 0
         diameter = 0
