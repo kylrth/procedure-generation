@@ -21,7 +21,7 @@ from weaviate import WeaviateAsyncClient
 
 import dataset
 import retrieval
-from embedder import CachingEmbedder, embedder_from_name
+from embedder import CachingEmbedder, Embedder, embedder_from_name
 from dataset import GraphProcedure
 from model import Model
 from systems import AAG, RAG, FewShot, ReAct, System
@@ -192,9 +192,9 @@ class Experiment(Config):
         logger.setLevel(logging.DEBUG)
         return logger
 
-    def make_embedder(self) -> retrieval.CachingEmbedder:
+    def make_embedder(self) -> CachingEmbedder:
         cache_path = self.emb_cache_root / self.system / self.ds / self.embedder
-        return retrieval.CachingEmbedder(retrieval.embedder_from_name(self.embedder), cache_path)
+        return CachingEmbedder(embedder_from_name(self.embedder), cache_path)
 
     @property
     def logdir(self) -> Path:
