@@ -232,12 +232,16 @@ def make_graph_object(nodes, edges, proc_title):
         node_inp_dict[edge["to"]] = inp_list
 
     # Add input and output
+    num_out = 0
     for name, inp_list in node_inp_dict.items():
         node_dict[name].add_inputs(*inp_list)
 
         if len(node_dict[name].outgoing) == 0:
+            num_out += 1
             node_dict[name].add_outputs(proc_title)
 
+    if num_out > 1:
+        raise ValueError(f"{proc_title}: More than one outputs detected")
     return GProcedure(*(node_dict.values()))
 
 
@@ -259,9 +263,9 @@ async def build_graph_from_linear_procedure(
         orig_nodes[i] = await refine_node(sys_prompt, hum_prompt_node_refine, model, seed)
 
     hum_prompt_edges = human_instruction_edges.format(graph_nodes=orig_nodes)
-    nodes, edges = await get_edge_list(sys_prompt, hum_prompt_edges, model, seed)
+    nodes, orig_edges = await get_edge_list(sys_prompt, hum_prompt_edges, model, seed)
 
-    edges = filter_edges(nodes, edges)
+    edges = filter_edges(nodes, orig_edges)
 
     if len(nodes) > 1:
         valid = False
@@ -278,9 +282,12 @@ async def build_graph_from_linear_procedure(
             nodes, edges = await get_corrected_nodes_edges(
                 sys_prompt, hum_prompt_corr_edges, model, seed
             )
+
             seed = random.randint(0, 1000)
             num_tries -= 1
+
     proc_graph = make_graph_object(nodes, edges, proc.output)
+
     return proc_graph
 
 
