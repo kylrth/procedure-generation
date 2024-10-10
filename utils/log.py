@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Any, ClassVar, Iterable, cast
 
 from langchain_core.messages import BaseMessage
-from dataset import GraphProcedure
 
 
 @dataclass
@@ -97,7 +96,7 @@ class InstanceLogger:
         self._wrapped.write(textwrap.indent(messages_to_string(p), "  "))
         self._wrapped.write(f"\nEND {kind}\n")
 
-    def result(self, want: GraphProcedure, got: GraphProcedure):
+    def result(self, want, got):
         """Pickle the reference and generated procedures together for later evaluation."""
         with self._out.open("wb") as f:
             pickle.dump((want, got), f)
