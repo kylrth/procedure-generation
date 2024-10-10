@@ -3,13 +3,12 @@ from dataclasses import dataclass
 from enum import Flag, auto
 from os import PathLike
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Literal, Sequence
 
 import numpy as np
 
 from embedder import Embedder
-from graph import DFSAction, Edge, Graph, Node
-from sklearn.metrics.pairwise import cosine_similarity
+from graph import Edge, Graph, Node
 
 
 @dataclass
@@ -143,58 +142,27 @@ class GraphProcedure(Graph[Step, str], ABC):
         s = ", ".join(o.content for o in self.inputs)
         return s
 
-    async def change_node_to_node_embeds(self, embedder: Embedder) -> Graph[np.ndarray, None]:
+    async def change_node_to_node_embeds(
+        self, embedder: Embedder
+    ) -> Graph[np.ndarray, Literal[""]]:
         """Create a copy of the Graph by duplicating all Nodes and Edges.
 
         Node data and Edge contents are shallow-copied.
         """
-        out = Graph()
 
-        # keep newly-created nodes so we can refer to them when we come across their old
-        # counterparts again
-        visited: dict[Node[Step, str], Node[np.ndarray, None]] = {}
+        async def embed_node(n: Node[Step, str]) -> np.ndarray:
+            str_to_embed = (
+                f"Description: {n.data.desc}\n"
+                f"Inputs: {", ".join([e.content for e in n.incoming])}\n"
+                f"Output: {n.outgoing[0].content}"
+            )
+            node_embed = await embedder.embed([str_to_embed])
+            return node_embed[0]
 
-        async def copy_edge(e: Edge[Step, str]) -> DFSAction:
-            # get our new copy of the to node
-            if e.to is None:
-                if e.from_ is None:
-                    raise ValueError("malformed graph: completely empty Edge")
-                # output
-                new_to_node = None
-            else:
-                new_to_node = visited[e.to]
+        async def _empty_edge(_: Edge[Step, str]):
+            return ""
 
-            if e.from_ is None:
-                # input
-                return DFSAction.CONTINUE
-
-            if e.from_ in visited:
-                new_from_node = visited[e.from_]
-            else:
-                # construct the new node
-                node_embed = await self.embed_node(e.from_, embedder)
-                new_from_node = Node(node_embed)  # Place embed here
-                visited[e.from_] = new_from_node
-
-            # node is constructed and stored in `visited`, just need to connect it
-            if new_to_node is None:  # output
-                out.outputs.extend(new_from_node.add_outputs(None))
-            else:
-                new_from_node.new_edge_to(new_to_node, None)
-            return DFSAction.CONTINUE
-
-        self.back_dfs(copy_edge)
-        return out
-
-    async def embed_node(self, node: Node[Step, str], embedder: Embedder):
-        str_to_embed = (
-            f"Description: {node.data.desc}\n"
-            f"Inputs: {", ".join([e.content for e in node.incoming])}\n"
-            f"Output: {node.outgoing[0].content}"
-        )
-
-        node_embed = await embedder.embed([str_to_embed])
-        return node_embed[0]
+        return await self.aapply(embed_node, _empty_edge, cls=Graph)
 
     async def get_graph_embedding(self, embedder: Embedder):
         new_graph = await self.change_node_to_node_embeds(embedder)
@@ -203,7 +171,9 @@ class GraphProcedure(Graph[Step, str], ABC):
 
         for _ in range(num_cycles):
             for node in reversed(node_list):
-                embeds_stack = np.stack([in_edge.from_.data for in_edge in node.incoming])
+                embeds_stack = np.stack(
+                    [in_edge.from_.data for in_edge in node.incoming if in_edge.from_ is not None]
+                )
                 max_pooled_embed = np.max(embeds_stack, axis=0)
                 node.data = max_pooled_embed
 
