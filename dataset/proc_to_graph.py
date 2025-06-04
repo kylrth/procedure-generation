@@ -1,7 +1,8 @@
 import json
 import logging
 import random
-from typing import Awaitable, Callable, Type
+from collections.abc import Awaitable
+from typing import Callable
 
 from graph import Graph, Node
 from model import Model
@@ -306,10 +307,8 @@ async def create_simple_linear_graph(proc: LinearProcedure):
     return GProcedure(*node_list)
 
 
-async def with_retries[
-    T
-](
-    f: Callable[[int | None], Awaitable[T]], *, exc: tuple[Type[Exception], ...], retries: int = 5
+async def with_retries[T](
+    f: Callable[[int | None], Awaitable[T]], *, exc: tuple[type[Exception], ...], retries: int = 5
 ) -> T:
     seed = None
     for _ in range(retries):

@@ -12,7 +12,7 @@ _help_key = "exp.help"
 _choices_key = "exp.choices"
 
 
-def help(
+def chelp(
     help: str | None = None,
     *,
     choices=None,

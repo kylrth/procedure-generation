@@ -1,10 +1,9 @@
-from typing import ClassVar, cast
+from typing import TYPE_CHECKING, ClassVar, cast
 
 from langchain import hub
 from langchain.agents import AgentExecutor, BaseMultiActionAgent, create_react_agent
 from langchain.tools import BaseTool, tool
 from langchain_core.callbacks import CallbackManager
-from langchain_core.prompts.prompt import PromptTemplate
 from langchain_core.runnables import RunnableConfig
 
 import retrieval
@@ -14,6 +13,10 @@ from utils import log
 from utils.lc import FileHandleCallbackHandler
 
 from .interface import Response, System
+
+
+if TYPE_CHECKING:
+    from langchain_core.prompts.prompt import PromptTemplate
 
 
 class ReAct(System):
@@ -121,11 +124,11 @@ class ReAct(System):
         self.model = model
         self.hs = hs
 
-        prompt = cast(PromptTemplate, hub.pull("hwchase17/react"))
+        prompt = cast("PromptTemplate", hub.pull("hwchase17/react"))
         prompt.template = self._template.format(**self._dataset_details[dataset])
         self.agent = AgentExecutor(
             agent=cast(
-                BaseMultiActionAgent, create_react_agent(model.model, [self.search_tool], prompt)
+                "BaseMultiActionAgent", create_react_agent(model.model, [self.search_tool], prompt)
             ),
             tools=[self.search_tool],
             callbacks=CallbackManager(handlers=[]),  # handlers will be managed in `generate`
@@ -159,7 +162,7 @@ class ReAct(System):
                 "query."
             )
 
-            self._search_tool = cast(BaseTool, tool(search))
+            self._search_tool = cast("BaseTool", tool(search))
 
         return self._search_tool
 

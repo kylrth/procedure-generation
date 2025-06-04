@@ -1,6 +1,7 @@
 from abc import abstractmethod
+from collections.abc import Awaitable, Sequence
 from enum import Enum, auto
-from typing import Awaitable, Callable, Protocol, Self, Sequence, cast
+from typing import Callable, Protocol, Self, cast
 
 
 class _Comparable(Protocol):
@@ -323,9 +324,7 @@ class Graph[T, U: _Comparable]:
         self.back_dfs(count)
         return len(seen), edges[""]
 
-    def apply[
-        NT, NU: _Comparable
-    ](
+    def apply[NT, NU: _Comparable](
         self,
         nf: Callable[[Node[T, U]], NT],
         ef: Callable[[Edge[T, U]], NU],
@@ -338,7 +337,7 @@ class Graph[T, U: _Comparable]:
         If cls is provided, it is used to construct the new Graph object instead of the Graph
         constructor.
         """
-        out = cast(Graph[NT, NU], self.__class__() if cls is None else cls())
+        out = cast("Graph[NT, NU]", self.__class__() if cls is None else cls())
 
         # keep newly-created nodes so we can refer to them when we come across their old
         # counterparts again
@@ -356,7 +355,7 @@ class Graph[T, U: _Comparable]:
 
             if e.from_ is None:
                 # input
-                new_to_node = cast(Node[NT, NU], new_to_node)  # we already checked this above
+                new_to_node = cast("Node[NT, NU]", new_to_node)  # we already checked this above
                 out.inputs.extend(new_to_node.add_inputs(ef(e)))
                 return DFSAction.CONTINUE
 
@@ -377,9 +376,7 @@ class Graph[T, U: _Comparable]:
         self.back_dfs(apply_edge)
         return out
 
-    async def aapply[
-        NT, NU: _Comparable
-    ](
+    async def aapply[NT, NU: _Comparable](
         self,
         nf: Callable[[Node[T, U]], Awaitable[NT]],
         ef: Callable[[Edge[T, U]], Awaitable[NU]],
@@ -387,7 +384,7 @@ class Graph[T, U: _Comparable]:
         cls: type | None = None,
     ) -> "Graph[NT, NU]":
         """Async version of apply."""
-        out = cast(Graph[NT, NU], self.__class__() if cls is None else cls())
+        out = cast("Graph[NT, NU]", self.__class__() if cls is None else cls())
 
         # keep newly-created nodes so we can refer to them when we come across their old
         # counterparts again
@@ -405,7 +402,7 @@ class Graph[T, U: _Comparable]:
 
             if e.from_ is None:
                 # input
-                new_to_node = cast(Node[NT, NU], new_to_node)  # we already checked this above
+                new_to_node = cast("Node[NT, NU]", new_to_node)  # we already checked this above
                 out.inputs.extend(new_to_node.add_inputs(await ef(e)))
                 return DFSAction.CONTINUE
 
@@ -431,7 +428,7 @@ class Graph[T, U: _Comparable]:
 
         Node data and Edge contents are shallow-copied.
         """
-        return cast(Self, self.apply(lambda n: n.data, lambda e: e.content, cls=self.__class__))
+        return cast("Self", self.apply(lambda n: n.data, lambda e: e.content, cls=self.__class__))
 
     def topo_sort(self) -> list[Node[T, U]]:
         """Return a topological sort of the nodes, such that no node in the list depends on any
@@ -502,7 +499,7 @@ class Graph[T, U: _Comparable]:
             for new_in in dead_node.outgoing:
                 if new_in.to is None:
                     # discard this output
-                    self.outputs.remove(cast(Output, new_in))
+                    self.outputs.remove(cast("Output", new_in))
                     continue
                 if new_in.to in removed:
                     # we're removing this node too, so discard this internal edge
@@ -538,7 +535,7 @@ class Graph[T, U: _Comparable]:
             for new_out in dead_node.incoming:
                 if new_out.from_ is None:
                     # discard this input
-                    self.inputs.remove(cast(Input, new_out))
+                    self.inputs.remove(cast("Input", new_out))
                     continue
                 if new_out.from_ in removed:
                     # we're removing this node too, so discard this internal edge

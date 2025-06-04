@@ -1,6 +1,6 @@
 import asyncio
-from collections.abc import Iterable
-from typing import Awaitable, Callable, TypeVar
+from collections.abc import Awaitable, Iterable
+from typing import Callable, TypeVar
 
 from tqdm import tqdm
 

@@ -4,8 +4,8 @@ import csv
 import json
 import logging
 import sys
+from collections.abc import Awaitable
 from pathlib import Path
-from typing import Awaitable
 
 from dataset import LinearProcedure
 from evaluation.api_overlap import ApiOverlap

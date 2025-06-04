@@ -11,7 +11,7 @@ from enum import IntEnum, StrEnum, auto
 from pathlib import Path
 
 from run import DatasetOption
-from utils.experiment import Config, help
+from utils.experiment import Config, chelp
 
 
 class OldSystemOption(StrEnum):
@@ -45,13 +45,13 @@ class PairwiseResult(IntEnum):
 
 @dataclass
 class Comparison(Config):
-    ds: DatasetOption = help(choices=list(DatasetOption), help="dataset to show results for")
-    s1: OldSystemOption = help(choices=list(OldSystemOption), help="first system to compare")
-    s2: OldSystemOption = help(choices=list(OldSystemOption), help="second system to compare")
-    emb: str = help(default="hf-all-mpnet-base-v2", help="embedder used for both systems")
+    ds: DatasetOption = chelp(choices=list(DatasetOption), help="dataset to show results for")
+    s1: OldSystemOption = chelp(choices=list(OldSystemOption), help="first system to compare")
+    s2: OldSystemOption = chelp(choices=list(OldSystemOption), help="second system to compare")
+    emb: str = chelp(default="hf-all-mpnet-base-v2", help="embedder used for both systems")
 
-    dataset_root: Path = help(default=Path("dataset"), help="path to dataset dir")
-    logdir_root: Path = help(default=Path("output"), help="path to output dir")
+    dataset_root: Path = chelp(default=Path("dataset"), help="path to dataset dir")
+    logdir_root: Path = chelp(default=Path("output"), help="path to output dir")
 
     @staticmethod
     def get_eval_results(f: Path) -> dict[int, dict[str, float]]:

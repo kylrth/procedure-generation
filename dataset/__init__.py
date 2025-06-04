@@ -15,17 +15,17 @@ from .recipenlg import RecipeNLG
 
 
 __all__ = [
+    "CHAMP",
     "Dataset",
     "Doc",
+    "GraphProcedure",
     "LCStep",
     "LinearProcedure",
     "RecipeNLG",
-    "CHAMP",
     "Split",
-    "format_steps",
-    "train_val_test",
-    "GraphProcedure",
     "Step",
     "build_graph_from_linear_procedure",
     "build_graph_with_retries",
+    "format_steps",
+    "train_val_test",
 ]

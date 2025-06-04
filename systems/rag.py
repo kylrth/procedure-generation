@@ -61,16 +61,15 @@ class RAG(FewShot):
             return res
 
         # call critic
-        raise NotImplementedError
-        # completion = await self.check_with_validator_and_modify(
-        #     logger,
-        #     LinearProcedure(input_, query, self.parse_completion(completion)),
-        #     context,
-        #     max_updates=3,
-        # )
+        completion = await self.check_with_validator_and_modify(
+            logger,
+            LinearProcedure(input_, query, self.parse_completion(completion)),
+            context,
+            max_updates=3,
+        )
 
-        # res.input_tokens = -1
-        # res.output_tokens = -1
+        res.input_tokens = -1
+        res.output_tokens = -1
 
         return res
 

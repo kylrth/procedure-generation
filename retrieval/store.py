@@ -2,7 +2,7 @@ import itertools
 import logging
 from abc import ABC, abstractmethod
 from os import PathLike
-from typing import Any, Type, cast
+from typing import Any, Self
 
 import numpy as np
 import weaviate
@@ -22,17 +22,15 @@ class Store(ABC):
     embedder: CachingEmbedder
 
     @classmethod
-    async def new[
-        T
-    ](
-        cls: Type[T],
+    async def new(
+        cls: type[Self],
         store: weaviate.WeaviateAsyncClient,
         name: str,
         desc: str,
         embedder: str,
         cache_path: str | PathLike,
-    ) -> T:
-        self = cast(Store, cls())
+    ) -> Self:
+        self = cls()
 
         self.store = store
         self.collection = await self.store.collections.create(
@@ -43,7 +41,7 @@ class Store(ABC):
         )
         self.embedder = CachingEmbedder(embedder_from_name(embedder), cache_path)
 
-        return cast(T, self)
+        return self
 
     @property
     @abstractmethod
