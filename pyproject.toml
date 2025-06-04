@@ -60,6 +60,7 @@ ignore = [
     "PLW2901",
     "PT009",
     "RET504",
+    "RUF009",  # we use helper functions to set field info for dataclasses
     "S301",  # we trust our own pickle files
     "S311",  # we're not doing any cryptography
     "S603",

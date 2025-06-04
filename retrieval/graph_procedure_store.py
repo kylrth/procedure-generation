@@ -102,25 +102,30 @@ class GraphProcedureStore:
             # empty embeddings cache to disk because we likely won't need them during generation
             self.embedder.flush()
 
-        success_stats = {
-            "failed": 0,
-            "uploaded": 0,
-        }
+        exceptions = []
 
         # insert to Weaviate
         async def _task(g_v: tuple[GraphProcedure, np.ndarray]):
+            g, v = g_v
+
             try:
-                await self.add_graph(logger, g_v[0], g_v[1])
-                success_stats["uploaded"] += 1
-            except ValueError:
-                success_stats["failed"] += 1
+                await self.add_graph(logger, g, v)
+            except ValueError as e:
+                logger.exception(
+                    f"exception while uploading graph '{', '.join(o.content for o in g.outputs)}'"
+                )
+                exceptions.append(e)
 
         use_tqdm = logger.getEffectiveLevel() >= logging.DEBUG
         await spread_gather(
             _task, zip(procs, vectors), n=w, length=len(procs) if use_tqdm else None
         )
 
-        print(success_stats)
+        if len(exceptions) == 0:
+            return
+        if len(exceptions) == 1:
+            raise exceptions[0]
+        raise ValueError("multiple exceptions encountered while uploading")
 
     def _raise_errors(self, logger: logging.Logger, res: BatchObjectReturn | BatchReferenceReturn):
         if not res.has_errors:
@@ -141,11 +146,11 @@ class GraphProcedureStore:
         if prev_uuids is None:
             prev_uuids = [None] * len(edges)
 
+        unique_edges = set()
         for e in edges:
-            if e in seen:
-                raise ValueError("malformed graph: encountered the same edge twice")
-        if len(set(edges)) != len(edges):
-            raise ValueError("malformed graph: encountered the same edge twice")
+            if e in seen or e in unique_edges:
+                raise ValueError(f"malformed graph: encountered the same edge twice: {e.content}")
+            unique_edges.add(e)
 
         res = await self.edges.data.insert_many(
             [
@@ -321,7 +326,7 @@ class GraphProcedureStore:
             prev_uuids = prev_uuids_filtered
 
         for e in g.inputs:
-            if id(e) not in seen_edges:
+            if e not in seen_edges:
                 logger.error("did not see input edge '%s'", e.content)
                 raise ValueError("malformed graph: input edge not reached by backward traversal")
 

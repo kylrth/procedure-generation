@@ -240,8 +240,8 @@ def make_graph_object(nodes, edges, proc_title):
             num_out += 1
             node_dict[name].add_outputs(proc_title)
 
-    if num_out > 1:
-        raise ValueError(f"{proc_title}: More than one outputs detected")
+    if num_out != 1:
+        raise ValueError(f"{proc_title}: {num_out} outputs detected; should be 1")
     return GProcedure(*(node_dict.values()))
 
 
@@ -296,6 +296,9 @@ async def create_simple_linear_graph(proc: LinearProcedure):
     for i, step in enumerate(proc.steps):
         step_obj = Step(f"Step {i}", step)
         node_obj = Node(step_obj)
+        if i > 0:
+            # edge
+            node_list[-1].new_edge_to(node_obj, "")
         node_list.append(node_obj)
     inp_list = [inp.strip() for inp in proc.input_.split(",")]
     node_list[0].add_inputs(*inp_list)

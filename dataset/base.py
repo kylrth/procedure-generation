@@ -213,6 +213,7 @@ class Split(Flag):
     TRAIN = auto()
     VAL = auto()
     TEST = auto()
+    ALL = TRAIN | VAL | TEST
 
     def get[T](self, data: list[T], val: float = 0.1, test: float = 0.2) -> list[T]:
         """Get the specified split of the given data."""
