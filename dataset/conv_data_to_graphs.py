@@ -25,8 +25,17 @@ async def convert_dataset_to_graphs(
     root.mkdir(parents=True, exist_ok=True)
 
     async def _task(i: int, p: LinearProcedure):
+        fname = root / f"{i}.pkl"
+        if fname.exists():
+            # check validity of existing graph
+            with fname.open("rb") as f:
+                g = pickle.load(f)
+                if len(g.outputs) == 1:
+                    return
+                logger.info(f"rerunning {i}: had {len(g.outputs)} outputs")
+
         g = await build_graph_with_retries(logger, p, model, dataset)
-        with (root / f"{i}.pkl").open("wb") as f:
+        with fname.open("wb") as f:
             pickle.dump(g, f)
 
     await spread_gather(

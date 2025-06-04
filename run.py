@@ -141,7 +141,6 @@ class SystemOption(StrEnum):
                 return True
 
 
-# ruff: noqa: RUF009  # here we use a helper function to set field info
 @dataclass
 class Experiment(Config):
     ds: DatasetOption = help(choices=list(DatasetOption), help="dataset to run the system on")

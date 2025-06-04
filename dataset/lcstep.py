@@ -2,12 +2,13 @@
 
 import bisect
 import pickle
+import random
 import re
 from os import PathLike
 from pathlib import Path
 from typing import cast
 
-from .base import Dataset, Doc, GraphProcedure, LinearProcedure
+from .base import Dataset, Doc, GraphProcedure, LinearProcedure, Split
 
 
 def load_api_ref(data_dir: str | PathLike = "./dataset/") -> list[Doc]:
@@ -157,15 +158,16 @@ class LCStep(Dataset):
 
     def _init_graphs(self) -> list[GraphProcedure]:
         d = self.dir / "graphs" / "lcstep"
-        file_list = d.glob("*.pkl")
         graph_list = []
-        for file in file_list:
-            with file.open("rb") as f:
-                graph = pickle.load(f)
-            graph_list.append(graph)
+        for i in range(len(self.procedures(Split.ALL))):
+            try:
+                with (d / f"{i}.pkl").open("rb") as f:
+                    graph = pickle.load(f)
+                graph_list.append(graph)
+            except FileNotFoundError:
+                continue
 
-        # this graph is malformed; skip
-        del graph_list[32]
+        random.Random(27).shuffle(graph_list)
 
         return graph_list
 
