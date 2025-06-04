@@ -3,7 +3,7 @@ import unittest
 
 import pytest
 
-from retrieval import embedder
+import embedder
 
 
 class TestBatch(unittest.TestCase):

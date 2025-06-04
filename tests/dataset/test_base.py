@@ -58,15 +58,16 @@ class TestGraphProcedure(unittest.TestCase):
 
         want = """goal: muffins
 inputs: muffin tin, paper muffin liners, spray grease, 2 cups all-purpose flour, 1 tbsp baking powder, 0.5 tsp salt, 0.75 cup sugar, 1 cup milk, 2 large eggs, 0.5 cup melted butter, 1 tsp vanilla extract
-- preheat
-- line tin
-- mix dry
-- mix wet
-- combine
-- fill tin
-- bake
-- let cool
-- remove muffins"""  # noqa: E501
+steps:
+- () -> warm oven: preheat
+- (muffin tin, paper muffin liners, spray grease) -> lined muffin tin: line tin
+- (2 cups all-purpose flour, 1 tbsp baking powder, 0.5 tsp salt, 0.75 cup sugar) -> bowl of mixed dry ingredients: mix dry
+- (1 cup milk, 2 large eggs, 0.5 cup melted butter, 1 tsp vanilla extract) -> bowl of mixed wet ingredients: mix wet
+- (bowl of mixed dry ingredients, bowl of mixed wet ingredients) -> bowl of mixed ingredients: combine
+- (lined muffin tin, bowl of mixed ingredients) -> filled muffin tin: fill tin
+- (warm oven, filled muffin tin) -> baked muffins in tin: bake
+- (baked muffins in tin) -> cooled muffins in tin: let cool
+- (cooled muffins in tin) -> muffins: remove muffins"""  # noqa: E501
 
         self.assertEqual(want, got)
 
