@@ -3,12 +3,12 @@ import unittest
 
 import numpy as np
 
-from retrieval.embedder import Embedder
-from retrieval.graph_procedure_store import GraphProcedureStore, Node, Recipe, Step
+from embedder import Embedder
+from retrieval.graph_procedure_store import GraphProcedure, GraphProcedureStore, Node, Step
 from utils.weaviate import NiceWeaviate
 
 
-def _example_recipe() -> Recipe:
+def _example_recipe() -> GraphProcedure:
     step1 = Node(Step("preheat", "preheat the oven to 375°F", ["375°F"]))
 
     step2 = Node(Step("line tin", "line a muffin tin with paper liners or grease it"))
@@ -43,7 +43,7 @@ def _example_recipe() -> Recipe:
     step8.new_edge_to(step9, "cooled muffins in tin")
     step9.add_outputs("muffins")
 
-    return Recipe(step1, step2, step3, step4, step5, step6, step7, step8, step9)
+    return GraphProcedure(step1, step2, step3, step4, step5, step6, step7, step8, step9)
 
 
 example_recipe = _example_recipe()
@@ -70,7 +70,7 @@ class TestGraphProcedureStore(unittest.IsolatedAsyncioTestCase):
         await self.client.__aexit__(None, None, None)
 
     async def _new_test_store(self):
-        store = GraphProcedureStore(self.client, TestEmbedder(), Recipe)
+        store = GraphProcedureStore(self.client, TestEmbedder())
         await store.setup_collection(prefix=unittest.TestCase.id(self).split(".")[-1])
         return store
 
