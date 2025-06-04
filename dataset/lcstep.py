@@ -154,7 +154,7 @@ def load_formatted_docs(
 
 class LCStep(Dataset):
     def _init_procedures(self) -> list[LinearProcedure]:
-        return [cast(LinearProcedure, d["procedure"]) for d in load_formatted_docs(self.dir)]
+        return [cast("LinearProcedure", d["procedure"]) for d in load_formatted_docs(self.dir)]
 
     def _init_graphs(self) -> list[GraphProcedure]:
         d = self.dir / "graphs" / "lcstep"

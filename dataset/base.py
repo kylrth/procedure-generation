@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Flag, auto
 from os import PathLike
 from pathlib import Path
-from typing import Any, Literal, Sequence
+from typing import Any, Literal
 
 import numpy as np
 
@@ -178,17 +179,16 @@ class GraphProcedure(Graph[Step, str], ABC):
 
                 if len(stack_list) == 1:
                     continue
-                else:
-                    max_pooled_embed = np.max(np.stack(stack_list), axis=0)
-                    node.data = max_pooled_embed
+                max_pooled_embed = np.max(np.stack(stack_list), axis=0)
+                node.data = max_pooled_embed
 
         embed_to_return = node_list[-1].data
         return embed_to_return / np.linalg.norm(embed_to_return)
 
 
-def train_val_test[
-    T
-](data: Sequence[T], val: float, test: float) -> tuple[Sequence[T], Sequence[T], Sequence[T]]:
+def train_val_test[T](
+    data: Sequence[T], val: float, test: float
+) -> tuple[Sequence[T], Sequence[T], Sequence[T]]:
     """Take test% of samples as test data from the end, then val% for val data, then everything
     before as train data.
 

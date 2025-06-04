@@ -6,8 +6,9 @@ import pickle
 import random
 import re
 import sys
+from collections.abc import Iterable, Sequence
 from os import PathLike
-from typing import Any, Iterable, Sequence, cast
+from typing import Any, cast
 
 from .base import Dataset, Doc, GraphProcedure, LinearProcedure, Split
 
@@ -115,7 +116,7 @@ class RecipeNLG(Dataset):
         for s in split:
             match s:
                 case Split.TRAIN:
-                    out.extend(cast(Sequence[GraphProcedure], self.g_train))
+                    out.extend(cast("Sequence[GraphProcedure]", self.g_train))
                 case Split.VAL:
                     out.extend(self.g_val)
                 case Split.TEST:

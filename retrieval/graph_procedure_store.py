@@ -1,6 +1,7 @@
 import asyncio
 import logging
-from typing import Sequence, cast
+from collections.abc import Sequence
+from typing import cast
 
 import numpy as np
 import weaviate
@@ -171,7 +172,7 @@ class GraphProcedureStore:
                 continue
             refs.append(
                 wvc.data.DataReference(
-                    from_uuid=cast(UUID, prev_uuids[i]),
+                    from_uuid=cast("UUID", prev_uuids[i]),
                     from_property="incoming",
                     to_uuid=edge_uuids[i],
                 )
@@ -244,7 +245,7 @@ class GraphProcedureStore:
                 continue
             refs.append(
                 wvc.data.DataReference(
-                    from_uuid=cast(UUID, prev_uuids[i]),
+                    from_uuid=cast("UUID", prev_uuids[i]),
                     from_property="fromNode",
                     to_uuid=node_uuids[i],
                 )
@@ -358,12 +359,12 @@ class GraphProcedureStore:
             node_data = output.references["fromNode"].objects[0]
             node = Node(
                 Step(
-                    cast(str, node_data.properties["api"]),
-                    cast(str, node_data.properties["description"]),
-                    cast(list[str], node_data.properties["args"]),
+                    cast("str", node_data.properties["api"]),
+                    cast("str", node_data.properties["description"]),
+                    cast("list[str]", node_data.properties["args"]),
                 )
             )
-            content = cast(str, output.properties["content"])
+            content = cast("str", output.properties["content"])
             out.outputs.extend(node.add_outputs(content))
 
             new_nodes.append(node_data.uuid)
@@ -385,7 +386,7 @@ class GraphProcedureStore:
             # collect visible nodes and add Edge objects to out, watching for Input edges
             new_nodes = []
             for edge in res.objects:
-                edge_content = cast(str, edge.properties["content"])
+                edge_content = cast("str", edge.properties["content"])
                 to_node = seen[edge.references["toNode"].objects[0].uuid]
 
                 if "fromNode" not in edge.references:  # Input
@@ -394,9 +395,9 @@ class GraphProcedureStore:
                     node_data = edge.references["fromNode"].objects[0]
                     node = Node(
                         Step(
-                            cast(str, node_data.properties["api"]),
-                            cast(str, node_data.properties["description"]),
-                            cast(list[str], node_data.properties["args"]),
+                            cast("str", node_data.properties["api"]),
+                            cast("str", node_data.properties["description"]),
+                            cast("list[str]", node_data.properties["args"]),
                         )
                     )
                     node.new_edge_to(to_node, edge_content)

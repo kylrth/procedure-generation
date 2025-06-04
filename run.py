@@ -12,10 +12,10 @@ import random
 import sys
 import time
 import traceback
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum, auto
 from pathlib import Path
-from typing import Sequence
 
 from weaviate import WeaviateAsyncClient
 
@@ -26,7 +26,7 @@ from dataset import GraphProcedure
 from model import Model
 from systems import AAG, RAG, FewShot, ReAct, System
 from utils import log, spread_gather
-from utils.experiment import Config, help
+from utils.experiment import Config, chelp
 from utils.weaviate import NiceWeaviate
 
 
@@ -143,28 +143,28 @@ class SystemOption(StrEnum):
 
 @dataclass
 class Experiment(Config):
-    ds: DatasetOption = help(choices=list(DatasetOption), help="dataset to run the system on")
-    system: SystemOption = help(choices=list(SystemOption), help="system to perform generation")
-    model: str = help(
+    ds: DatasetOption = chelp(choices=list(DatasetOption), help="dataset to run the system on")
+    system: SystemOption = chelp(choices=list(SystemOption), help="system to perform generation")
+    model: str = chelp(
         default="openai-gpt-3.5-turbo-0125", help="full name of service/model for completions"
     )
-    embedder: str = help(
+    embedder: str = chelp(
         default="hf-all-mpnet-base-v2", help="full name of service/model for embeddings"
     )
-    n: int = help(default=sys.maxsize, help="limit the number of samples to test")
-    workers: int = help(default=10, help="number of concurrent queries to process")
+    n: int = chelp(default=sys.maxsize, help="limit the number of samples to test")
+    workers: int = chelp(default=10, help="number of concurrent queries to process")
 
     # method-specific options
-    k: int = help(
+    k: int = chelp(
         default=3, help="max # examples for FewShot, or max to retrieve for retrieval-based methods"
     )
-    n_queries: int = help(default=4, help="number of rewritten queries for AAG")
-    critic: bool = help(default=None, help="whether to use the critic")
-    hierarchical_search: bool = help(default=None, help="whether to use hierarchical search")
+    n_queries: int = chelp(default=4, help="number of rewritten queries for AAG")
+    critic: bool = chelp(default=None, help="whether to use the critic")
+    hierarchical_search: bool = chelp(default=None, help="whether to use hierarchical search")
 
-    dataset_root: Path = help(default=Path("dataset"), help="path to dataset dir")
-    emb_cache_root: Path = help(default=Path("cache"), help="path to cache dir")
-    logdir_root: Path = help(default=Path("output"), help="path to output dir")
+    dataset_root: Path = chelp(default=Path("dataset"), help="path to dataset dir")
+    emb_cache_root: Path = chelp(default=Path("cache"), help="path to cache dir")
+    logdir_root: Path = chelp(default=Path("output"), help="path to output dir")
 
     def __post_init__(self):
         if not self.system.uses_retrieval:

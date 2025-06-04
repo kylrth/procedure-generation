@@ -1,9 +1,10 @@
 import os
 import pickle
 from abc import ABC, abstractmethod
+from collections.abc import Generator, Iterable
 from os import PathLike
 from pathlib import Path
-from typing import Callable, ClassVar, Generator, Iterable, Type, cast
+from typing import Callable, ClassVar, cast
 
 import mmh3
 import numpy as np
@@ -147,7 +148,7 @@ class HFEmbedder(NamedEmbedder):
 
     async def embed(self, text: list[str], *, is_query: bool = False) -> list[np.ndarray]:
         return cast(
-            list[np.ndarray],
+            "list[np.ndarray]",
             self.model.encode(
                 text,
                 prompt_name=self._is_query if is_query else self._is_doc,
@@ -159,7 +160,7 @@ class HFEmbedder(NamedEmbedder):
         )
 
 
-embedder_dict: dict[str, Type[NamedEmbedder]] = {
+embedder_dict: dict[str, type[NamedEmbedder]] = {
     "hf": HFEmbedder,
     "openai": OpenAIEmbedder,
 }

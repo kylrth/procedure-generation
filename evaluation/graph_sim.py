@@ -1,15 +1,22 @@
+# ruff: noqa: T201
+# This script needs to print.
+
 import argparse
 import asyncio
 import csv
 import pickle
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
-from dataset import GraphProcedure
 from embedder import CachingEmbedder, Embedder, embedder_from_name
 from utils import spread_gather
+
+
+if TYPE_CHECKING:
+    from dataset import GraphProcedure
 
 
 dataset_lcstep = "lcstep"
@@ -18,10 +25,8 @@ dataset_champ = "champ"
 
 
 async def calc_similarity(id_: int, file_path, embedder: Embedder):
-    gen_graph: GraphProcedure = None
-    gt_graph: GraphProcedure = None
     with file_path.open("rb") as f:
-        gt_graph, gen_graph = pickle.load(f)
+        gt_graph, gen_graph = cast("tuple[GraphProcedure, ...]", pickle.load(f))
 
     gen_embed = await gen_graph.get_graph_embedding(embedder)
     gt_embed = await gt_graph.get_graph_embedding(embedder)
@@ -34,7 +39,7 @@ def evaluate_and_store(args):
     system_name = args.system.lower()
     out_name = (
         system_name
-        # + ("_hs" if system_name in ("aag", "rag", "react") and args.hs else "_s")
+        + ("_hs" if system_name in ("aag", "rag", "react") and args.hs else "_s")
         + ("_no-critic" if system_name in ("rag", "aag") and not args.critic else "")
         + (f"_{args.n_queries}" if system_name == "aag" and args.n_queries != 4 else "")
     )
@@ -42,7 +47,6 @@ def evaluate_and_store(args):
     cache_path = Path("cache") / system_name / args.dataset / args.embedder
     embedder = CachingEmbedder(embedder_from_name(args.embedder), cache_path)
     file_list = list(outdir.glob("*.pkl"))
-    breakpoint()
     sim_results = asyncio.run(
         spread_gather(
             lambda item: calc_similarity(*item, embedder),

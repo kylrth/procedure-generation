@@ -5,9 +5,10 @@ import logging
 import os
 import pickle
 import textwrap
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, ClassVar, Iterable, cast
+from typing import Any, ClassVar, cast
 
 from langchain_core.messages import BaseMessage
 
@@ -140,7 +141,7 @@ def messages_to_string(messages: str | list[BaseMessage]) -> str:
         return messages
 
     def _format(msg: BaseMessage) -> str:
-        content = cast(str, msg.content)
+        content = cast("str", msg.content)
         if "\n" not in content:
             return msg.__class__.__name__ + "(" + content + ")"
         return msg.__class__.__name__ + "(\n  " + content.replace("\n", "\n  ") + "\n)"

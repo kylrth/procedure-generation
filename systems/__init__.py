@@ -8,7 +8,7 @@ from .rag import RAG
 from .react import ReAct
 
 
-__all__ = [
+__all__ = [  # noqa:RUF022  # presented in logical order
     "Response",
     "System",
     # systems

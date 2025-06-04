@@ -5,8 +5,8 @@ import logging
 import random
 import re
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 import tqdm
 from langchain.schema import HumanMessage, SystemMessage

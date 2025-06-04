@@ -140,7 +140,7 @@ class TestGraph(unittest.TestCase):
             [i.content for i in cut.inputs],
         )
         self.assertEqual(
-            {"fill tin", "combine"}, {cast(Node[str, str], i.to).data for i in cut.inputs}
+            {"fill tin", "combine"}, {cast("Node[str, str]", i.to).data for i in cut.inputs}
         )
 
         cut.cut_input_layer()  # remove steps 5 and 6
@@ -149,7 +149,7 @@ class TestGraph(unittest.TestCase):
             ["filled muffin tin"],
             [i.content for i in cut.inputs],
         )
-        self.assertEqual({"bake"}, {cast(Node[str, str], i.to).data for i in cut.inputs})
+        self.assertEqual({"bake"}, {cast("Node[str, str]", i.to).data for i in cut.inputs})
 
         cut.cut_input_layer()  # remove step 7 (indirectly removing 1)
 
@@ -157,7 +157,7 @@ class TestGraph(unittest.TestCase):
             ["baked muffins in tin"],
             [i.content for i in cut.inputs],
         )
-        self.assertEqual({"let cool"}, {cast(Node[str, str], i.to).data for i in cut.inputs})
+        self.assertEqual({"let cool"}, {cast("Node[str, str]", i.to).data for i in cut.inputs})
 
         cut.cut_input_layer()  # remove step 8
         cut.cut_input_layer()  # remove step 9
@@ -168,14 +168,14 @@ class TestGraph(unittest.TestCase):
     def test_cut_output_layer(self):
         cut = example_graph.copy().cut_output_layer()  # remove step 9
         self.assertEqual(["cooled muffins in tin"], [o.content for o in cut.outputs])
-        self.assertEqual({"let cool"}, {cast(Node[str, str], o.from_).data for o in cut.outputs})
+        self.assertEqual({"let cool"}, {cast("Node[str, str]", o.from_).data for o in cut.outputs})
 
         cut.cut_output_layer()  # remove step 8
         cut.cut_output_layer()  # remove step 7
 
         self.assertEqual(["warm oven", "filled muffin tin"], [o.content for o in cut.outputs])
         self.assertEqual(
-            {"preheat", "fill tin"}, {cast(Node[str, str], o.from_).data for o in cut.outputs}
+            {"preheat", "fill tin"}, {cast("Node[str, str]", o.from_).data for o in cut.outputs}
         )
 
         cut.cut_output_layer()  # remove steps 1 and 6
